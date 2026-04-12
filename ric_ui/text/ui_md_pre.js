@@ -90,14 +90,15 @@ const _parse_blocks = (src) => {
 
       const raw = code_lines.join('\n');
       // hljs でハイライトを試みる（ui_code_pre と同じロジック）
+      // lang 指定ありのときのみ hljs を呼ぶ。指定なしはプレーンテキスト。
+      // highlightAuto はリアルタイム入力で重くなるため使わない。
       let code_node;
-      if (typeof window !== 'undefined' && typeof window.hljs !== 'undefined' && lang) {
+      if (lang && typeof window !== 'undefined' && typeof window.hljs !== 'undefined') {
         try {
-          const result = lang === 'auto'
-            ? window.hljs.highlightAuto(raw)
-            : window.hljs.highlight(raw, { language: lang });
+          const result = window.hljs.highlight(raw, { language: lang });
           code_node = { tag: 'code', class: 'hljs', innerHTML: result.value };
         } catch (_) {
+          // 未知の言語名などで失敗したらプレーンテキストにフォールバック
           code_node = { tag: 'code', ctx: [raw] };
         }
       } else {
