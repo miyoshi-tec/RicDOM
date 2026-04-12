@@ -42,6 +42,7 @@ try {
     { no: '09', file: '09_json_editor.html',      title: 'JSON エディタ' },
     { no: '10', file: '10_theme_studio.html',     title: 'Theme Studio' },
     { no: '11', file: '11_theme_override.html',   title: 'テーマ上書き' },
+    { no: '12', file: '12_md_viewer.html',        title: 'Markdown ビューア' },
   ];
 
   // ── 現在のページ検出 ──
