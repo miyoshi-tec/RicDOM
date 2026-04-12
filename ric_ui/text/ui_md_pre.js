@@ -120,12 +120,15 @@ const _parse_blocks = (src) => {
       continue;
     }
 
-    // ── 見出し # ## ### ──
-    const heading_match = line.match(/^(#{1,3})\s+(.+)/);
+    // ── 見出し # 〜 ###### ──
+    const heading_match = line.match(/^(#{1,6})\s+(.+)/);
     if (heading_match) {
       const level = heading_match[1].length;
+      // h4〜h6 は h3 と同じスタイルで表示
+      const tag = level <= 3 ? 'h' + level : 'h' + level;
+      const cls = level <= 3 ? 'ric-md-pre__h' + level : 'ric-md-pre__h3';
       blocks.push({
-        tag: 'h' + level, class: 'ric-md-pre__h' + level,
+        tag, class: cls,
         ctx: _parse_inline(heading_match[2]),
       });
       i++;

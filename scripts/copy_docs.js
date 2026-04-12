@@ -17,4 +17,9 @@ for (const f of ['RicDOM.min.js', 'RicUI.min.js']) {
   fs.copyFileSync(path.join(root, f), path.join(root, 'docs', f));
 }
 
+// Markdown ドキュメントをコピー（spec.html / tutorial.html が fetch する）
+for (const f of ['SPEC.md', 'TUTORIAL.md']) {
+  fs.copyFileSync(path.join(root, f), path.join(root, 'docs', f));
+}
+
 console.log('[copy_docs] docs/ updated.');

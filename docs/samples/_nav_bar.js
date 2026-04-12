@@ -196,27 +196,34 @@ try {
             { tag: 'span', style: 'color:var(--ric-color-border)', ctx: ['|'] },
 
             // ── 中央: prev / サンプル一覧（create_ui_popup） / next ──
-            prev
-              ? ui_button({ variant: 'ghost', ctx: [`← ${prev.no}`], onclick: () => { location.href = prev.file; } })
-              : ui_button({ variant: 'ghost', ctx: ['←'], disabled: true }),
+            // data-sample がないページ（ドキュメント等）ではサンプルナビを省略し
+            // タイトルのみ表示する。
+            ...(current_no ? [
+              prev
+                ? ui_button({ variant: 'ghost', ctx: [`← ${prev.no}`], onclick: () => { location.href = prev.file; } })
+                : ui_button({ variant: 'ghost', ctx: ['←'], disabled: true }),
 
-            (() => {
-              const samples_popup = s._samples_popup ??= create_ui_popup();
-              return samples_popup({ label: `${current?.no ?? '?'} – ${current?.title ?? '?'}`, ctx:
-                SAMPLES.map(sample => {
-                  const is_cur = sample.no === current_no;
-                  return ui_button({
-                    ctx: [`${sample.no} – ${sample.title}`],
-                    variant: is_cur ? 'primary' : 'ghost',
-                    onclick: () => { location.href = sample.file; },
-                  });
-                }),
-              });
-            })(),
+              (() => {
+                const samples_popup = s._samples_popup ??= create_ui_popup();
+                return samples_popup({ label: `${current?.no ?? '?'} – ${current?.title ?? '?'}`, ctx:
+                  SAMPLES.map(sample => {
+                    const is_cur = sample.no === current_no;
+                    return ui_button({
+                      ctx: [`${sample.no} – ${sample.title}`],
+                      variant: is_cur ? 'primary' : 'ghost',
+                      onclick: () => { location.href = sample.file; },
+                    });
+                  }),
+                });
+              })(),
 
-            next
-              ? ui_button({ variant: 'ghost', ctx: [`${next.no} →`], onclick: () => { location.href = next.file; } })
-              : ui_button({ variant: 'ghost', ctx: ['→'], disabled: true }),
+              next
+                ? ui_button({ variant: 'ghost', ctx: [`${next.no} →`], onclick: () => { location.href = next.file; } })
+                : ui_button({ variant: 'ghost', ctx: ['→'], disabled: true }),
+            ] : [
+              // ドキュメントページ: data-doc 属性からタイトルを表示
+              { tag: 'span', style: 'font-weight:600', ctx: [nav_el.dataset.doc ?? ''] },
+            ]),
 
             // ── スペーサー ──
             { tag: 'span', style: 'flex:1;min-width:8px' },
