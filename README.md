@@ -5,7 +5,7 @@ Electron・社内ツール・IoT デバイス UI 向け。JSON で書く 8KB の
 | レイヤー | サイズ | 役割 |
 |---------|------:|------|
 | **RicDOM** | 8KB | コア — JSON → DOM 差分更新 + Proxy リアクティビティ |
-| **RicUI** | 49KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
+| **RicUI** | 52KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
 
 Virtual DOM を持たず、JSON オブジェクトの差分から実 DOM を直接パッチします。
 Electron やブラウザで、リアルタイムなダッシュボード・パラメータ調整 UI・データ可視化ツールを素早く構築できます。
@@ -48,7 +48,7 @@ npm パッケージとしては公開していません。
 | バンドル | サイズ | 内容 |
 |---------|------:|------|
 | `RicDOM.min.js` | 8KB | コア（必須） |
-| `RicUI.min.js` | 49KB | UI コンポーネント集 + パラメータ調整パネル |
+| `RicUI.min.js` | 52KB | UI コンポーネント集 + パラメータ調整パネル |
 
 ### Hello World（RicDOM のみ）
 
@@ -297,6 +297,7 @@ create_ui_page ─ テーマの入口。CSS 変数を注入する
 |------|------|
 | `ui_text({ ctx, variant })` | テキスト |
 | `ui_code_pre({ ctx, obj, lang })` | コードブロック |
+| `ui_md_pre({ ctx })` | Markdown → VDOM 変換 |
 
 `ui_text` の variant：
 

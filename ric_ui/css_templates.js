@@ -910,6 +910,74 @@ ${_P}.ric-tooltip { display: inline-flex; }
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }`,
 
+  'ric-md-pre': () => `
+.ric-md-pre {
+  line-height: 1.7;
+  color: ${_fg};
+  font-size: ${_fs};
+}
+.ric-md-pre__h1 {
+  font-size: 1.6em; font-weight: 700;
+  margin: 0.8em 0 0.4em; padding-bottom: 0.2em;
+  border-bottom: ${_b1};
+}
+.ric-md-pre__h2 {
+  font-size: 1.3em; font-weight: 700;
+  margin: 0.7em 0 0.3em; padding-bottom: 0.15em;
+  border-bottom: ${_b1};
+}
+.ric-md-pre__h3 {
+  font-size: 1.1em; font-weight: 700;
+  margin: 0.6em 0 0.2em;
+}
+.ric-md-pre__p {
+  margin: 0.5em 0;
+}
+.ric-md-pre__list {
+  margin: 0.5em 0; padding-left: 1.5em;
+}
+.ric-md-pre__list li {
+  margin: 0.2em 0;
+}
+.ric-md-pre__quote {
+  margin: 0.5em 0; padding: 0.3em 0.8em;
+  border-left: 3px solid ${_ac};
+  color: ${_fm};
+}
+.ric-md-pre__fence {
+  margin: 0.5em 0; padding: ${_gm};
+  background: ${_tb}; color: ${_tf};
+  border: 1px solid color-mix(in srgb, ${_fg} 6%, transparent);
+  border-radius: ${_r};
+  overflow-x: auto;
+  font-family: Consolas, "Cascadia Code", "Source Code Pro", Monaco, monospace;
+  font-size: 0.85em; line-height: 1.6;
+  white-space: pre;
+}
+.ric-md-pre__fence > code {
+  display: block;
+}
+.ric-md-pre__fence > code.hljs {
+  background: transparent; padding: 0; overflow: visible;
+}
+.ric-md-pre__code {
+  padding: 0.15em 0.4em;
+  background: color-mix(in srgb, ${_fg} 8%, transparent);
+  border-radius: 3px;
+  font-family: Consolas, "Cascadia Code", "Source Code Pro", Monaco, monospace;
+  font-size: 0.9em;
+}
+.ric-md-pre__link {
+  color: ${_ac}; text-decoration: none;
+}
+.ric-md-pre__link:hover {
+  text-decoration: underline;
+}
+.ric-md-pre__hr {
+  border: none; border-top: ${_b1};
+  margin: 1em 0;
+}`,
+
   'ric-code-pre': () => `
 .ric-code-pre {
   margin: 0;

@@ -13,7 +13,7 @@
 //               ui_color / bind_color
 //               ui_select / bind_select
 //               ui_separator
-//   text      : ui_text / ui_code_pre
+//   text      : ui_text / ui_code_pre / ui_md_pre
 //   popup     : create_ui_popup / create_ui_tooltip / create_ui_dialog / create_ui_toast
 //   composite : create_ui_accordion / create_ui_splitter / ui_tabs / bind_tabs
 //               create_ui_tweak_panel / ui_tweak_panel / ui_tweak_folder / ui_tweak_row
@@ -46,6 +46,7 @@ const { ui_separator     } = require('./control/ui_separator');
 
 const { ui_text     } = require('./text/ui_text');
 const { ui_code_pre } = require('./text/ui_code_pre');
+const { ui_md_pre   } = require('./text/ui_md_pre');
 
 const { create_ui_popup    } = require('./popup/create_ui_popup');
 const { create_ui_tooltip  } = require('./popup/create_ui_tooltip');
@@ -92,6 +93,7 @@ module.exports = {
   // text
   ui_text,
   ui_code_pre,
+  ui_md_pre,
   // popup
   create_ui_popup,
   create_ui_tooltip,

@@ -32,7 +32,7 @@ ric_ui/
   layout/                # ui_page, ui_col, ui_row
   surface/               # ui_panel, create_ui_panel
   control/               # ui_button, ui_input, bind_input, ui_range, bind_range, ui_color, bind_color, ui_separator, etc.
-  text/                  # ui_text, ui_code_pre
+  text/                  # ui_text, ui_code_pre, ui_md_pre
   popup/                 # create_ui_popup, create_ui_tooltip, create_ui_dialog, create_ui_toast
   composite/             # create_ui_accordion, create_ui_splitter, ui_tabs, bind_tabs, create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row
 ```
@@ -302,7 +302,19 @@ ui_text({ variant: 'label', ctx: ['ラベル'] })     // <label> font-sm, semi-b
 
 ui_code_pre({ obj: data })                         // JSON.stringify + hljs ハイライト
 ui_code_pre({ ctx: [code], lang: 'javascript' })   // コード表示
+
+ui_md_pre({ ctx: ['# 見出し\n\nテキスト'] })       // Markdown → VDOM 変換
 ```
+
+#### ui_md_pre
+
+Markdown テキストを VDOM ノードに変換する簡易パーサー。外部ライブラリ不要。
+
+| Props | 型 | 説明 |
+|-------|------|------|
+| `ctx` | `string[]` | Markdown テキスト（複数渡すと連結） |
+
+対応構文：`# ## ###` 見出し、`**太字**`、`*斜体*`、`` `code` ``、` ``` ` コードブロック（hljs 対応）、`- リスト`、`> 引用`、`[text](url)` リンク、`---` 水平線
 
 ### Popup
 
