@@ -29,4 +29,27 @@ describe('blocks', () => {
   test('fence', () => assert.equal(c('```\nx\n```')[0].tag, 'pre'));
   test('hr', () => assert.equal(c('---')[0].tag, 'hr'));
   test('para', () => assert.equal(c('text')[0].tag, 'p'));
+  test('h4', () => { const n = c('#### T')[0]; assert.equal(n.tag, 'h4'); assert.equal(n.class, 'ric-md-pre__h3'); });
+});
+
+describe('table', () => {
+  const tbl = () => c('| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |')[0];
+  test('tag', () => assert.equal(tbl().tag, 'table'));
+  test('class', () => assert.equal(tbl().class, 'ric-md-pre__table'));
+  test('thead', () => assert.equal(tbl().ctx[0].tag, 'thead'));
+  test('th', () => assert.equal(tbl().ctx[0].ctx[0].ctx[0].ctx[0], 'A'));
+  test('tbody rows', () => assert.equal(tbl().ctx[1].ctx.length, 2));
+  test('td', () => assert.equal(tbl().ctx[1].ctx[0].ctx[0].ctx[0], '1'));
+  test('align center', () => {
+    const t = c('| L | C |\n|---|:---:|\n| a | b |')[0];
+    assert.equal(t.ctx[0].ctx[0].ctx[1].style, 'text-align:center');
+  });
+  test('align right', () => {
+    const t = c('| L | R |\n|---|---:|\n| a | b |')[0];
+    assert.equal(t.ctx[0].ctx[0].ctx[1].style, 'text-align:right');
+  });
+  test('inline in cell', () => {
+    const t = c('| H |\n|---|\n| **b** |')[0];
+    assert.equal(t.ctx[1].ctx[0].ctx[0].ctx[0].tag, 'strong');
+  });
 });
