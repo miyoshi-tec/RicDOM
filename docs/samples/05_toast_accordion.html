@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accordion — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+
+  <!-- ナビ -->
+  <div id="nav_bar" data-sample="05"></div>
+
+  <!-- イントロ -->
+  <p class="page-intro">
+    アコーディオン開閉を <strong>RicDOM のみ</strong> と <strong>RicUI</strong> で実装し、コードの差を比べます。
+    <code>create_ui_accordion</code> は grid-template-rows 0fr↔1fr のトリックで auto 高さに対してスムーズな開閉アニメーションを提供します。
+  </p>
+
+  <!-- ── 比較グリッド ── -->
+  <div class="compare-grid"></div>
+
+
+  <!-- ══════════════════════════════════════════════
+       デモコード（表示 & 実行の両用）
+       ══════════════════════════════════════════════ -->
+
+  <!-- 左：RicDOM のみ版 -->
+  <script type="text/plain" id="src-raw">
+const { create_RicDOM } = RicDOM;
+const ACC_ITEMS = [
+  { id: 'q1', title: 'RicDOM とは？',
+    body: 'JSON オブジェクトで DOM を宣言的に記述し、差分更新する軽量ライブラリです。Electron / Node.js 環境にも対応します。' },
+  { id: 'q2', title: 'React との違いは？',
+    body: 'ビルドツール不要・依存ゼロ。require() だけで動きます。仮想 DOM ではなく実 DOM を直接パッチします。' },
+  { id: 'q3', title: 'RicUI は必須ですか？',
+    body: 'いいえ。RicDOM だけでも UI を構築できます。RicUI はテーマ・アニメーション付きコンポーネントを提供するオプションレイヤーです。' },
+];
+
+const HEIGHT_CACHE = {};
+
+create_RicDOM('#mount-raw', {
+  open_map: { q1: true },
+  render(s) {
+    const highlighted_json = hljs.highlight(
+      JSON.stringify({ open_map: s.open_map }, null, 2),
+      { language: 'json' },
+    ).value;
+
+    return {
+    tag: 'div',
+    style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', alignSelf: 'stretch' },
+    ctx: [
+      // ── アコーディオン ─────────────────────────────
+      // 各 item をまとめるコンテナ
+      { tag: 'div',
+        style: { display: 'flex', flexDirection: 'column', gap: '4px', alignSelf: 'stretch' },
+        ctx: ACC_ITEMS.map((item) => ({
+          tag: 'div',
+          style: { border: '1px solid #ccc' },
+          ctx: [
+            { tag: 'button',
+              style: {
+                display: 'flex', justifyContent: 'space-between',
+                width: '100%', padding: '6px 10px',
+                background: '#fff', border: 'none', cursor: 'pointer', textAlign: 'left',
+              },
+              onclick: (e) => {
+                // 開くときに自然高を計測 — e.currentTarget（ボタン）の隣要素が body
+                if (!s.open_map[item.id] && !HEIGHT_CACHE[item.id]) {
+                  const body_el = e.currentTarget.nextElementSibling;
+                  if (body_el) HEIGHT_CACHE[item.id] = body_el.scrollHeight;
+                }
+                s.open_map = { ...s.open_map, [item.id]: !s.open_map[item.id] };
+              },
+              ctx: [
+                { tag: 'span', ctx: [item.title] },
+                { tag: 'span', ctx: [s.open_map[item.id] ? '▼' : '▶'] },
+              ],
+            },
+            // max-height トランジションで開閉アニメーションを実装する
+            { tag: 'div',
+              style: s.open_map[item.id]
+                ? {
+                    maxHeight: (HEIGHT_CACHE[item.id] || 999) + 'px',
+                    padding: '8px 10px',
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease, padding 0.3s ease',
+                  }
+                : {
+                    maxHeight: 0,
+                    padding: '0 10px',
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease, padding 0.3s ease',
+                  },
+              ctx: [item.body] },
+          ],
+        })),
+      },
+
+      // ── State（highlight.js で色付け）──
+      { tag: 'p', style: { margin: 0 }, ctx: ['State'] },
+      { tag: 'pre', class: 'hljs language-json',
+        style: { padding: '10px', margin: 0, alignSelf: 'stretch' },
+        innerHTML: highlighted_json },
+    ],
+  }; },
+});
+// 初期オープン（q1）は大きめフォールバック（999px）で表示される
+// クリック時に e.currentTarget.nextElementSibling で自然高を計測・キャッシュする
+  </script>
+
+  <!-- 右：RicUI 版 -->
+  <script type="text/plain" id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_panel, ui_text, create_ui_accordion } = RicUI;
+const ACC_ITEMS = [
+  { id: 'q1', title: 'RicDOM とは？',
+    body: 'JSON オブジェクトで DOM を宣言的に記述し、差分更新する軽量ライブラリです。Electron / Node.js 環境にも対応します。' },
+  { id: 'q2', title: 'React との違いは？',
+    body: 'ビルドツール不要・依存ゼロ。require() だけで動きます。仮想 DOM ではなく実 DOM を直接パッチします。' },
+  { id: 'q3', title: 'RicUI は必須ですか？',
+    body: 'いいえ。RicDOM だけでも UI を構築できます。RicUI はテーマ・アニメーション付きコンポーネントを提供するオプションレイヤーです。' },
+];
+
+create_RicDOM('#mount-rui', {
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  acc: create_ui_accordion({ default_open: { q1: true } }),
+  render(s) {
+    return s.page({
+      ctx: [
+        ui_panel({ ctx: [
+          // ── アコーディオン ─────────────────────────────
+          s.acc({
+            items: ACC_ITEMS.map(item => ({
+              id:    item.id,
+              title: item.title,
+              ctx:   [ui_text({ ctx: [item.body] })],
+            })),
+          }),
+        ]}),
+      ],
+    });
+  },
+});
+  </script>
+
+
+  <script src="_nav_bar.js"></script>
+  <script src="_compare.js"></script>
+
+</body>
+</html>

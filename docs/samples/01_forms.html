@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forms — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+
+  <!-- ナビ -->
+  <div id="nav_bar" data-sample="01"></div>
+
+  <!-- イントロ -->
+  <p class="page-intro">
+    名前・メール入力＋同意チェック＋送信バリデーションを
+    <strong>RicDOM のみ</strong>と <strong>RicUI</strong> で実装し、コードの差を比べます。
+  </p>
+
+  <!-- ── 比較グリッド ── -->
+  <div class="compare-grid"></div>
+
+
+  <!-- ══════════════════════════════════════════════
+       デモコード（表示 & 実行の両用）
+       ══════════════════════════════════════════════ -->
+
+  <!-- 左：RicDOM のみ版 -->
+  <script type="text/plain" id="src-raw">
+const { create_RicDOM } = RicDOM;
+create_RicDOM('#mount-raw', {
+  name: 'Taro Yamada', email: 'taro@example.com',
+  agree: false, submitted: false,
+  render(s) {
+    const ok = s.name.trim() !== '' && s.agree;
+    const state = { name: s.name, email: s.email, agree: s.agree, submitted: s.submitted };
+    const highlighted_json = hljs.highlight(JSON.stringify(state, null, 2), { language: 'json' }).value;
+
+    // label + input をまとめる小さなグループ（内部 gap は小さく）
+    const field = (label_ctx, input_node) => ({
+      tag: 'div',
+      style: { display: 'flex', flexDirection: 'column', gap: '3px' },
+      ctx: [
+        { tag: 'label', ctx: label_ctx },
+        input_node,
+      ],
+    });
+
+    return {
+      tag: 'div',
+      style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' },
+      ctx: [
+        { tag: 'h3', style: { margin: 0, fontSize: '1.1em', fontWeight: 700 }, ctx: ['フォームサンプル'] },
+
+        // ── 名前 ────────────────────────────────────
+        field(['名前 *'],
+          { tag: 'input', type: 'text', placeholder: 'Your name',
+            style: { padding: '4px 6px' },
+            value: s.name,
+            oninput: (e) => { s.name = e.target.value; } }),
+
+        // ── メール ───────────────────────────────────
+        field(['メール'],
+          { tag: 'input', type: 'email', placeholder: 'name@example.com',
+            style: { padding: '4px 6px' },
+            value: s.email,
+            oninput: (e) => { s.email = e.target.value; } }),
+
+        // ── 同意チェック ─────────────────────────────
+        { tag: 'label',
+          style: { display: 'flex', alignItems: 'center', gap: '6px' },
+          ctx: [
+            { tag: 'input', type: 'checkbox', checked: s.agree,
+              onchange: (e) => { s.agree = e.target.checked; } },
+            '利用規約に同意する *',
+          ]},
+
+        // ── ボタン行 ─────────────────────────────────
+        { tag: 'div', style: { display: 'flex', gap: '6px' }, ctx: [
+          { tag: 'button', disabled: !ok || s.submitted,
+            onclick: () => { s.submitted = true; },
+            ctx: [s.submitted ? '送信済み' : '送信'] },
+          { tag: 'button',
+            onclick: () => {
+              s.name = ''; s.email = '';
+              s.agree = false; s.submitted = false;
+            },
+            ctx: ['リセット'] },
+        ]},
+
+        // ── バリデーション ───────────────────────────
+        (!ok && !s.submitted)
+          ? { tag: 'p', style: { margin: 0, color: '#dc2626', fontSize: '12px' },
+              ctx: ['必須項目を入力してください。'] }
+          : null,
+
+        // ── State（highlight.js で色付け）────────────
+        { tag: 'p', style: { margin: 0 }, ctx: ['State'] },
+        { tag: 'pre', class: 'hljs language-json',
+          style: { padding: '10px', margin: 0, alignSelf: 'stretch' },
+          innerHTML: highlighted_json },
+      ].filter(Boolean),
+    };
+  },
+});
+  </script>
+
+  <!-- 右：RicUI 版 -->
+  <script type="text/plain" id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_panel, ui_text, bind_input, bind_checkbox, ui_button, ui_col, ui_row, ui_code_pre } = RicUI;
+create_RicDOM('#mount-rui', {
+  name: 'Taro Yamada', email: 'taro@example.com',
+  agree: false, submitted: false,
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  render(s) {
+  const ok = s.name.trim() !== '' && s.agree;
+  return s.page({
+    ctx: [
+      ui_panel({ ctx: [
+        ui_text({ variant: 'title', ctx: ['フォームサンプル'] }),
+
+        // ── 名前 ────────────────────────────────────
+        ui_col({ ctx: [
+          ui_text({ variant: 'label', ctx: ['名前 *'] }),
+          bind_input(s, 'name', { placeholder: 'Your name' }),
+        ]}),
+
+        // ── メール ───────────────────────────────────
+        ui_col({ ctx: [
+          ui_text({ variant: 'label', ctx: ['メール'] }),
+          bind_input(s, 'email',
+            { placeholder: 'name@example.com', type: 'email' }),
+        ]}),
+
+        // ── 同意チェック ─────────────────────────────
+        bind_checkbox(s, 'agree',
+          { ctx: ['利用規約に同意する *'] }),
+
+        // ── ボタン行 ─────────────────────────────────
+        ui_row({ ctx: [
+          ui_button({ ctx: [s.submitted ? '送信済み' : '送信'],
+            variant: 'primary', disabled: !ok || s.submitted,
+            onclick: () => { s.submitted = true; } }),
+          ui_button({ ctx: ['リセット'],
+            onclick: () => {
+              s.name = ''; s.email = '';
+              s.agree = false; s.submitted = false;
+            } }),
+        ]}),
+
+        // ── バリデーション ───────────────────────────
+        (!ok && !s.submitted)
+          ? ui_text({ style: { color: '#dc2626', fontSize: '12px' },
+              ctx: ['必須項目を入力してください。'] })
+          : null,
+
+        // ── State ───────────────────────────────────
+        ui_code_pre({ obj: { name: s.name, email: s.email,
+          agree: s.agree, submitted: s.submitted } }),
+      ]}),
+    ],
+  });
+  },
+});
+  </script>
+
+
+  <script src="_nav_bar.js"></script>
+  <script src="_compare.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controls — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+
+  <!-- ナビ -->
+  <div id="nav_bar" data-sample="02"></div>
+
+  <!-- イントロ -->
+  <p class="page-intro">
+    ラジオボタン・ネイティブ select・カスタムドロップダウンを
+    <strong>RicDOM のみ</strong>と <strong>RicUI</strong> で実装します。
+    ドロップダウンは <code>create_ui_popup()</code> をライブラリから利用し、
+    ポータルパターンで <code>ui_page</code> 末尾に展開されます。
+  </p>
+
+  <!-- ── 比較グリッド ── -->
+  <div class="compare-grid"></div>
+
+
+  <!-- ══════════════════════════════════════════════
+       デモコード（表示 & 実行の両用）
+       ══════════════════════════════════════════════ -->
+
+  <!-- 左：RicDOM のみ版 -->
+  <script type="text/plain" id="src-raw">
+const { create_RicDOM } = RicDOM;
+// ── データ定義 ────────────────────────────────────────────────────────
+const ROLES = [
+  { value: 'viewer', label: '閲覧者' },
+  { value: 'editor', label: '編集者' },
+  { value: 'admin',  label: '管理者' },
+];
+const LANGS = [
+  { value: 'ja', label: '日本語' },
+  { value: 'en', label: 'English' },
+  { value: 'zh', label: '中文'   },
+];
+const NOTIFIES = [
+  { value: 'all',       label: 'すべて'   },
+  { value: 'important', label: '重要のみ' },
+  { value: 'none',      label: 'なし'     },
+];
+
+create_RicDOM('#mount-raw', {
+  role: 'editor', lang: 'ja', notify: 'all',
+  render(s) {
+    const sel = NOTIFIES.find(o => o.value === s.notify) ?? NOTIFIES[0];
+    const state = { role: s.role, lang: s.lang, notify: s.notify };
+    const highlighted_json = hljs.highlight(JSON.stringify(state, null, 2), { language: 'json' }).value;
+
+    return {
+      tag: 'div',
+      style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' },
+      ctx: [
+        { tag: 'h3', style: { margin: 0, fontSize: '1.1em', fontWeight: 700 }, ctx: ['設定'] },
+
+        // ── ラジオボタン ──────────────────────
+        { tag: 'p', style: { margin: 0 }, ctx: ['権限'] },
+        { tag: 'div',
+          style: { display: 'flex', flexDirection: 'column', gap: '4px' },
+          ctx: ROLES.map(r => ({
+            tag: 'label',
+            style: { display: 'flex', alignItems: 'center', gap: '6px' },
+            ctx: [
+              { tag: 'input', type: 'radio', name: 'role-raw',
+                value: r.value, checked: r.value === s.role ? 1 : 0,
+                onchange: () => { s.role = r.value; } },
+              r.label,
+            ],
+          })),
+        },
+
+        // ── ネイティブ select ─────────────────
+        { tag: 'p', style: { margin: 0 }, ctx: ['言語'] },
+        { tag: 'select',
+          onchange: (e) => { s.lang = e.target.value; },
+          ctx: LANGS.map(l => ({
+            tag: 'option', value: l.value,
+            selected: l.value === s.lang ? 1 : 0,
+            ctx: [l.label],
+          })),
+        },
+
+        // ── カスタムドロップダウン ────────────
+        // 自前で position/overlay を書く必要がある（これが raw RicDOM のペイン）
+        // _dd: open/close フラグ（state に直接持つ）
+        { tag: 'p', style: { margin: 0 }, ctx: ['通知'] },
+        { tag: 'div',
+          style: { position: 'relative' },
+          ctx: [
+            // 背景オーバーレイ：外側クリックで閉じる
+            s._dd ? { tag: 'div',
+              style: { position: 'fixed', inset: 0, zIndex: 99 },
+              onclick: () => { s._dd = false; } } : null,
+            { tag: 'button',
+              style: { position: 'relative', zIndex: 100 },
+              onclick: () => { s._dd = !s._dd; },
+              ctx: [sel.label, ' ', s._dd ? '▲' : '▼'],
+            },
+            s._dd ? {
+              tag: 'div',
+              // menu: 絶対配置でトリガーの直下に出す（背景なしだと透けて読めないので白背景は必須）
+              style: {
+                position: 'absolute', top: 'calc(100% + 2px)', left: 0, zIndex: 100,
+                background: '#fff', border: '1px solid #ccc',
+                display: 'flex', flexDirection: 'column',
+              },
+              ctx: NOTIFIES.map(n => ({
+                tag: 'div',
+                style: {
+                  padding: '4px 10px', cursor: 'pointer',
+                  fontWeight: n.value === s.notify ? 700 : 400,
+                },
+                onclick: () => { s.notify = n.value; s._dd = false; },
+                ctx: [n.label],
+              })),
+            } : null,
+          ].filter(Boolean),
+        },
+
+        // ── State（highlight.js で色付け）────
+        { tag: 'p', style: { margin: 0 }, ctx: ['State'] },
+        { tag: 'pre', class: 'hljs language-json',
+          style: { padding: '10px', margin: 0, alignSelf: 'stretch' },
+          innerHTML: highlighted_json },
+      ],
+    };
+  },
+});
+  </script>
+
+  <!-- 右：RicUI 版 -->
+  <script type="text/plain" id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_panel, ui_text, bind_radiobutton, bind_select, create_ui_popup, ui_button, ui_col, ui_code_pre } = RicUI;
+// ── データ定義 ────────────────────────────────────────────────────────
+const ROLES = [
+  { value: 'viewer', label: '閲覧者' },
+  { value: 'editor', label: '編集者' },
+  { value: 'admin',  label: '管理者' },
+];
+const LANGS = [
+  { value: 'ja', label: '日本語' },
+  { value: 'en', label: 'English' },
+  { value: 'zh', label: '中文'   },
+];
+const NOTIFIES = [
+  { value: 'all',       label: 'すべて'   },
+  { value: 'important', label: '重要のみ' },
+  { value: 'none',      label: 'なし'     },
+];
+
+create_RicDOM('#mount-rui', {
+  role: 'editor', lang: 'ja', notify: 'all',
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  notify_dd: create_ui_popup(),
+  render(s) {
+    const notify_label = NOTIFIES.find(n => n.value === s.notify)?.label ?? '';
+    const NOTIFY_CTX = NOTIFIES.map(n =>
+      ui_button({ ctx: [n.label], variant: 'ghost', onclick: () => { s.notify = n.value; } }),
+    );
+
+    return s.page({
+      ctx: [
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['設定'] }),
+
+          // ── ラジオボタン ──────────────────────
+          ui_col({ ctx: [
+            ui_text({ variant: 'label', ctx: ['権限'] }),
+            bind_radiobutton(s, 'role', { options: ROLES }),
+          ]}),
+
+          // ── ネイティブ select ─────────────────
+          ui_col({ ctx: [
+            ui_text({ variant: 'label', ctx: ['言語'] }),
+            bind_select(s, 'lang', { options: LANGS }),
+          ]}),
+
+          // ── カスタムドロップダウン ────────────
+          // ポータルパターン：ポップアップは ui_page 末尾に展開される
+          ui_col({ ctx: [
+            ui_text({ variant: 'label', ctx: ['通知'] }),
+            s.notify_dd({ label: notify_label, ctx: NOTIFY_CTX }),
+          ]}),
+
+          // ── State ─────────────────────────────
+          ui_code_pre({ obj: {
+            role: s.role, lang: s.lang, notify: s.notify,
+          }}),
+        ]}),
+      ],
+    });
+  },
+});
+  </script>
+
+
+  <script src="_nav_bar.js"></script>
+  <script src="_compare.js"></script>
+
+</body>
+</html>

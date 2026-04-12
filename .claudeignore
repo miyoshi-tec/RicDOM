@@ -1,0 +1,4 @@
+# .claudeignore
+node_modules/
+docs/
+samples/

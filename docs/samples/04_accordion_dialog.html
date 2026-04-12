@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dialog &amp; Toast — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+
+  <!-- ナビ -->
+  <div id="nav_bar" data-sample="04"></div>
+
+  <!-- イントロ -->
+  <p class="page-intro">
+    ダイアログとトースト通知を <strong>RicDOM のみ</strong> と <strong>RicUI</strong> で実装し、コードの差を比べます。
+    ダイアログは <code>create_ui_dialog</code>（ポータルパターン）で、トーストは <code>create_ui_toast</code> で表示します。
+    設定をJSONファイルとしてエクスポートする実用的なサンプルです。
+  </p>
+
+  <!-- ── 比較グリッド ── -->
+  <div class="compare-grid"></div>
+
+
+  <!-- ══════════════════════════════════════════════
+       デモコード（表示 & 実行の両用）
+       ══════════════════════════════════════════════ -->
+
+  <!-- 左：RicDOM のみ版 -->
+  <script type="text/plain" id="src-raw">
+const { create_RicDOM } = RicDOM;
+const TOAST_ANIM_MS = 200;
+
+// ── raw 版に最低限必要な CSS ──
+// keyframes は <style> タグに入れるしかない（inline style では書けない）。
+// 位置・背景などは各要素に inline style で直接書く。
+const RAW_CSS = `
+@keyframes dlg-in    { from { opacity:0; } to { opacity:1; } }
+@keyframes dlg-out   { from { opacity:1; } to { opacity:0; } }
+@keyframes toast-in  { from { transform:translateX(-120%); } to { transform:translateX(0); } }
+@keyframes toast-out { from { transform:translateX(0); } to { transform:translateX(-120%); } }
+`;
+
+// エクスポート用ヘルパー
+const download_json_raw = (data, filename) => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+create_RicDOM('#mount-raw', {
+  show_dlg: false, dlg_closing: false, user: 'Alice', theme: 'light', notifications: true, ignore: {},
+  render(s) {
+    // ── ダイアログ helper ────────────────────────────
+    const close_dlg = () => {
+      if (s.dlg_closing) return;
+      s.dlg_closing = true;
+      setTimeout(() => { s.show_dlg = false; s.dlg_closing = false; }, 300);
+    };
+
+    // ── トースト helper ─────────────────────────────
+    // ignore 配下に生配列を持つ（reactive 外）。配列要素の変更は
+    // 自動では拾われないので _render_tick で手動トリガーする。
+    s.ignore._toasts  = s.ignore._toasts  || [];
+    s.ignore._next_id = s.ignore._next_id || 0;
+
+    const do_close_toast = (item) => {
+      if (item._closing) return;
+      item._closing = true;
+      s._render_tick = (s._render_tick || 0) + 1;
+      setTimeout(() => {
+        const i = s.ignore._toasts.indexOf(item);
+        if (i >= 0) s.ignore._toasts.splice(i, 1);
+        s._render_tick = (s._render_tick || 0) + 1;
+      }, TOAST_ANIM_MS);
+    };
+
+    const show_toast = (msg) => {
+      const item = { id: s.ignore._next_id++, msg, _closing: false };
+      s.ignore._toasts.push(item);
+      s._render_tick = (s._render_tick || 0) + 1;
+      setTimeout(() => do_close_toast(item), 3000);
+    };
+
+    const settings = { user: s.user, theme: s.theme, notifications: s.notifications };
+
+    // JSON を highlight.js で色付け（language-json クラスのスタイルが適用される）
+    const highlighted_json = hljs.highlight(JSON.stringify(settings, null, 2), { language: 'json' }).value;
+
+    return {
+    tag: 'div',
+    // 外側コンテナ：padding + flex column + gap で全体を適度にばらす
+    style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' },
+    ctx: [
+      // keyframes だけは <style> タグで注入する必要がある
+      { tag: 'style', ctx: [RAW_CSS] },
+
+      // ── ダイアログ（トリガーボタン + オーバーレイ）──
+      { tag: 'p', ctx: ['設定エクスポート'] },
+      { tag: 'button',
+        onclick: () => { s.show_dlg = true; },
+        ctx: ['📤 設定をエクスポート'] },
+
+      s.show_dlg
+        ? { tag: 'div',
+            // 全画面オーバーレイ（position:fixed）+ 中央寄せ + フェードアニメ
+            style: {
+              position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: (s.dlg_closing ? 'dlg-out' : 'dlg-in') + ' 0.3s ease forwards',
+            },
+            onclick: close_dlg,
+            ctx: [
+              { tag: 'div',
+                // 背景色がないとオーバーレイの上で文字が読めないので必須
+                style: {
+                  background: '#fff', padding: '16px', minWidth: '280px',
+                  display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start',
+                },
+                onclick: (e) => e.stopPropagation(),
+                ctx: [
+                  { tag: 'p', ctx: ['エクスポートの確認'] },
+                  { tag: 'p', ctx: ['現在の設定を JSON ファイルとして保存しますか？'] },
+                  { tag: 'div', style: { display: 'flex', gap: '8px' }, ctx: [
+                    { tag: 'button',
+                      onclick: () => {
+                        download_json_raw(settings, 'settings.json');
+                        show_toast('エクスポートしました！');
+                        close_dlg();
+                      },
+                      ctx: ['エクスポート'] },
+                    { tag: 'button', onclick: close_dlg, ctx: ['キャンセル'] },
+                  ]},
+                ],
+              },
+            ],
+          }
+        : null,
+
+      // ── トースト ──
+      { tag: 'p', ctx: ['トースト通知'] },
+      { tag: 'div', style: { display: 'flex', gap: '8px', flexWrap: 'wrap' }, ctx: [
+        { tag: 'button', onclick: () => show_toast('保存しました！'),       ctx: ['✔ 成功'] },
+        { tag: 'button', onclick: () => show_toast('エラーが発生しました'), ctx: ['✖ エラー'] },
+        { tag: 'button', onclick: () => show_toast('注意が必要です'),       ctx: ['⚠ 警告'] },
+        { tag: 'button', onclick: () => show_toast('更新を確認しました'),   ctx: ['ℹ 情報'] },
+      ]},
+
+      // トーストコンテナ（ビューポート左下に固定）
+      s.ignore._toasts.length > 0
+        ? { tag: 'div',
+            style: {
+              position: 'fixed', bottom: '20px', left: '20px', zIndex: 200,
+              display: 'flex', flexDirection: 'column', gap: '6px', pointerEvents: 'none',
+            },
+            ctx: s.ignore._toasts.map(item => ({
+              tag: 'div',
+              style: {
+                background: '#fff', border: '1px solid #ccc', padding: '6px 10px', pointerEvents: 'auto',
+                display: 'flex', alignItems: 'center', gap: '8px',
+                animation: (item._closing ? 'toast-out' : 'toast-in') + ' 0.2s ease forwards',
+              },
+              ctx: [
+                { tag: 'span', ctx: [item.msg] },
+                { tag: 'button', onclick: () => do_close_toast(item), ctx: ['✕'] },
+              ],
+            })) }
+        : null,
+
+      // ── State ──
+      // highlight.js で JSON を色付けし innerHTML で注入する
+      { tag: 'p', ctx: ['STATE'] },
+      { tag: 'pre', class: 'hljs language-json',
+        style: { padding: '10px', margin: 0, alignSelf: 'stretch' },
+        innerHTML: highlighted_json },
+    ].filter(Boolean),
+  }; },
+});
+  </script>
+
+  <!-- 右：RicUI 版 -->
+  <script type="text/plain" id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_panel, ui_text, create_ui_dialog, create_ui_toast, ui_button, ui_row, ui_code_pre } = RicUI;
+// エクスポート用ヘルパー — state を JSON ファイルとしてダウンロード
+const download_json = (data, filename) => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+create_RicDOM('#mount-rui', {
+  user: 'Alice', theme: 'light', notifications: true,
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  dlg: create_ui_dialog(),
+  toast: create_ui_toast(),
+  render(s) {
+    s.toast(); // ポータル登録（毎レンダー実行）
+
+    const settings = { user: s.user, theme: s.theme, notifications: s.notifications };
+
+    return s.page({
+      ctx: [
+        ui_panel({ ctx: [
+          // ── ダイアログ ──────────────────────────────────
+          ui_text({ variant: 'label', ctx: ['設定エクスポート'] }),
+          ui_row({ ctx: [
+            s.dlg({
+              trigger_ctx: ['📤 設定をエクスポート'],
+              title: 'エクスポートの確認',
+              ctx: [ui_text({ ctx: ['現在の設定を JSON ファイルとして保存しますか？'] })],
+              actions: [
+                ui_button({
+                  ctx: ['エクスポート'], variant: 'primary',
+                  onclick: () => {
+                    download_json(settings, 'settings.json');
+                    s.toast.show('エクスポートしました！', { type: 'success' });
+                    s.dlg.close();
+                  },
+                }),
+                ui_button({ ctx: ['キャンセル'], onclick: s.dlg.close }),
+              ],
+            }),
+          ]}),
+
+          // ── トースト ──────────────────────────────────────
+          ui_text({ variant: 'label', ctx: ['トースト通知'] }),
+          ui_row({ ctx: [
+            ui_button({ ctx: ['✔ 成功'],
+              onclick: () => s.toast.show('保存しました！',       { type: 'success' }) }),
+            ui_button({ ctx: ['✖ エラー'],
+              onclick: () => s.toast.show('エラーが発生しました', { type: 'error'   }) }),
+            ui_button({ ctx: ['⚠ 警告'],
+              onclick: () => s.toast.show('注意が必要です',       { type: 'warning' }) }),
+            ui_button({ ctx: ['ℹ 情報'],
+              onclick: () => s.toast.show('更新を確認しました',   { type: 'info'    }) }),
+          ]}),
+
+          // ── State ──────────────────────────────────────
+          ui_code_pre({ obj: settings }),
+        ]}),
+      ],
+    });
+  },
+});
+  </script>
+
+
+  <script src="_nav_bar.js"></script>
+  <script src="_compare.js"></script>
+
+</body>
+</html>

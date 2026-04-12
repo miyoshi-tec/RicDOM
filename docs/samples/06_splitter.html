@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Splitter — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+
+  <!-- ナビ -->
+  <div id="nav_bar" data-sample="06"></div>
+
+  <!-- イントロ -->
+  <p class="page-intro">
+    左/右/上/下の4パターンに対応したリサイズ可能スプリッター。
+    仕切り線をドラッグしてサイズを変更し、中央のボタンで開閉できます。
+    ドラッグ中は再レンダーせず DOM を直接操作することで 60fps を確保します。
+  </p>
+
+  <!-- ── 比較グリッド ── -->
+  <div class="compare-grid" data-sub-raw="手書き実装（side='left' パターン）" data-sub-rui="bind_tabs でパターン切り替え"></div>
+
+
+  <!-- ══════════════════════════════════════════════
+       デモコード（表示 & 実行の両用）
+       ══════════════════════════════════════════════ -->
+
+  <!-- 左：RicDOM のみ版 -->
+  <script type="text/plain" id="src-raw">
+const { create_RicDOM } = RicDOM;
+const SP_MIN = 60, SP_MAX = 480;
+const NAV_ITEMS = ['📁 プロジェクト','📄 ファイル','🔍 検索','⚙ 設定','📦 パッケージ'];
+
+create_RicDOM('#mount-raw', {
+  _render_tick: 0, ignore: {},
+  render(s) {
+    // ── ステートフルな変数（ignore に保持）────────────────
+    // ignore 以下は reactive 対象外。トグルは手動で _render_tick を増やす。
+    s.ignore._size      = s.ignore._size      ?? 180;
+    s.ignore._collapsed = s.ignore._collapsed ?? false;
+
+    // ── ドラッグハンドラ ──────────────────────────────────
+    // ドラッグ中は再レンダーせず DOM を直接操作して 60fps を確保する
+    const on_mouse_down = (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      if (s.ignore._collapsed) return;
+      e.preventDefault();
+
+      const start_x    = e.clientX;
+      const start_size = s.ignore._size;
+      const div_el     = e.currentTarget;
+      const side_el    = div_el.previousElementSibling;
+
+      // ドラッグ中: トランジション無効化
+      if (side_el) side_el.style.transition = 'none';
+
+      const on_move = (e) => {
+        let new_size = start_size + (e.clientX - start_x);
+        new_size = Math.max(SP_MIN, Math.min(SP_MAX, new_size));
+        s.ignore._size = new_size;
+        if (side_el) side_el.style.flexBasis = new_size + 'px';
+      };
+      const on_up = () => {
+        if (side_el) side_el.style.transition = '';
+        document.removeEventListener('mousemove', on_move);
+        document.removeEventListener('mouseup',   on_up);
+      };
+      document.addEventListener('mousemove', on_move);
+      document.addEventListener('mouseup',   on_up);
+    };
+
+    // ── 折り畳みトグル ────────────────────────────────────
+    const toggle = () => {
+      s.ignore._collapsed = !s.ignore._collapsed;
+      s._render_tick = (s._render_tick || 0) + 1;
+    };
+
+    // ── レンダー ──────────────────────────────────────────
+    return {
+      tag: 'div',
+      style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', alignSelf: 'stretch' },
+      ctx: [
+        { tag: 'p', style: { margin: 0 }, ctx: ["side='left' パターン"] },
+        // スプリッター外枠（固定高さが必要）
+        { tag: 'div',
+          style: { border: '1px solid #ccc', height: '260px', display: 'flex', alignSelf: 'stretch' },
+          ctx: [
+            // サイドパネル：flex-basis でサイズ制御、transition で折り畳みアニメ
+            { tag: 'div',
+              style: {
+                flexShrink: 0,
+                flexBasis: (s.ignore._collapsed ? 0 : s.ignore._size) + 'px',
+                overflow: 'hidden',
+                background: '#f5f5f5',
+                transition: 'flex-basis 0.2s ease',
+              },
+              ctx: [{ tag: 'div',
+                style: { padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' },
+                ctx: NAV_ITEMS.map((label) => ({
+                  tag: 'button',
+                  style: { whiteSpace: 'nowrap' },
+                  ctx: [label],
+                })),
+              }] },
+            // 仕切り線：position:relative で中央のトグルボタンを配置
+            { tag: 'div',
+              style: {
+                flex: '0 0 5px',
+                background: '#ccc',
+                cursor: 'col-resize',
+                position: 'relative',
+                userSelect: 'none',
+              },
+              onmousedown: on_mouse_down,
+              ctx: [{ tag: 'button',
+                style: {
+                  position: 'absolute', left: '50%', top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: '14px', height: '28px', padding: 0,
+                },
+                onclick: toggle,
+                ctx: [s.ignore._collapsed ? '›' : '‹'] }] },
+            // メインパネル
+            { tag: 'div',
+              style: { flex: 1, overflow: 'auto', minWidth: 0, padding: '10px' },
+              ctx: [
+                { tag: 'h3', style: { margin: 0, fontSize: '1.1em', fontWeight: 700 }, ctx: ['メインコンテンツ'] },
+                { tag: 'p', style: { margin: '6px 0 0' }, ctx: ['仕切り線をドラッグしてサイズを変更できます。'] },
+                { tag: 'p', style: { margin: '6px 0 0' }, ctx: ['左の ‹ ボタンでサイドパネルを折り畳めます。'] },
+              ] },
+          ],
+        },
+      ],
+    };
+  },
+});
+  </script>
+
+  <!-- 右：RicUI 版 -->
+  <script type="text/plain" id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, create_ui_splitter, bind_tabs, ui_button, ui_col, ui_row, ui_text } = RicUI;
+// パネル内コンテンツのヘルパー
+// vertical=true: side=left/right 用（ボタン縦並び）、false: side=top/bottom 用（横並び）
+const NAV_ITEMS = ['📁 プロジェクト','📄 ファイル','🔍 検索','⚙ 設定','📦 パッケージ'];
+const make_nav = (vertical) => ({
+  ctx: [
+    (vertical ? ui_col : ui_row)({ style: 'padding:6px;flex-wrap:wrap', ctx:
+      NAV_ITEMS.map((label) => ui_button({
+        ctx:     [label],
+        variant: 'ghost',
+        style:   vertical ? 'justify-content:flex-start' : '',
+      })),
+    }),
+  ],
+});
+
+const make_main = (msg) => ({
+  ctx: [
+    ui_col({ style: 'padding:10px', ctx: [
+      ui_text({ variant: 'title', ctx: ['メインコンテンツ'] }),
+      ui_text({ ctx: [msg] }),
+      ui_text({ class: 'ric-text--muted', ctx: ['‹/› ボタンで折り畳み、仕切り線のドラッグでリサイズ。'] }),
+    ]}),
+  ],
+});
+
+create_RicDOM('#mount-rui', {
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  // アクティブなタブは state に直接持つ（radiobutton の value と同じ扱い）
+  active_side: 'left',
+  // 4パターン分のスプリッターは内部状態を持つので create_ui_splitter で初回のみ生成
+  sp_l: create_ui_splitter({ side:'left',   size:140, min:50 }),
+  sp_r: create_ui_splitter({ side:'right',  size:140, min:50 }),
+  sp_t: create_ui_splitter({ side:'top',    size: 90, min:30 }),
+  sp_b: create_ui_splitter({ side:'bottom', size: 90, min:30 }),
+  render(s) {
+    // スプリッターを固定高さのコンテナで包む
+    const wrap_sp = (splitter, side_ctx, main_ctx) => ({
+      tag: 'div', style: 'height:280px',
+      ctx: [ splitter({ side: side_ctx, main: main_ctx }) ],
+    });
+
+    return s.page({
+      style: 'border-radius:0',
+      ctx: [
+        bind_tabs(s, 'active_side', {
+          variant: 'pill',
+          items: [
+            { key: 'left',   label: "side='left'",   ctx: [ wrap_sp(s.sp_l, make_nav(true),  make_main('左パネルを開閉')) ] },
+            { key: 'right',  label: "side='right'",  ctx: [ wrap_sp(s.sp_r, make_nav(true),  make_main('右パネルを開閉')) ] },
+            { key: 'top',    label: "side='top'",    ctx: [ wrap_sp(s.sp_t, make_nav(false), make_main('上パネルを開閉')) ] },
+            { key: 'bottom', label: "side='bottom'", ctx: [ wrap_sp(s.sp_b, make_nav(false), make_main('下パネルを開閉')) ] },
+          ],
+        }),
+      ],
+    });
+  },
+});
+  </script>
+
+
+  <script src="_nav_bar.js"></script>
+  <script src="_compare.js"></script>
+
+</body>
+</html>

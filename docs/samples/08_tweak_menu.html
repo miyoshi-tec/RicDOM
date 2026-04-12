@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tweak Panel in Menu — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    /* viewport を nav_bar + デモ + コード の縦分割で埋める。
+       body の margin リセットと flex column は inline では書けないので style タグで指定する。*/
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  </style>
+</head>
+<body>
+
+<div id="nav_bar" data-sample="08"></div>
+<div id="mount-rui" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<script src="../RicDOM.min.js"></script>
+<script src="../RicUI.min.js"></script>
+<script src="_nav_bar.js"></script>
+
+<script id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, create_ui_popup, create_ui_tweak_panel,
+        ui_panel, ui_text, ui_code_pre } = RicUI;
+
+// そのまま編集される「JSON そのもの」。create_ui_tweak_panel に投げ込むだけで GUI 化。
+const params = {
+  char_name:  'Hero',
+  move_speed: 5,
+  jump_power: 3,
+  invincible: false,
+  quality:    'high',
+  volume:     70,
+};
+
+create_RicDOM('#mount-rui', {
+  params,
+  page:     create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  settings: create_ui_popup(),
+  // keys で「推論できないもの（range の min/max、select の options 等）」だけ部分上書き。
+  // 何も指定しなければラベル = キー名、型は値から自動推論される。
+  tw: create_ui_tweak_panel({
+    title: 'Game Config',
+    data: params,
+    keys: {
+      move_speed: { type: 'range', min: 1, max: 10, step: 0.5 },
+      jump_power: { type: 'range', min: 1, max: 8,  step: 0.5 },
+      invincible: { type: 'radiobutton',
+        options: [{ value: true, label: 'true' }, { value: false, label: 'false' }] },
+      quality:    { type: 'select', options: ['low', 'medium', 'high', 'ultra'] },
+      volume:     { type: 'range', min: 0, max: 100 },
+    },
+  }),
+
+  render(s) {
+    return s.page({
+      // 上: デモ領域 / 下: コード領域 の縦分割
+      style: { height: '100%', borderRadius: 0, padding: 0,
+               display: 'flex', flexDirection: 'column', overflow: 'visible' },
+      ctx: [
+        // ── 上半分: デモ ─────────────────────────────────────
+        { tag: 'div', style: { flex: '1 1 50%', minHeight: 0, overflow: 'auto', padding: '20px' }, ctx: [
+          ui_panel({ style: { maxWidth: '640px', margin: '0 auto' }, ctx: [
+            // タイトル行 + ≡ ボタン（popup トリガー）
+            { tag: 'div',
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                       marginBottom: 'var(--ric-gap-md)' },
+              ctx: [
+                ui_text({ variant: 'title', ctx: ['Game Dashboard'] }),
+                // ≡ クリックで tweak パネルが popup する。
+                // stopPropagation でパネル内のクリックがメニュー閉じに伝播しないようにする。
+                s.settings({ ctx: [
+                  { tag: 'div', onclick: (e) => { e.stopPropagation(); }, ctx: [ s.tw() ] },
+                ]}),
+              ],
+            },
+            ui_text({ variant: 'muted',
+              ctx: ['右上の ≡ でパネル開閉。パネル内操作でメニューは閉じません。'],
+              style: { marginBottom: 'var(--ric-gap-md)' } }),
+
+            // params オブジェクトのライブ表示。tweak で編集した値がそのまま映る。
+            ui_code_pre({ obj: s.params }),
+          ]}),
+        ]},
+
+        // ── 下半分: このサンプル自身のソースコード（横幅いっぱい） ──
+        // flex item として残り 50% 高さを埋める。
+        ui_code_pre({
+          ctx:  [document.getElementById('src-rui').textContent.trim()],
+          lang: 'javascript',
+          style: { flex: '1 1 50%', minHeight: 0, overflowY: 'auto', borderRadius: 0 },
+        }),
+      ],
+    });
+  },
+});
+</script>
+
+</body>
+</html>

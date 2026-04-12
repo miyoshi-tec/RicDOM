@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hello RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+
+  <!-- ナビ -->
+  <div id="nav_bar" data-sample="00"></div>
+
+  <!-- イントロ -->
+  <p class="page-intro">
+    同じ「名前入力＋挨拶」アプリを <strong>RicDOM のみ</strong>（スタイルなし）と
+    <strong>RicUI</strong>（CSS 主導テーマ）で実装し、コードの差を比べます。
+  </p>
+
+  <!-- ── 比較グリッド ── -->
+  <div class="compare-grid"></div>
+
+
+  <!-- ══════════════════════════════════════════════
+       デモコード（表示 & 実行の両用）
+       ══════════════════════════════════════════════ -->
+
+  <!-- 左：RicDOM のみ版 -->
+  <script type="text/plain" id="src-raw">
+const { create_RicDOM } = RicDOM;
+create_RicDOM('#mount-raw', {
+  name: '',
+  render(s) {
+    return {
+      tag: 'div',
+      style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' },
+      ctx: [
+        { tag: 'h3', style: { margin: 0, fontSize: '1.1em', fontWeight: 700 }, ctx: ['はじめまして'] },
+        { tag: 'p',  style: { margin: 0 }, ctx: ['お名前を入力するとリアルタイムで挨拶します。'] },
+        { tag: 'input',
+          type: 'text', placeholder: '名前…',
+          style: { padding: '4px 6px' },
+          value: s.name,
+          oninput: (e) => { s.name = e.target.value; },
+        },
+        s.name
+          ? { tag: 'p', style: { margin: 0 }, ctx: [`こんにちは、${s.name}さん！`] }
+          : { tag: 'p', style: { margin: 0, color: '#aaa' }, ctx: ['（名前を入力してください）'] },
+      ],
+    };
+  },
+});
+  </script>
+
+  <!-- 右：RicUI 版 -->
+  <script type="text/plain" id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_panel, ui_text, bind_input } = RicUI;
+create_RicDOM('#mount-rui', {
+  name: '',
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  render(s) {
+    return s.page({
+      ctx: [
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['はじめまして'] }),
+          ui_text({ ctx: ['お名前を入力するとリアルタイムで挨拶します。'] }),
+          bind_input(s, 'name', { placeholder: '名前…' }),
+          s.name
+            ? ui_text({ ctx: [`こんにちは、${s.name}さん！`] })
+            : ui_text({ variant: 'muted', ctx: ['（名前を入力してください）'] }),
+        ]}),
+      ],
+    });
+  },
+});
+  </script>
+
+
+  <script src="_nav_bar.js"></script>
+  <script src="_compare.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Theme Studio — RicUI</title>
+  <style>
+    /* viewport 全域をフレックスで使うため body の margin をリセットし、
+       #mount が残り高さを埋めるように flex: 1 を指定する。*/
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    #mount { flex: 1; min-height: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+
+<div id="nav_bar" data-sample="10"></div>
+<div id="mount"></div>
+
+<script src="../RicDOM.min.js"></script>
+<script src="../RicUI.min.js"></script>
+<script src="_nav_bar.js"></script>
+
+<script id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, create_ui_accordion, create_ui_dialog, create_ui_popup, create_ui_splitter, bind_tabs, create_ui_toast, create_ui_tooltip, create_theme, ui_tweak_panel, ui_tweak_folder, ui_tweak_row, ui_button, ui_col, ui_input, ui_panel, ui_radiobutton, ui_row, ui_select, ui_text, bind_checkbox, ui_code_pre } = RicUI;
+
+// ═══════════════════════════════════════════════════════════
+// Theme Studio — CSS 変数エディタ + UI プレビュー
+// 左: ui_tweak_folder + ui_tweak_row で全テーマ変数を編集（JSON 保存/読込付き）
+// 右: 全 UI 部品のライブプレビュー（クリックでセクションをハイライト）
+//
+// ui_tweak の 3 段階 API のうち「Tier 3: 完全自前 ctx」のサンプル。
+// 全行を手書きすることで、テーマ変数の固定リストやカスタムボタンを自由に並べる。
+// ═══════════════════════════════════════════════════════════
+
+// ── セクション表示名 ──
+const SECTION_LABELS = {
+  typography: 'Typography', buttons: 'Buttons', forms: 'Form Controls',
+  surface: 'Surface (Panel)', popup: 'Popup & Tooltip', dialog: 'Dialog',
+  toast: 'Toast', accordion: 'Accordion', tabs: 'Tabs',
+  splitter_demo: 'Splitter', code: 'Code Block',
+};
+
+// ── セクション → 関連 CSS 変数マッピング（左パネルのハイライト用） ──
+const SEC_VARS = {
+  typography:     ['--ric-color-fg', '--ric-color-fg-muted'],
+  buttons:        ['--ric-color-accent', '--ric-color-accent-fg', '--ric-color-control', '--ric-radius'],
+  forms:          ['--ric-color-control', '--ric-color-border', '--ric-control-h', '--ric-radius', '--ric-pad-x', '--ric-pad-y'],
+  surface:        ['--ric-color-bg', '--ric-color-border', '--ric-radius', '--ric-panel-shadow', '--ric-pad-x', '--ric-pad-y'],
+  popup:          ['--ric-popup-bg', '--ric-popup-blur', '--ric-shadow', '--ric-radius'],
+  dialog:         ['--ric-color-bg', '--ric-shadow', '--ric-radius'],
+  toast:          ['--ric-color-accent', '--ric-color-accent-fg'],
+  accordion:      ['--ric-color-border', '--ric-color-bg'],
+  tabs:           ['--ric-color-accent', '--ric-color-accent-fg', '--ric-color-border'],
+  splitter_demo:  ['--ric-color-border'],
+  code:           ['--ric-color-fg', '--ric-color-bg', '--ric-color-fg-muted'],
+};
+
+// ── テーマオブジェクト直接操作 ──
+// s.page.theme を常にオブジェクトとして扱い、ui_tweak_row はそれを直接読み書きする。
+// nav_bar でプリセットが選ばれたら、create_theme(name) でオブジェクトに展開して代入。
+
+// 現在のテーマを確実にオブジェクトにする
+const _ensure_theme_obj = (s) => {
+  if (typeof s.page.theme === 'string') {
+    s.page.theme = create_theme(s.page.theme);
+  }
+  return s.page.theme;
+};
+
+// ── テーマ変数行ジェネレータ ──
+// 各変数は ui_tweak_row に type 省略で渡し、infer_type に推論させる：
+//   '#rrggbb' や 'rgb(...)'/'rgba(...)' → color ピッカー
+//   'linear-gradient(...)' や '8px' 等  → text 入力
+// これにより teal/cyber/aqua のグラデ背景や rgba 半透明値も破綻しない。
+const make_var_row = (s, name, label) => {
+  const row = ui_tweak_row({
+    label,
+    get: () => { const t = _ensure_theme_obj(s); return t[name] ?? ''; },
+    set: (val) => {
+      const t = _ensure_theme_obj(s);
+      t[name] = val;
+      // theme オブジェクトの中身を直接変えても Proxy は検知しないので、
+      // スプレッドで新オブジェクトを作り s.page.theme に再代入して再描画をトリガー。
+      s.page.theme = { ...t };
+    },
+  });
+  // 右パネルでセクション選択中 → 関連する行をハイライト、それ以外を薄く
+  if (!s._sel_part) return row;
+  const related = SEC_VARS[s._sel_part]?.includes(name);
+  return { ...row, style: related
+    ? { background: 'rgba(37,99,235,0.12)', transition: 'background 0.15s' }
+    : { opacity: '0.3', transition: 'opacity 0.15s' },
+  };
+};
+
+// JSON 保存ボタン
+const _save_theme = (s) => {
+  const theme = _ensure_theme_obj(s);
+  const json = JSON.stringify(theme, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ric-theme.json'; a.click();
+  URL.revokeObjectURL(url);
+};
+
+// JSON 読込ボタン
+const _load_theme = (s) => {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const theme = JSON.parse(ev.target.result);
+        s.page.theme = theme;
+      } catch (err) { console.error('[Theme Studio] JSON 読込エラー:', err); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+};
+
+// ── ハイライトスタイル計算（右パネルのセクション用） ──
+const section_style = (s, sec_id) => {
+  const base = 'padding:12px;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:opacity 0.15s,border-color 0.15s,box-shadow 0.15s';
+  if (s._sel_part === sec_id) {
+    return base + ';border-color:var(--ric-color-accent);box-shadow:0 0 12px rgba(37,99,235,0.25)';
+  }
+  if (s._sel_part && s._sel_part !== sec_id) {
+    return base + ';opacity:0.25';
+  }
+  return base;
+};
+
+// ═══════════════════════════════════════════════════════════
+// メイン: create_RicDOM
+// ═══════════════════════════════════════════════════════════
+const s = create_RicDOM('#mount', {
+  _sel_part: null,
+  _chk_demo: false,
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  sp: create_ui_splitter({ side: 'left', size: 280, min: 220 }),
+  // ── ステートフルコンポーネント（右パネル用） ──
+  popup1: create_ui_popup(),
+  popup2: create_ui_popup(),
+  tip1:   create_ui_tooltip(),
+  dlg:    create_ui_dialog(),
+  toast:  create_ui_toast(),
+  acc:    create_ui_accordion({ default_open: { a1: true } }),
+  // tabs の選択状態は radiobutton や select と同じ扱い — state に直接持つ
+  active_demo_tab: 'tab1',
+  render(s) {
+    s.toast(); // ポータル登録
+
+    const on_section_click = (sec_id, e) => {
+      e.stopPropagation();
+      s._sel_part = s._sel_part === sec_id ? null : sec_id;
+    };
+    const on_bg_click = () => {
+      if (s._sel_part) s._sel_part = null;
+    };
+
+    // ══════════════════════════════════════
+    // 左パネル: テーマ変数エディタ（Tier 3 — 完全自前 ctx）
+    // ══════════════════════════════════════
+    // ui_tweak_panel は stateless wrapper。render() 内で毎回 ctx を組み立てる
+    // ことで、theme 値の変化が即座に各 ui_tweak_row.get() に反映される。
+    const tweak_vdom = () => ui_tweak_panel({
+      title: 'Theme Editor',
+      width: '100%',
+      ctx: [
+        ui_tweak_folder({ label: 'Colors', open: true, ctx: [
+          make_var_row(s, '--ric-color-fg',        'fg'),
+          make_var_row(s, '--ric-color-fg-muted',  'fg-muted'),
+          make_var_row(s, '--ric-color-bg',        'bg'),
+          make_var_row(s, '--ric-color-control',   'control'),
+          make_var_row(s, '--ric-color-border',    'border'),
+          make_var_row(s, '--ric-color-accent',    'accent'),
+          make_var_row(s, '--ric-color-accent-fg', 'accent-fg'),
+          make_var_row(s, '--ric-tooltip-bg',      'tooltip-bg'),
+          make_var_row(s, '--ric-tooltip-fg',      'tooltip-fg'),
+        ]}),
+        ui_tweak_folder({ label: 'Effects', ctx: [
+          make_var_row(s, '--ric-shadow',       'shadow'),
+          make_var_row(s, '--ric-popup-bg',     'popup-bg'),
+          make_var_row(s, '--ric-popup-blur',   'popup-blur'),
+          make_var_row(s, '--ric-panel-shadow', 'panel-shadow'),
+        ]}),
+        ui_tweak_folder({ label: 'Layout', ctx: [
+          make_var_row(s, '--ric-radius',    'radius'),
+          make_var_row(s, '--ric-control-h', 'control-h'),
+          make_var_row(s, '--ric-gap',       'gap'),
+          make_var_row(s, '--ric-pad-x',     'pad-x'),
+          make_var_row(s, '--ric-pad-y',     'pad-y'),
+        ]}),
+        ui_tweak_folder({ label: 'Animation', ctx: [
+          make_var_row(s, '--ric-duration', 'duration'),
+          make_var_row(s, '--ric-easing',   'easing'),
+        ]}),
+        // ── ボタン行（separator + 保存 / 読込）──
+        { tag: 'hr', class: 'ric-separator' },
+        { tag: 'div', style: { display: 'flex', gap: '8px', padding: '8px 12px' }, ctx: [
+          ui_button({ ctx: ['JSON 保存'], onclick: () => _save_theme(s), style: { flex: 1 } }),
+          ui_button({ ctx: ['JSON 読込'], onclick: () => _load_theme(s), style: { flex: 1 } }),
+        ]},
+      ],
+    });
+    const left_panel = () => ({
+      style: { overflowY: 'auto' },
+      ctx: [ tweak_vdom() ],
+    });
+
+    // ══════════════════════════════════════
+    // 右パネル: UI 部品プレビュー
+    // ══════════════════════════════════════
+    const sec = (id, ctx) => ({
+      tag: 'div',
+      style: section_style(s, id),
+      onclick: (e) => on_section_click(id, e),
+      ctx: [
+        { tag: 'div', style: 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;opacity:0.5;margin-bottom:8px', ctx: [SECTION_LABELS[id]] },
+        ...ctx,
+      ],
+    });
+
+    const right_panel = () => ({ ctx: [
+      { tag: 'div', style: 'padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto',
+        onclick: on_bg_click,
+        ctx: [
+          { tag: 'div', style: 'font-size:11px;opacity:0.5;text-align:center', ctx: ['UI 部品をクリック → 左右パネルで関連項目をハイライト'] },
+
+          sec('typography', [
+            ui_text({ variant: 'title', ctx: ['Title テキスト'] }),
+            ui_text({ ctx: ['Body テキスト — 通常の本文です。'] }),
+            ui_text({ variant: 'muted', ctx: ['Muted テキスト — 補足情報。'] }),
+            ui_text({ variant: 'label', ctx: ['Label テキスト'] }),
+          ]),
+
+          sec('buttons', [
+            ui_row({ ctx: [
+              ui_button({ ctx: ['Default'] }),
+              ui_button({ ctx: ['Primary'], variant: 'primary' }),
+              ui_button({ ctx: ['Disabled'], disabled: true }),
+            ]}),
+          ]),
+
+          sec('forms', [
+            ui_row({ style: { alignItems: 'flex-end' }, ctx: [
+              ui_col({ style: { flex: '1' }, ctx: [
+                ui_text({ variant: 'label', ctx: ['テキスト入力'] }),
+                ui_input({ placeholder: 'placeholder...' }),
+              ]}),
+              bind_checkbox(s, '_chk_demo', { ctx: ['チェック'] }),
+            ]}),
+            ui_row({ ctx: [
+              ui_radiobutton({ name: '_rd_demo', value: 'A', options: ['A', 'B'] }),
+              ui_select({ options: ['Option 1', 'Option 2'], style: { minWidth: '120px' } }),
+            ]}),
+          ]),
+
+          sec('surface', [
+            ui_panel({ ctx: [
+              ui_text({ ctx: ['ui_panel — テーマ背景・枠線・角丸・シャドウ'] }),
+            ]}),
+          ]),
+
+          sec('popup', [
+            ui_row({ ctx: [
+              s.popup1({ label: 'Dropdown', ctx: [
+                ui_button({ ctx: ['Item A'], variant: 'ghost' }),
+                ui_button({ ctx: ['Item B'], variant: 'ghost' }),
+              ]}),
+              s.popup2({ ctx: [
+                ui_button({ ctx: ['Menu 1'], variant: 'ghost' }),
+                ui_button({ ctx: ['Menu 2'], variant: 'ghost' }),
+              ]}),
+              s.tip1({ content: 'ツールチップ', ctx: [ui_button({ ctx: ['Hover me'] })] }),
+            ]}),
+          ]),
+
+          sec('dialog', [
+            s.dlg({
+              trigger_ctx: ['Dialog を開く'],
+              title: 'ダイアログ',
+              ctx: [ui_text({ ctx: ['ダイアログの中身です。'] })],
+              actions: [
+                ui_button({ ctx: ['OK'], variant: 'primary', onclick: s.dlg.close }),
+                ui_button({ ctx: ['Cancel'], onclick: s.dlg.close }),
+              ],
+            }),
+          ]),
+
+          sec('toast', [
+            ui_row({ ctx: [
+              ui_button({ ctx: ['Success'], onclick: () => s.toast.show('保存しました', { type: 'success' }) }),
+              ui_button({ ctx: ['Error'], onclick: () => s.toast.show('エラー', { type: 'error' }) }),
+              ui_button({ ctx: ['Info'], onclick: () => s.toast.show('情報', { type: 'info' }) }),
+            ]}),
+          ]),
+
+          sec('accordion', [
+            s.acc({
+              items: [
+                { id: 'a1', title: 'アイテム 1', ctx: [ui_text({ ctx: ['アコーディオンの内容です。'] })] },
+                { id: 'a2', title: 'アイテム 2', ctx: [ui_text({ ctx: ['2番目の内容。'] })] },
+              ],
+            }),
+          ]),
+
+          sec('tabs', [
+            bind_tabs(s, 'active_demo_tab', {
+              items: [
+                { key: 'tab1', label: 'Tab A', ctx: [ui_text({ ctx: ['タブ A の内容'] })] },
+                { key: 'tab2', label: 'Tab B', ctx: [ui_text({ ctx: ['タブ B の内容'] })] },
+              ],
+            }),
+          ]),
+
+          sec('splitter_demo', [
+            ui_text({ variant: 'muted', ctx: ['この画面自体が create_ui_splitter を使用しています。'] }),
+          ]),
+
+          sec('code', [
+            ui_code_pre({ obj: { theme: s.page.theme, sel_part: s._sel_part } }),
+          ]),
+        ],
+      },
+    ]});
+
+    // ══════════════════════════════════════
+    // ページ全体（body の flex 内で残り全高を埋める）
+    // ══════════════════════════════════════
+    return s.page({
+      style: { height: '100%', borderRadius: 0, padding: 0 },
+      ctx: [
+        s.sp({
+          side: left_panel(),
+          main: right_panel(),
+        }),
+      ],
+    });
+  },
+});
+
+</script>
+</body>
+</html>

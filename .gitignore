@@ -1,0 +1,17 @@
+node_modules/
+.claude/
+
+# 下書き・旧仕様書・旧サンプル（ローカル参照用）
+_drafts/
+
+# ビルド成果物（npm run build で再生成可能）
+# ルート直下の min.js は除外、docs/ 内は GitHub Pages 用に含める
+/*.min.js
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+local_http_server.js

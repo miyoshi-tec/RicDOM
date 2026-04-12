@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON Editor — RicUI</title>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+
+<div id="nav_bar" data-sample="09"></div>
+<div id="mount"></div>
+
+<script src="_nav_bar.js"></script>
+
+<script>
+'use strict';
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, create_ui_dialog, create_ui_toast, ui_button, ui_input, ui_text } = RicUI;
+
+// ── JSON ヘルパー群（純粋関数）──
+// 書き込み系（set_at / del_at / rename_at）は immutable に clone を返す。
+// 読み取り系（get_at）と分類系（type_of / preview / unique_key）は副作用なし。
+const clone  = (x) => JSON.parse(JSON.stringify(x));
+const get_at = (root, path) => path.reduce((c, k) => c?.[k], root);
+const set_at = (root, path, val) => {
+  if (path.length === 0) return val;
+  const r = clone(root);
+  let cur = r;
+  for (let i = 0; i < path.length - 1; i++) cur = cur[path[i]];
+  cur[path[path.length - 1]] = val;
+  return r;
+};
+const del_at = (root, path) => {
+  const r = clone(root);
+  let cur = r;
+  for (let i = 0; i < path.length - 1; i++) cur = cur[path[i]];
+  const last = path[path.length - 1];
+  if (Array.isArray(cur)) cur.splice(last, 1); else delete cur[last];
+  return r;
+};
+// キーのリネーム: JS オブジェクトはキー挿入順が保存されるため、単純に
+// 新キーで代入すると末尾に追加されてしまう。そこで「全キー delete → 順に再追加」
+// というダンスで元の位置を保つ。
+const rename_at = (root, path, new_key) => {
+  const r = clone(root);
+  let parent = r;
+  for (let i = 0; i < path.length - 1; i++) parent = parent[path[i]];
+  const old_key = String(path[path.length - 1]);
+  const entries = Object.entries(parent).map(([k, v]) => k === old_key ? [new_key, v] : [k, v]);
+  for (const k of Object.keys(parent)) delete parent[k];
+  for (const [k, v] of entries) parent[k] = v;
+  return r;
+};
+const type_of = (v) => v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v;
+const preview = (v) => {
+  const t = type_of(v);
+  if (t === 'null')   return 'null';
+  if (t === 'string') return `"${v.length > 40 ? v.slice(0, 40) + '…' : v}"`;
+  if (t === 'object') return `{${Object.keys(v).length}}`;
+  if (t === 'array')  return `[${v.length}]`;
+  return String(v);
+};
+const unique_key = (obj) => {
+  let k = 'key', i = 1;
+  while (k in obj) k = `key_${i++}`;
+  return k;
+};
+
+// ── デモデータ ──
+const DEMO = {
+  name: 'Alice', age: 28, active: true, score: null,
+  tags: ['admin', 'editor'],
+  address: { city: 'Tokyo', zip: '100-0001' },
+  config:  { theme: 'dark', fontSize: 14, autosave: false },
+};
+
+create_RicDOM('#mount', {
+  json_root: clone(DEMO),
+  filename:  'demo.json',
+  // expanded: パスの JSON.stringify をキー、bool を値とする展開状態マップ。
+  // '[]' = JSON.stringify([]) は空パス = root を初期から開く。
+  expanded:  { '[]': true },
+  // editing: 編集中のみ { path, key, val_str, is_new } を持つ。
+  //   val_str は JSON リテラル文字列。folder（object/array）の場合は null（値入力なし）。
+  //   is_new=true の場合、キャンセルで追加自体を取り消す。
+  editing:   null,
+  page:  create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  dlg:   create_ui_dialog(),
+  toast: create_ui_toast(),
+  render(s) {
+    s.toast(); // ポータル登録
+
+    // ── 編集アクション ──
+    // folder（object/array）は val_str=null にして値入力を出さない（キーのみリネーム可）
+    // is_new=true のときはキャンセルで追加自体を取り消す
+    const begin_edit = (path, val, is_new = false) => {
+      const t = type_of(val);
+      s.editing = {
+        path,
+        key: String(path[path.length - 1] ?? ''),
+        val_str: (t === 'object' || t === 'array') ? null : JSON.stringify(val),
+        is_new,
+      };
+    };
+    const commit_edit = () => {
+      const e = s.editing;
+      if (!e) return;
+      let path = e.path;
+      // キー変更（親が object のときのみ）
+      if (path.length > 0) {
+        const parent = get_at(s.json_root, path.slice(0, -1));
+        const old_key = String(path[path.length - 1]);
+        if (parent && !Array.isArray(parent) && e.key !== old_key) {
+          if (e.key in parent) { s.toast.show('キーが重複しています', { type: 'error' }); return; }
+          s.json_root = rename_at(s.json_root, path, e.key);
+          // rename 後の値更新に備えてパス末尾を新キーに差し替える
+          path = [...path.slice(0, -1), e.key];
+        }
+      }
+      // 値更新（folder 以外）— JSON リテラルとしてパース
+      if (e.val_str !== null) {
+        let val;
+        try { val = JSON.parse(e.val_str); }
+        catch { s.toast.show('JSON としてパースできません', { type: 'error' }); return; }
+        s.json_root = set_at(s.json_root, path, val);
+      }
+      s.editing = null;
+    };
+    const cancel_edit = () => {
+      // 新規追加のキャンセルは追加自体をなかったことにする
+      if (s.editing && s.editing.is_new) {
+        s.json_root = del_at(s.json_root, s.editing.path);
+        const k = JSON.stringify(s.editing.path);
+        if (s.expanded[k]) {
+          const { [k]: _, ...rest } = s.expanded;
+          s.expanded = rest;
+        }
+      }
+      s.editing = null;
+    };
+
+    // ── ツリー操作 ──
+    const toggle = (path) => {
+      const k = JSON.stringify(path);
+      s.expanded = { ...s.expanded, [k]: !s.expanded[k] };
+    };
+    const delete_row = (path) => {
+      s.json_root = del_at(s.json_root, path);
+      s.toast.show('削除しました', { type: 'success' });
+    };
+    // 追加：initial に '' / {} / [] を渡して 3 種類のボタンから作れる。
+    // 親が object なら編集モードを開いてキー名を入力してもらう（folder の場合は
+    // val_str=null なので値入力は出ず、キー入力のみ）。
+    // 親が array の場合は、string のみ編集モードに入る（配列要素にキーはないので
+    // {} / [] は即座に追加して展開するだけ）。
+    const add_row = (parent_path, initial) => {
+      const parent = get_at(s.json_root, parent_path);
+      const parent_is_array = Array.isArray(parent);
+      let new_path;
+      if (parent_is_array) {
+        new_path = [...parent_path, parent.length];
+      } else if (parent && typeof parent === 'object') {
+        new_path = [...parent_path, unique_key(parent)];
+      } else return;
+      s.json_root = set_at(s.json_root, new_path, initial);
+      // folder を追加した場合は新規ノードも自動展開
+      const new_expanded = { ...s.expanded, [JSON.stringify(parent_path)]: true };
+      if (typeof initial === 'object' && initial !== null) {
+        new_expanded[JSON.stringify(new_path)] = true;
+      }
+      s.expanded = new_expanded;
+      // 親が object ならキー編集のため常に編集モード。
+      // 親が array なら、string のときだけ編集モード（キーがないので folder は直追加）。
+      if (!parent_is_array || typeof initial === 'string') {
+        begin_edit(new_path, initial, true);
+      }
+    };
+
+    // ── ファイル I/O ──
+    const save_file = () => {
+      const blob = new Blob([JSON.stringify(s.json_root, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = s.filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      s.toast.show(`${s.filename} を保存しました`, { type: 'success' });
+    };
+    const load_file = (file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          s.json_root = JSON.parse(reader.result);
+          s.filename = file.name;
+          s.editing = null;
+          s.toast.show(`${file.name} を読み込みました`, { type: 'success' });
+        } catch (err) {
+          s.toast.show('JSON パースエラー: ' + err.message, { type: 'error' });
+        }
+      };
+      reader.readAsText(file);
+    };
+    const open_file = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.onchange = (ev) => { if (ev.target.files[0]) load_file(ev.target.files[0]); };
+      input.click();
+    };
+
+    // ── ツリー描画（再帰）──
+    const render_node = (val, path) => {
+      const type = type_of(val);
+      const is_folder = type === 'object' || type === 'array';
+      const is_open = is_folder && s.expanded[JSON.stringify(path)];
+      const is_editing = s.editing && JSON.stringify(s.editing.path) === JSON.stringify(path);
+      const parent = path.length > 0 ? get_at(s.json_root, path.slice(0, -1)) : null;
+      const parent_is_array = Array.isArray(parent);
+      const indent_px = path.length * 16;
+
+      // 編集行：[key input] [value input (flex)] [OK] [キャンセル] を 1 行に。
+      // 幅が足りなければ flex-wrap で折り返す。
+      if (is_editing) {
+        const e = s.editing;
+        return [{ tag: 'div',
+          style: { padding: `6px 8px 6px ${indent_px + 8}px`, display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center',
+                   borderBottom: '1px solid var(--ric-color-border)', borderLeft: '3px solid var(--ric-color-accent)' },
+          ctx: [
+            parent_is_array || path.length === 0
+              ? ui_text({ ctx: [path.length === 0 ? 'root' : `[${path[path.length - 1]}]`] })
+              : ui_input({ value: e.key, style: { width: '10em', flexShrink: 0 },
+                  oninput: (ev) => { s.editing.key = ev.target.value; } }),
+            e.val_str !== null
+              ? ui_input({ value: e.val_str, style: { flex: 1, minWidth: '8em', fontFamily: 'monospace' },
+                  placeholder: '"text" / 42 / true / null / {} / []',
+                  oninput: (ev) => { s.editing.val_str = ev.target.value; } })
+              : { tag: 'span', style: { flex: 1 } }, // spacer: OK/キャンセルを右寄せするため
+            ui_button({ variant: 'primary', ctx: ['OK'],       onclick: commit_edit }),
+            ui_button({                     ctx: ['キャンセル'], onclick: cancel_edit }),
+          ]}];
+      }
+
+      // 通常行
+      const row = { tag: 'div',
+        style: { padding: `4px 8px 4px ${indent_px + 8}px`, display: 'flex', alignItems: 'center', gap: '6px',
+                 borderBottom: '1px solid var(--ric-color-border)' },
+        ctx: [
+          { tag: 'span',
+            style: { width: '16px', userSelect: 'none', color: 'var(--ric-color-fg-muted)' },
+            ...(is_folder ? { class: 'je-click', onclick: () => toggle(path) } : {}),
+            ctx: [is_folder ? (is_open ? '▼' : '▶') : ' '] },
+          { tag: 'span',
+            style: { fontFamily: 'monospace', fontWeight: 700, color: 'var(--ric-color-accent)' },
+            ...(path.length > 0 ? { class: 'je-click', onclick: () => begin_edit(path, val) } : {}),
+            ctx: [path.length === 0 ? 'root' : (parent_is_array ? `[${path[path.length - 1]}]` : String(path[path.length - 1]))] },
+          { tag: 'span', style: { color: 'var(--ric-color-fg-muted)' }, ctx: [':'] },
+          // preview: folder なら toggle、leaf なら begin_edit
+          { tag: 'span', class: 'je-click',
+            style: { fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+            onclick: is_folder ? () => toggle(path) : () => begin_edit(path, val),
+            ctx: [preview(val)] },
+          is_folder       ? ui_button({ variant: 'ghost', ctx: ['+'],   onclick: () => add_row(path, '') }) : null,
+          is_folder       ? ui_button({ variant: 'ghost', ctx: ['+{}'], onclick: () => add_row(path, {}) }) : null,
+          is_folder       ? ui_button({ variant: 'ghost', ctx: ['+[]'], onclick: () => add_row(path, []) }) : null,
+          path.length > 0 ? ui_button({ variant: 'ghost', ctx: ['✕'],   onclick: () => delete_row(path) }) : null,
+        ].filter(Boolean) };
+
+      // folder の子は「閉じていても」常にレンダリングして DOM に残す。
+      // 閉じているときは grid-template-rows: 0fr で高さ 0 にクリップし、
+      // 開くときは 1fr に遷移させる。これで auto 高さへの滑らかな
+      // 開閉アニメーションが得られる（max-height と違い自然高を知らなくてよい）。
+      if (is_folder) {
+        const children = Array.isArray(val)
+          ? val.flatMap((v, i) => render_node(v, [...path, i]))
+          : Object.entries(val).flatMap(([k, v]) => render_node(v, [...path, k]));
+        const wrap = { tag: 'div',
+          style: {
+            display: 'grid',
+            gridTemplateRows: is_open ? '1fr' : '0fr',
+            transition: 'grid-template-rows var(--ric-duration) var(--ric-easing)',
+          },
+          ctx: [{ tag: 'div', style: { overflow: 'hidden', minHeight: 0 }, ctx: children }],
+        };
+        return [row, wrap];
+      }
+      return [row];
+    };
+
+    return s.page({
+      style: { height: '100vh', padding: 0, borderRadius: 0, display: 'flex', flexDirection: 'column' },
+      ctx: [
+        // :hover 疑似クラスは inline style では書けないので <style> タグで注入する
+        { tag: 'style', ctx: [`
+          .je-click { cursor: pointer; padding: 6px 6px; border-radius: 3px; transition: background 0.1s; }
+          .je-click:hover { background: color-mix(in srgb, var(--ric-color-accent) 18%, transparent); }
+        `] },
+        // ── ツールバー ──
+        { tag: 'div',
+          style: { display: 'flex', gap: '6px', padding: '8px 12px', borderBottom: '1px solid var(--ric-color-border)',
+                   alignItems: 'center', flexShrink: 0 },
+          ctx: [
+            ui_button({ ctx: ['📂 Open'], onclick: open_file }),
+            ui_text({ variant: 'muted', ctx: [s.filename] }),
+            // スペーサー: 以降のボタンを右に寄せる
+            { tag: 'span', style: { flex: 1 } },
+            ui_button({ ctx: ['💾 Save'], onclick: save_file }),
+            s.dlg({
+              trigger_ctx: ['🔄 Reset'],
+              trigger_variant: 'default',
+              title: 'デモデータに戻す',
+              ctx: [ui_text({ ctx: ['現在の編集内容は失われます。'] })],
+              actions: [
+                ui_button({ variant: 'primary', ctx: ['リセット'], onclick: () => {
+                  s.json_root = clone(DEMO);
+                  s.filename  = 'demo.json';
+                  s.editing   = null;
+                  s.dlg.close();
+                  s.toast.show('リセットしました', { type: 'success' });
+                }}),
+                ui_button({ ctx: ['キャンセル'], onclick: s.dlg.close }),
+              ],
+            }),
+          ]},
+        // ── ツリー（ドロップで読み込み）──
+        { tag: 'div',
+          style: { flex: 1, overflowY: 'auto' },
+          ondrop: (ev) => { ev.preventDefault(); if (ev.dataTransfer.files[0]) load_file(ev.dataTransfer.files[0]); },
+          ondragover: (ev) => { ev.preventDefault(); },
+          ctx: render_node(s.json_root, []),
+        },
+      ],
+    });
+  },
+});
+</script>
+
+</body>
+</html>

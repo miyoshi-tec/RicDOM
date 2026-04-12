@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RicDOM — JSON で書くリアルタイムコントロール DOM</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+  #app { max-width: 960px; margin: 0 auto; padding: 40px 20px; }
+
+  /* サンプルリンク */
+  .sample-link {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 6px 8px; border-bottom: 1px solid var(--ric-color-border, #e5e7eb);
+    border-radius: 6px; cursor: pointer; text-decoration: none; color: inherit;
+    transition: background 0.15s;
+  }
+  .sample-link:hover { background: var(--ric-color-bg-hover, rgba(0,0,0,0.05)); }
+  .sample-link:active { background: var(--ric-color-bg-active, rgba(0,0,0,0.1)); }
+  .sample-no { font-weight: 700; font-size: 12px; opacity: 0.5; min-width: 28px; }
+  .sample-title { font-weight: 600; }
+  .sample-desc { font-size: 12px; opacity: 0.6; }
+  /* コード */
+  .code-block {
+    background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 8px;
+    font-family: 'SF Mono', Consolas, monospace; font-size: 13px;
+    line-height: 1.6; overflow-x: auto; white-space: pre;
+  }
+  /* バッジ */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge--core { background: #dcfce7; color: #166534; }
+  .badge--ui   { background: #dbeafe; color: #1e40af; }
+  .badge--opt  { background: #fef3c7; color: #92400e; }
+  /* セクション間余白 */
+  .section-gap { height: 24px; }
+  /* クイックスタート 2カラム */
+  .qs-row { display: flex; gap: 16px; flex: 0 0 auto; }
+  .qs-code { flex: 1; min-width: 0; }
+  .qs-demo { flex: 1; min-width: 0; }
+  .qs-code pre { margin: 0; border-radius: 8px; font-size: 12px; line-height: 1.5; }
+  .qs-code code { font-family: 'SF Mono', Consolas, monospace; }
+  @media (max-width: 800px) {
+    .qs-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div id="index_page"></div>
+<script src="RicDOM.min.js"></script>
+<script src="RicUI.min.js"></script>
+<script>
+// localStorage からテーマ設定を復元（_nav_bar.js と同じキー）
+try {
+  const _s = JSON.parse(localStorage.getItem('ric-settings') || 'null');
+  if (_s) window._ric_settings = _s;
+} catch {}
+</script>
+<script id="src00" type="text/javascript">// <div id="app_page"></div>
+// <script src="RicDOM.min.js"><\/script>
+// <script src="RicUI.min.js"><\/script>
+
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_panel, ui_text, bind_input } = RicUI;
+
+create_RicDOM('#app_page', {
+  name: '',
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  render(s) {
+    return s.page({ ctx: [
+      ui_panel({ ctx: [
+        ui_text({ variant: 'title', ctx: ['Hello'] }),
+        bind_input(s, 'name', { placeholder: '名前…' }),
+        s.name
+          ? ui_text({ ctx: [`こんにちは、${s.name}さん！`] })
+          : ui_text({ variant: 'muted', ctx: ['（名前を入力）'] }),
+      ]}),
+    ]});
+  },
+});
+</script>
+<script>
+// create_RicDOM, create_ui_page 等は前の <script> で destructure 済み
+const { ui_col, ui_row, ui_button, ui_code_pre, ui_radiobutton } = RicUI;
+
+// ── サンプル一覧データ ──
+const SAMPLES = [
+  { no: '00', file: '00_hello.html',              title: 'Hello World',       desc: 'RicDOM vs RicUI の比較' },
+  { no: '01', file: '01_forms.html',              title: 'フォーム',           desc: 'bind_input / ui_checkbox / ui_radiobutton' },
+  { no: '02', file: '02_controls.html',           title: 'コントロール',       desc: 'ui_button / create_ui_popup' },
+  { no: '03', file: '03_popup.html',              title: 'ポップアップ',       desc: 'create_ui_popup / create_ui_tooltip' },
+  { no: '04', file: '04_accordion_dialog.html',   title: 'ダイアログ & トースト', desc: 'create_ui_dialog / create_ui_toast' },
+  { no: '05', file: '05_toast_accordion.html',    title: 'アコーディオン',     desc: 'create_ui_accordion で開閉パネル' },
+  { no: '06', file: '06_splitter.html',           title: 'スプリッター',       desc: 'create_ui_splitter / bind_tabs' },
+  { no: '07', file: '07_tweak_splitter.html',     title: 'Tweak Panel + スプリッター', desc: 'create_ui_tweak_panel をスプリッターに配置' },
+  { no: '08', file: '08_tweak_menu.html',         title: 'Tweak Panel + メニュー',desc: 'create_ui_tweak_panel をポップアップメニューに' },
+  { no: '09', file: '09_json_editor.html',        title: 'JSON エディタ',      desc: 'スプリッター + ダイアログ + トースト' },
+  { no: '10', file: '10_theme_studio.html',       title: 'テーマ編集',         desc: 'CSS 変数エディタ + UI プレビュー + JSON 保存/読込' },
+  { no: '11', file: '11_theme_override.html',     title: 'ローカルテーマ',     desc: 'create_ui_panel のテーマ / 密度 / disabled' },
+];
+
+// ── メインレンダー ──
+create_RicDOM('#index_page', {
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  render(s) {
+    return s.page({ style: 'padding: 40px 20px;', ctx: [
+      ui_col({ ctx: [
+
+        // ── ヒーロー ──
+        ui_text({ variant: 'title', ctx: ['RicDOM'],
+          style: { fontSize: '2.5rem', textAlign: 'center' },
+        }),
+        ui_text({ ctx: ['JSON で書く、8KB のリアルタイムコントロール DOM ライブラリ'],
+          style: { textAlign: 'center', fontSize: '1.1rem', opacity: '0.7' },
+        }),
+        ui_text({ ctx: ['Electron アプリ・社内ツール・パラメータ調整 UI 向け。大規模 SPA には向きません。'],
+          style: { textAlign: 'center', fontSize: '0.95rem', opacity: '0.75' },
+        }),
+        ui_text({ variant: 'muted', ctx: ['RicDOM = コア / RicUI = UI部品 + 調整パネル'],
+          style: { textAlign: 'center', fontSize: '0.9rem' },
+        }),
+
+        { tag: 'div', class: 'section-gap' },
+
+        // ── 5 分で動く（動く証拠 + 唯一の Hello World）──
+        // このページ自体が RicDOM + RicUI で描画されていて、右側のデモも
+        // 左側のコードがそのままブラウザで実行されている本物の証拠です
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['5 分で動く'], style: { fontSize: '1.3rem' } }),
+          ui_text({ variant: 'muted',
+            ctx: ['<script> タグ 1 つ、ビルド不要。このページ自体が RicDOM + RicUI で描画されています。下のコードは右側のパネルで実際に動作しています。'],
+          }),
+          { tag: 'div', class: 'qs-row', ctx: [
+            // 左: シンタックスハイライト付きコード
+            { tag: 'div', class: 'qs-code', ctx: [
+              ui_code_pre({ ctx: [ src00.textContent ], lang: 'javascript' }),
+            ]},
+            // 右: 実際の実行結果（#src00 のコードがそのまま実行される）
+            { tag: 'div', class: 'qs-demo', ctx: [
+              { tag: 'div', id: 'app_page' },
+            ]},
+          ]},
+          // テーマ切り替え — リアクティビティの証拠としてクイックスタート内に置く
+          ui_row({ style: { justifyContent: 'center', flexWrap: 'wrap', gap: '10px' }, ctx: [
+            ui_text({ variant: 'muted', ctx: ['テーマ切替（ページ全体が即座に再描画されます）:'] }),
+            ui_radiobutton({
+              name: 'theme', value: s.page.theme,
+              options: ['light', 'dark', 'teal', 'cyber', 'aqua'],
+              onchange: (e) => {
+                s.page.theme = e.target.value;
+                // サンプルページと設定を共有（_nav_bar.js と同じキー）
+                try {
+                  const cur = JSON.parse(localStorage.getItem('ric-settings') || '{}');
+                  cur.theme = e.target.value;
+                  localStorage.setItem('ric-settings', JSON.stringify(cur));
+                } catch {}
+              },
+            }),
+          ]}),
+        ]}),
+
+        { tag: 'div', class: 'section-gap' },
+
+        // ── なぜ RicDOM？（benefit 先行）──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['なぜ RicDOM？'], style: { fontSize: '1.3rem' } }),
+          ui_col({ ctx: [
+            ui_text({ ctx: ['🇯🇵 日本語 IME を壊さない — Virtual DOM の再構築がないので、input 入力中に変換が途切れません'] }),
+            ui_text({ ctx: ['⚡ ビルド不要 — <script> タグ 1 つで動きます。webpack / Vite / JSX 不要'] }),
+            ui_text({ ctx: ['📝 JSON で UI を書く — { tag: \'div\', ctx: [...] } の plain object で宣言的に記述'] }),
+            ui_text({ ctx: ['🔄 Proxy 自動追跡 — s.count = 5 と書くだけで自動再描画'] }),
+            ui_text({ ctx: ['🪶 小さい — コア 8KB、学習コストは create_RicDOM だけ'] }),
+          ]}),
+          ui_text({ variant: 'muted',
+            ctx: ['🎯 得意: Electron アプリ、社内ツール、プロトタイプ、データ可視化、パラメータ調整 UI。  ❌ 苦手: 大規模 SPA、SEO 必須のマーケサイト。'],
+            style: { fontSize: '0.85rem' },
+          }),
+        ]}),
+
+        { tag: 'div', class: 'section-gap' },
+
+        // ── バンドル ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['バンドル構成'], style: { fontSize: '1.3rem' } }),
+          ui_col({ ctx: [
+            ui_row({ ctx: [
+              { tag: 'span', class: 'badge badge--core', ctx: ['RicDOM.min.js — 8KB'] },
+              ui_text({ ctx: ['コア（必須）'] }),
+            ]}),
+            ui_row({ ctx: [
+              { tag: 'span', class: 'badge badge--ui', ctx: ['RicUI.min.js — 49KB'] },
+              ui_text({ ctx: ['UI コンポーネント集 + パラメータ調整パネル'] }),
+            ]}),
+          ]}),
+        ]}),
+
+        { tag: 'div', class: 'section-gap' },
+
+        // ── サンプル一覧 ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['サンプル'], style: { fontSize: '1.3rem' } }),
+          ui_text({ variant: 'muted', ctx: ['初めてなら 00 → 01 → 03 → 07 の順がおすすめです'] }),
+          ui_col({ style: { gap: '0' }, ctx:
+            SAMPLES.map(s => ({
+              tag: 'a', class: 'sample-link',
+              href: 'samples/' + s.file,
+              ctx: [
+                { tag: 'span', class: 'sample-no', ctx: [s.no] },
+                { tag: 'span', class: 'sample-title', ctx: [s.title] },
+                { tag: 'span', class: 'sample-desc', ctx: [' — ' + s.desc] },
+              ],
+            })),
+          }),
+        ]}),
+
+        { tag: 'div', class: 'section-gap' },
+
+        // ── フッター ──
+        ui_row({ style: { justifyContent: 'center', gap: '16px' }, ctx: [
+          { tag: 'a', href: 'https://github.com/miyoshi-tec/RicDOM',
+            style: 'color: var(--ric-color-accent); text-decoration: none',
+            ctx: ['GitHub'] },
+          { tag: 'a', href: 'https://github.com/miyoshi-tec/RicDOM/blob/main/SPEC.md',
+            style: 'color: var(--ric-color-accent); text-decoration: none',
+            ctx: ['API リファレンス'] },
+          ui_text({ variant: 'muted', ctx: ['個人利用・学習・研究・OSS 開発は自由。商用利用は要相談'] }),
+        ]}),
+      ]}),
+    ]});
+  },
+});
+</script>
+</body>
+</html>

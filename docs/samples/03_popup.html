@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Popup / Menu — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+  <style>
+    body {
+      padding-bottom: 72px; /* flip-zone の高さ分 */
+    }
+
+    /* ric-page の overflow: hidden をオーバーライドしてポップアップが切れないようにする */
+    #mount-rui .ric-page { overflow: visible; }
+
+    /* ── raw デモ：ブラウザ的な体裁を復元 ── */
+    #mount-raw h3          { font-size: 1.1em; font-weight: 700; }
+    #mount-raw .head-row   { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    #mount-raw .ctrl-label { margin: 14px 0 6px; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* raw ハンバーガーメニュー */
+    #mount-raw .raw-menu          { position: relative; display: inline-flex; }
+    #mount-raw .raw-menu__bg      { position: fixed; inset: 0; z-index: 99; }
+    #mount-raw .raw-menu__trigger {
+      width: 32px; height: 32px;
+      border: 1px solid #d1d5db; border-radius: 4px;
+      background: #fff; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; z-index: 100;
+    }
+    #mount-raw .raw-menu__trigger:hover { border-color: #9ca3af; }
+    #mount-raw .raw-menu__trigger--open { background: #2563eb; color: #fff; border-color: #2563eb; }
+    #mount-raw .raw-menu__popup {
+      position: absolute; top: calc(100% + 4px); right: 0;
+      min-width: 150px; z-index: 100;
+      background: #fff; border: 1px solid #d1d5db;
+      border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;
+    }
+    #mount-raw .raw-menu__popup--above { top: auto; bottom: calc(100% + 4px); }
+    #mount-raw .raw-menu__item  { padding: 7px 12px; cursor: pointer; font-size: 13px; }
+    #mount-raw .raw-menu__item:hover { background: #2563eb; color: #fff; }
+    #mount-raw .raw-menu__sep   { height: 1px; background: #e5e7eb; margin: 4px 0; }
+
+    /* raw カスタムドロップダウン */
+    #mount-raw .raw-dd          { position: relative; }
+    #mount-raw .raw-dd__bg      { position: fixed; inset: 0; z-index: 99; }
+    #mount-raw .raw-dd__trigger {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; height: 32px; padding: 0 9px;
+      background: #fff; border: 1px solid #d1d5db; border-radius: 4px;
+      cursor: pointer; font-size: 13px; position: relative; z-index: 100;
+    }
+    #mount-raw .raw-dd__trigger:hover { border-color: #9ca3af; }
+    #mount-raw .raw-dd__arrow   { font-size: 10px; color: #9ca3af; pointer-events: none; }
+    #mount-raw .raw-dd__menu    {
+      position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+      z-index: 100; background: #fff; border: 1px solid #d1d5db;
+      border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;
+    }
+    #mount-raw .raw-dd__menu--above { top: auto; bottom: calc(100% + 2px); }
+    #mount-raw .raw-dd__item    { padding: 7px 9px; cursor: pointer; font-size: 13px; }
+    #mount-raw .raw-dd__item:hover    { background: #2563eb; color: #fff; }
+    #mount-raw .raw-dd__item--sel     { font-weight: 700; }
+
+    /* state preview */
+    #mount-raw .state-label { margin-top: 16px; margin-bottom: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #9ca3af; }
+    #mount-raw .state-pre   { padding: 10px 12px; background: #0f172a; color: #e2e8f0; font-family: Consolas, Monaco, monospace; font-size: 11px; line-height: 1.6; border-radius: 6px; white-space: pre; }
+
+    /* ── フリップゾーン（ビューポート下端に固定）── */
+    #flip-zone {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      z-index: 400;
+      display: flex; align-items: center; gap: 16px;
+      padding: 8px 20px;
+      background: rgba(255,255,255,0.97);
+      backdrop-filter: blur(6px);
+      border-top: 2px solid #22c55e;
+      box-shadow: 0 -2px 16px rgba(0,0,0,0.08);
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+    .fz-label {
+      font-size: 11px; color: #6b7280;
+      font-weight: 600; letter-spacing: 0.03em;
+      flex-shrink: 0;
+    }
+    .fz-label em { color: #16a34a; font-style: normal; }
+    #flip-mount { display: flex; align-items: center; gap: 8px; }
+    /* flip zone 内の ric-page は透明・no-overflow */
+    #flip-mount .ric-page {
+      overflow: visible;
+      background: transparent;
+      border-radius: 0;
+    }
+    /* flip zone 内の ric-panel はパディングなし */
+    #flip-mount .ric-panel { padding: 0; box-shadow: none; background: transparent; }
+
+    @media (max-width: 700px) {
+      .theme-sw { margin-left: 0; margin-top: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ナビ -->
+  <div id="nav_bar" data-sample="03"></div>
+
+  <!-- イントロ -->
+  <p class="page-intro">
+    <code>create_ui_popup()</code> でドロップダウンとハンバーガーメニューを統合実装。
+    <code>create_ui_tooltip()</code> でホバーツールチップ。
+    <code>ctx: [ ui_button({...}), ... ]</code> で中身を自由に組み立てられます。
+    画面下端の固定バーで上方向フリップを確認できます。
+  </p>
+
+  <!-- ── 比較グリッド ── -->
+  <div class="compare-grid"></div>
+
+  <!-- ── フリップゾーン（ビューポート下端固定）── -->
+  <div id="flip-zone">
+    <span class="fz-label">↑ 下端固定バー — <em>開くと上向きにフリップします</em></span>
+    <div id="flip-mount"></div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════
+       デモコード（表示 & 実行の両用）
+       ══════════════════════════════════════════════ -->
+
+  <!-- 左：RicDOM のみ版 -->
+  <script type="text/plain" id="src-raw">
+const { create_RicDOM } = RicDOM;
+// ── A. make_popup_dir ──────────────────────────────────────
+// trigger の下に content_h px 収まるか判定して 'below'|'above' を返す
+const make_popup_dir = (trigger_el, content_h) => {
+  const rect        = trigger_el.getBoundingClientRect();
+  const space_below = window.innerHeight - rect.bottom;
+  return (space_below >= content_h || space_below >= rect.top)
+    ? 'below' : 'above';
+};
+
+// ── データ ────────────────────────────────────────────────
+const LANGS = [
+  { value: 'ja', label: '日本語' },
+  { value: 'en', label: 'English' },
+  { value: 'zh', label: '中文'   },
+];
+const ACTIONS = [
+  { value: 'new',    label: '新規作成' },
+  { value: 'save',   label: '保存'     },
+  { value: 'export', label: 'エクスポート' },
+  null,
+  { value: 'settings', label: '設定' },
+];
+
+// ── create_RicDOM ──────────────────────────────────────────
+create_RicDOM('#mount-raw', {
+  lang: 'ja', last_action: null,
+  render(s) {
+    const lang_label = (LANGS.find(l => l.value === s.lang) || LANGS[0]).label;
+    const is_dd = !!s._dd;
+    const is_mn = !!s._mn;
+    const DD_H  = LANGS.length * 32 + 8;
+    const MN_H  = ACTIONS.filter(Boolean).length * 36 + 8;
+
+    return {
+      tag: 'div',
+      ctx: [
+        // ── タイトル行 + ハンバーガーメニュー ─────
+        { tag: 'div', class: 'head-row',
+          ctx: [
+            { tag: 'h3', ctx: ['ポップアップ'] },
+            { tag: 'div', class: 'raw-menu',
+              ctx: [
+                is_mn ? { tag: 'div', class: 'raw-menu__bg',
+                  onclick: () => { s._mn = false; } } : null,
+                { tag: 'button',
+                  class: 'raw-menu__trigger' + (is_mn ? ' raw-menu__trigger--open' : ''),
+                  onclick: (e) => {
+                    s._mn_dir = make_popup_dir(e.currentTarget, MN_H);
+                    s._mn     = !is_mn;
+                  },
+                  ctx: ['≡'],
+                },
+                is_mn ? {
+                  tag: 'div',
+                  class: 'raw-menu__popup' +
+                    (s._mn_dir === 'above' ? ' raw-menu__popup--above' : ''),
+                  ctx: ACTIONS.map(a => a
+                    ? { tag: 'div', class: 'raw-menu__item',
+                        onclick: () => { s.last_action = a.value; s._mn = false; },
+                        ctx: [a.label] }
+                    : { tag: 'div', class: 'raw-menu__sep' }),
+                } : null,
+              ].filter(Boolean),
+            },
+          ],
+        },
+
+        // ── カスタムドロップダウン（フリップ対応）────
+        { tag: 'p', class: 'ctrl-label', ctx: ['言語'] },
+        { tag: 'div', class: 'raw-dd',
+          ctx: [
+            is_dd ? { tag: 'div', class: 'raw-dd__bg',
+              onclick: () => { s._dd = false; } } : null,
+            { tag: 'button', class: 'raw-dd__trigger',
+              onclick: (e) => {
+                s._dd_dir = make_popup_dir(e.currentTarget, DD_H);
+                s._dd     = !is_dd;
+              },
+              ctx: [
+                { tag: 'span', ctx: [lang_label] },
+                { tag: 'span', class: 'raw-dd__arrow',
+                  ctx: [is_dd ? '▲' : '▼'] },
+              ],
+            },
+            is_dd ? {
+              tag: 'div',
+              class: 'raw-dd__menu' +
+                (s._dd_dir === 'above' ? ' raw-dd__menu--above' : ''),
+              ctx: LANGS.map(l => ({
+                tag: 'div',
+                class: l.value === s.lang
+                  ? 'raw-dd__item raw-dd__item--sel' : 'raw-dd__item',
+                onclick: () => { s.lang = l.value; s._dd = false; },
+                ctx: [l.label],
+              })),
+            } : null,
+          ].filter(Boolean),
+        },
+
+        // ── State ─────────────────────────────────
+        { tag: 'p', class: 'state-label', ctx: ['State'] },
+        { tag: 'pre', class: 'state-pre',
+          ctx: [JSON.stringify(
+            { lang: s.lang, last_action: s.last_action }, null, 2,
+          )] },
+      ],
+    };
+  },
+});
+  </script>
+
+  <!-- 右：RicUI 版 -->
+  <script type="text/plain" id="src-rui">
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_panel, ui_text, create_ui_popup, create_ui_tooltip, ui_button, ui_col, ui_row, ui_code_pre } = RicUI;
+// ── RicDOM インスタンス ──────────────────────────────────────────
+create_RicDOM('#mount-rui', {
+  lang: 'ja', last_action: null,
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  nav_l: create_ui_popup(),
+  nav_r: create_ui_popup(),
+  lang_dd: create_ui_popup(),
+  // ツールチップは 1 インスタンス = 1 トリガー（dropdown / menu と同じ設計）
+  tip1: create_ui_tooltip(),
+  tip2: create_ui_tooltip(),
+  tip3: create_ui_tooltip(),
+  render(s) {
+    const lang_map   = { ja: '日本語', en: 'English', zh: '中文' };
+    const lang_label = lang_map[s.lang] || s.lang;
+
+    // ctx はレンダーごとに生成（s を参照するため）
+    const MENU_CTX = [
+      ui_button({ ctx: ['新規作成'],     variant: 'ghost', onclick: () => { s.last_action = '新規作成'; } }),
+      ui_button({ ctx: ['保存'],         variant: 'ghost', onclick: () => { s.last_action = '保存'; } }),
+      ui_button({ ctx: ['エクスポート'], variant: 'ghost', onclick: () => { s.last_action = 'エクスポート'; } }),
+      { tag: 'div', class: 'ric-menu__sep' },
+      ui_button({ ctx: ['設定'],         variant: 'ghost', onclick: () => { s.last_action = '設定を開く'; } }),
+    ];
+    const LANG_CTX = [
+      ui_button({ ctx: ['日本語'], variant: 'ghost', onclick: () => { s.lang = 'ja'; } }),
+      ui_button({ ctx: ['English'], variant: 'ghost', onclick: () => { s.lang = 'en'; } }),
+      ui_button({ ctx: ['中文'],   variant: 'ghost', onclick: () => { s.lang = 'zh'; } }),
+    ];
+
+    return s.page({
+      ctx: [
+        ui_panel({ ctx: [
+          // ── タイトル行 + ハンバーガーメニュー ─────
+          { tag: 'div',
+            style: 'display:flex;align-items:center;justify-content:space-between;' +
+                   'margin-bottom:var(--ric-gap-md)',
+            ctx: [
+              s.nav_l({ ctx: MENU_CTX }),
+              ui_text({ variant: 'title', ctx: ['ポップアップ'] }),
+              s.nav_r({ ctx: MENU_CTX }),
+            ],
+          },
+
+          // ── カスタムドロップダウン ──────────────────
+          ui_col({ ctx: [
+            ui_text({ variant: 'label', ctx: ['言語'] }),
+            s.lang_dd({ label: lang_label, ctx: LANG_CTX }),
+          ]}),
+
+          // ── ツールチップ ───────────────────────────
+          ui_col({ ctx: [
+            ui_text({ variant: 'label', ctx: ['ツールチップ'] }),
+            { tag: 'div',
+              style: 'display:flex;align-items:center;gap:var(--ric-gap-md);flex-wrap:wrap',
+              ctx: [
+                s.tip1({ content: 'ファイルを開く', ctx: [ui_button({ ctx: ['開く'] })] }),
+                s.tip2({ content: '変更を保存（Ctrl+S）', ctx: [ui_button({ ctx: ['保存'], variant: 'primary' })] }),
+                s.tip3({ content: '下方向に表示', dir: 'bottom', ctx: [ui_button({ ctx: ['初期化'], variant: 'ghost' })] }),
+              ],
+            },
+          ]}),
+
+          // ── State ─────────────────────────────────
+          ui_code_pre({ obj: { lang: s.lang, last_action: s.last_action } }),
+        ]}),
+      ],
+    });
+  },
+});
+  </script>
+
+
+  <script src="_nav_bar.js"></script>
+  <script src="_compare.js"></script>
+  <script>
+    'use strict';
+
+    // ── フリップゾーン（ビューポート下端固定・上向きフリップのデモ）──
+    const { create_RicDOM } = RicDOM;
+    const { create_ui_page, create_ui_popup, create_ui_tooltip, ui_button, ui_row } = RicUI;
+    create_RicDOM('#flip-mount', {
+      lang: 'ja', last_action: null,
+      render(fs) {
+        fs.page ??= create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' });
+        // ステートフルコンポーネント（初回のみ生成）
+        const lang = fs.lang_dd ??= create_ui_popup();
+        const menu = fs.menu    ??= create_ui_popup();
+        const tip  = fs.tip  ??= create_ui_tooltip();
+
+        const lang_map   = { ja: '日本語', en: 'English', zh: '中文' };
+        const lang_label = lang_map[fs.lang] || fs.lang;
+        const LANG_CTX = [
+          ui_button({ ctx: ['日本語'], variant: 'ghost', onclick: () => { fs.lang = 'ja'; } }),
+          ui_button({ ctx: ['English'], variant: 'ghost', onclick: () => { fs.lang = 'en'; } }),
+          ui_button({ ctx: ['中文'],   variant: 'ghost', onclick: () => { fs.lang = 'zh'; } }),
+        ];
+        const MENU_CTX = [
+          ui_button({ ctx: ['新規作成'],     variant: 'ghost', onclick: () => { fs.last_action = '新規作成'; } }),
+          ui_button({ ctx: ['保存'],         variant: 'ghost', onclick: () => { fs.last_action = '保存'; } }),
+          ui_button({ ctx: ['エクスポート'], variant: 'ghost', onclick: () => { fs.last_action = 'エクスポート'; } }),
+          { tag: 'div', class: 'ric-menu__sep' },
+          ui_button({ ctx: ['設定'],         variant: 'ghost', onclick: () => { fs.last_action = '設定を開く'; } }),
+        ];
+        return fs.page({ ctx: [
+          ui_row({ ctx: [
+            lang({ label: lang_label, ctx: LANG_CTX }),
+            menu({ ctx: MENU_CTX }),
+            tip({ content: 'フリップゾーン（上向きフリップ）', ctx: [ui_button({ ctx: ['?'], variant: 'ghost' })] }),
+          ]}),
+        ]});
+      },
+    });
+
+  </script>
+</body>
+</html>
