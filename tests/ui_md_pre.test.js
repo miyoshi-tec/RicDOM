@@ -32,6 +32,31 @@ describe('blocks', () => {
   test('h4', () => { const n = c('#### T')[0]; assert.equal(n.tag, 'h4'); assert.equal(n.class, 'ric-md-pre__h3'); });
 });
 
+// 無限ループ回帰テスト：上のブロック分岐で拾われない行が段落に降りてきたときに
+// 無限ループせず段落として消費されることを確認する。
+// 過去に `#hello` / `#` / `####### ` / `|foo` などで _parse_blocks が無限ループした。
+describe('safety net (infinite loop regression)', () => {
+  test('#hello (no space)', () => { const n = c('#hello')[0]; assert.equal(n.tag, 'p'); });
+  test('# alone',         () => { const n = c('#')[0];       assert.equal(n.tag, 'p'); });
+  test('####### (7 #s)',  () => { const n = c('####### hi')[0]; assert.equal(n.tag, 'p'); });
+  test('|foo (no table)', () => { const n = c('|foo')[0];    assert.equal(n.tag, 'p'); });
+  test('#### alone',      () => { const n = c('####')[0];    assert.equal(n.tag, 'p'); });
+  test('mixed', () => {
+    // 不正見出し（#bad）は段落の終端ではないので、3 行がひとつの段落にまとまる
+    const nodes = c('text1\n#bad\ntext2');
+    assert.equal(nodes.length, 1);
+    assert.equal(nodes[0].tag, 'p');
+  });
+  test('valid heading still terminates para', () => {
+    // 正しい見出し（## H）は段落の終端になる
+    const nodes = c('text1\n## H\ntext2');
+    assert.equal(nodes.length, 3);
+    assert.equal(nodes[0].tag, 'p');
+    assert.equal(nodes[1].tag, 'h2');
+    assert.equal(nodes[2].tag, 'p');
+  });
+});
+
 describe('table', () => {
   const tbl = () => c('| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |')[0];
   test('tag', () => assert.equal(tbl().tag, 'table'));

@@ -216,9 +216,14 @@ const _parse_blocks = (src) => {
     }
 
     // ── 段落（連続する非空行をまとめる）──
+    // 段落の終端条件（次のブロックが始まる条件）は、上の if チェインと一致させる。
+    // 注意：「# で始まる」だけで終端にしてはいけない。`#hello` や `#` のように
+    // 上のヘッダー判定に失敗したトークンまで段落から追い出すと、どのブロックにも
+    // 拾われず i++ が走らず無限ループになる。ここでは「正しい見出しパターン」に
+    // 限定して終端判定する。
     const para_lines = [];
     while (i < lines.length && lines[i].trim() !== '' &&
-           !lines[i].trimStart().startsWith('#') &&
+           !/^#{1,6}\s+\S/.test(lines[i].trimStart()) &&
            !lines[i].trimStart().startsWith('```') &&
            !lines[i].trimStart().startsWith('> ') &&
            !/^\s*[-*]\s+/.test(lines[i]) &&
@@ -232,7 +237,18 @@ const _parse_blocks = (src) => {
         tag: 'p', class: 'ric-md-pre__p',
         ctx: _parse_inline(para_lines.join('\n')),
       });
+      continue;
     }
+
+    // ── セーフティネット（無限ループ防止）──
+    // どの分岐でも line を消費できなかった場合は、その 1 行を素の段落として
+    // 吐き出し、必ず i++ する。将来同じ形のバグが混入しても落ちないように
+    // while ループの終端を保証する。
+    blocks.push({
+      tag: 'p', class: 'ric-md-pre__p',
+      ctx: _parse_inline(lines[i]),
+    });
+    i++;
   }
 
   return blocks;
