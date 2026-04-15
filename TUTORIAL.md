@@ -208,6 +208,37 @@ ui_button({ ctx: ['ダークモード'], onclick: () => { s.page.theme = 'dark';
 
 `s.page.theme = 'dark'` と代入するだけで、画面全体が即座に再描画されます。
 
+### DOM 属性を自由に付与する
+
+`ui_xxx` コンポーネントには、表に載っている引数のほかに任意の DOM 属性を
+そのまま渡せます。`id` / `data-*` / `aria-*` / `onclick` / `class` などが
+外側要素に透過されます。
+
+```javascript
+ui_button({
+  ctx: ['保存'],
+  onclick: save,
+  id: 'save-btn',            // ← id が button 要素に付く
+  'data-action': 'save',     // ← data-* 属性も透過
+  'aria-label': 'Save file', // ← アクセシビリティ属性
+  class: 'emphasized',       // ← 基底クラス ric-button の後ろに連結
+}),
+
+ui_panel({
+  id: 'main',
+  onmouseenter: () => { console.log('hover'); },
+  ctx: [ /* ... */ ],
+}),
+```
+
+`class` を指定しても `ric-button` 等の基底クラスは消えず、後ろに連結される
+ので、テーマスタイルを壊さずにクラスを追加できます。
+
+また、`ui_checkbox` / `ui_range` / `ui_color` のように内部に `<input>` を
+持つコンポーネントでは、`onchange` や `value` は内部 input にだけ掛かり、
+外側の要素には漏れません。そのため、これらのコンポーネントに `id` や
+`onclick` を付けても、イベントハンドラが混線する心配はありません。
+
 ---
 
 ## 6. JSON を投げるだけで調整パネルを作る

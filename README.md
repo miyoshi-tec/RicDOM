@@ -272,6 +272,16 @@ create_ui_page ─ テーマの入口。CSS 変数を注入する
 
 ### コンポーネント一覧
 
+すべての `ui_xxx` コンポーネントは、表に記載の引数に加えて任意の DOM 属性
+（`onclick` / `id` / `data-*` / `aria-*` / `style` / `class`）を**外側要素に透過**します。
+`class` は基底クラスの後ろに自動連結されます（例: `ui_button({ class: 'my' }).class` → `"ric-button my"`）。
+詳細は [SPEC.md の rest スプレッド契約](SPEC.md#任意属性の透過rest-スプレッド契約) を参照。
+
+```javascript
+ui_button({ ctx: ['Save'], onclick: save, id: 'save-btn', 'data-role': 'primary' }),
+ui_panel({ id: 'main', onmouseenter: hover, ctx: [...] }),
+```
+
 #### Control
 
 | 関数 | 説明 |

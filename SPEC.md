@@ -273,6 +273,58 @@ s.dark({ ctx: [...] })
 プロパティ: `theme`, `density`, `font_size`, `disabled`, `layout`
 `disabled: true` → `inert` 属性 + `opacity: 0.45`（Tab フォーカス・クリック・選択を遮断）
 
+### 任意属性の透過（rest スプレッド契約）
+
+すべての `ui_xxx` コンポーネント（layout / surface / control / text）は、
+明示引数にない props を **rest スプレッド**で受け取り、**外側要素**（wrapper）
+にそのまま透過する。これにより `onclick` / `id` / `data-*` / `aria-*` /
+`style` / `class` 等の任意の DOM 属性を自由に付与できる。
+
+```javascript
+ui_button({ ctx: ['Save'], onclick: save, id: 'btn-save', 'data-role': 'primary' })
+ui_panel({ ctx: [...], id: 'main', onmouseenter: hover })
+ui_input({ id: 'name', onchange: handle, 'aria-label': 'Full name' })
+```
+
+**class の連結**: `class` を渡しても基底クラス（`ric-button` 等）は保たれ、
+その後ろにユーザ指定 class が連結される。
+
+```javascript
+ui_button({ class: 'my-btn' }).class      // → "ric-button my-btn"
+ui_panel({ class: 'card', layout: 'row' }) // → "ric-panel ric-panel--row card"
+```
+
+**計算済みフィールドは上書き不可**: `tag` / `class` / `ctx` などコンポーネントの
+責務で決まるフィールドは rest から上書きできない（計算済みの値が必ず勝つ）。
+
+**隔離契約（内部 input を持つコンポーネント）**: `ui_checkbox` / `ui_radiobutton` /
+`ui_range` / `ui_color` は内部に `<input>` を持つが、そこに掛けるべき
+`checked` / `value` / `onchange` / `oninput` は**内部 input に限定**され、
+外側 wrapper 要素には漏れない。これはテストで保証される契約である。
+
+```javascript
+const n = ui_checkbox({ onchange: fn });
+n.onchange           // → undefined（label wrapper には付かない）
+n.ctx[0].onchange    // → fn（内部 input にのみ付く）
+```
+
+**実装ルール**（コンポーネント作者向け）: 戻り値の object リテラルでは
+`...rest` を**先頭**に置き、計算済みフィールドを後から列挙する。これにより
+rest 経由で tag や class を渡されても計算済みの値で上書きされる。
+
+```javascript
+return {
+  ...rest,                                                     // 先頭
+  tag: 'button',
+  class: rest.class ? cls_base + ' ' + rest.class : cls_base,
+  ...(onclick ? { onclick } : {}),
+  ctx,
+};
+```
+
+`...rest` を末尾に置くと `class` キーが rest の値で上書きされ、基底クラスが
+消える（リグレッションあり、`ui_button` / `ui_input` v0.3.1 まで存在）。
+
 ### Control
 
 | 関数 | 説明 |
