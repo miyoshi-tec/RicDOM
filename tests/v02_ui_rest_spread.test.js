@@ -71,6 +71,21 @@ describe('ui_color: rest スプレッド (hex モード)', () => {
   test('rest で tag を上書きできない', () => {
     assert.equal(ui_color({ tag: 'span' }).tag, 'div');
   });
+  // 隔離契約: oninput / value は内部 picker input に掛かり、wrapper div には漏れない
+  test('oninput は picker input に掛かり wrapper に混入しない', () => {
+    const fn = () => {};
+    const node  = ui_color({ value: '#112233', oninput: fn });
+    const picker = node.ctx[0];
+    assert.equal(picker.tag, 'input');
+    assert.equal(picker.type, 'color');
+    assert.equal(typeof picker.oninput, 'function');
+    assert.ok(!Object.prototype.hasOwnProperty.call(node, 'oninput'));
+  });
+  test('value は picker input に掛かり wrapper に混入しない', () => {
+    const node = ui_color({ value: '#112233' });
+    assert.equal(node.ctx[0].value, '#112233');
+    assert.ok(!Object.prototype.hasOwnProperty.call(node, 'value'));
+  });
 });
 
 describe('ui_color: rest スプレッド (rgba モード)', () => {

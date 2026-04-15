@@ -150,6 +150,18 @@ describe('ui_checkbox: rest スプレッド', () => {
   test('rest で tag を上書きできない', () => {
     assert.equal(ui_checkbox({ tag: 'div' }).tag, 'label');
   });
+  // 隔離契約: onchange / checked / disabled は内部 input に掛かり、label wrapper には漏れない
+  test('onchange は内部 input に掛かり label wrapper に混入しない', () => {
+    const fn = () => {};
+    const node = ui_checkbox({ onchange: fn });
+    assert.equal(node.ctx[0].onchange, fn);
+    assert.ok(!Object.prototype.hasOwnProperty.call(node, 'onchange'));
+  });
+  test('checked は内部 input に掛かり label wrapper に混入しない', () => {
+    const node = ui_checkbox({ checked: true });
+    assert.equal(node.ctx[0].checked, 1);
+    assert.ok(!Object.prototype.hasOwnProperty.call(node, 'checked'));
+  });
 });
 
 // =====================================================================

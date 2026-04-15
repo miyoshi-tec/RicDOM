@@ -1,7 +1,12 @@
 // RicUI — ui_input
 // テキスト入力フィールド（control カテゴリ）。
 // 既定では width: 100% で親コンテナの幅に合わせる。
-// style / class 等の追加属性は rest スプレッドで透過する。
+//
+// rest スプレッド:
+//   onchange / id / data-* / aria-* / style 等の任意属性を透過する。
+//   rest を先頭に展開してから計算済み tag / class / type / value で上書きするため、
+//   rest から tag や class を渡しても基底クラスは保たれる。
+//   （rest を最後に置くと class: 'ric-input foo' が rest.class='foo' で上書きされる）
 
 'use strict';
 
@@ -14,6 +19,7 @@ const ui_input = ({
   maxlength   = null,
   ...rest
 } = {}) => ({
+  ...rest,
   tag:   'input',
   class: rest.class ? 'ric-input ' + rest.class : 'ric-input',
   type,
@@ -22,7 +28,6 @@ const ui_input = ({
   ...(oninput              ? { oninput }         : {}),
   ...(disabled             ? { disabled: true }  : {}),
   ...(maxlength != null    ? { maxlength }       : {}),
-  ...rest,
 });
 
 module.exports = { ui_input };
