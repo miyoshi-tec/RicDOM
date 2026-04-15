@@ -213,3 +213,26 @@ describe('bind_radiobutton: 双方向バインド', () => {
     assert.deepEqual(checked, ['editor']);
   });
 });
+
+// =====================================================================
+// rest スプレッド（ui_button / ui_input / ui_panel と同じ流儀）
+// =====================================================================
+
+describe('ui_radiobutton: rest スプレッド', () => {
+  test('onclick がラッパー div に透過される', () => {
+    const fn = () => {};
+    assert.equal(ui_radiobutton({ onclick: fn }).onclick, fn);
+  });
+  test('id / data-* / aria-* がラッパー div に透過される', () => {
+    const n = ui_radiobutton({ id: 'rg', 'data-role': 'group', 'aria-label': 'Role' });
+    assert.equal(n.id, 'rg');
+    assert.equal(n['data-role'], 'group');
+    assert.equal(n['aria-label'], 'Role');
+  });
+  test('class が ric-radiogroup の後ろに連結される', () => {
+    assert.equal(ui_radiobutton({ class: 'my' }).class, 'ric-radiogroup my');
+  });
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_radiobutton({ tag: 'span' }).tag, 'div');
+  });
+});

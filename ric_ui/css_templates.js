@@ -125,6 +125,12 @@ ${_P}.ric-tweak-row__label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* checkbox 行は ui_checkbox 内蔵ラベルを使うため __label を持たない。
+   通常行とトーンを揃えるため、内部の .ric-checkbox にも同じ色・サイズを適用する。 */
+${_P}.ric-tweak-row--checkbox .ric-checkbox {
+  font-size: 0.85em;
+  color: ${_fm};
+}
 ${_P}.ric-tweak-row > .ric-input,
 ${_P}.ric-tweak-row > .ric-range,
 ${_P}.ric-tweak-row > .ric-select,

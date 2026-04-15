@@ -20,8 +20,11 @@ const _style_to_string = (obj) => {
 };
 
 const ui_panel = ({ ctx = [], layout = 'col', style = {},
-                    theme, density, font_size, disabled = false } = {}) => {
-  const cls = layout === 'row' ? 'ric-panel ric-panel--row' : 'ric-panel';
+                    theme, density, font_size, disabled = false,
+                    ...rest } = {}) => {
+  // rest に含まれる class は ric-panel の後ろに連結する（基底クラスを保つ）
+  const cls_base = layout === 'row' ? 'ric-panel ric-panel--row' : 'ric-panel';
+  const cls      = rest.class ? cls_base + ' ' + rest.class : cls_base;
 
   // テーマ上書き: CSS 変数文字列をインラインスタイルに注入
   // RicDOM の normalize_style は配列内の文字列をスキップするため、
@@ -41,7 +44,13 @@ const ui_panel = ({ ctx = [], layout = 'col', style = {},
 
   const final_style = parts.length ? parts.join('; ') : null;
 
+  // rest を先に展開してから、計算済みの tag/class/style/inert/ctx で上書きする。
+  // これにより onclick / id / data-* / aria-* 等の任意属性が DOM に透過される。
+  // 計算済みフィールドは常に ui_panel の責任で決まるので、rest から tag や class
+  // を渡しても無視される（class だけは cls_base に連結済み）。
+  // （ui_button / ui_input 等と同じ rest スプレッドの流儀）
   return {
+    ...rest,
     tag: 'section',
     class: cls,
     ...(final_style ? { style: final_style } : {}),

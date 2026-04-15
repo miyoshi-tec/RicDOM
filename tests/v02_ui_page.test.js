@@ -199,3 +199,33 @@ describe('ui_page: CSS 収集（collect_classes）', () => {
     assert.ok(css.includes('ric-page'), 'ric-page の CSS が含まれる');
   });
 });
+
+// =====================================================================
+// 4. rest スプレッド（任意属性透過）
+// =====================================================================
+
+describe('ui_page: rest スプレッド', () => {
+  test('onclick が透過される', () => {
+    const fn = () => {};
+    assert.equal(ui_page({ onclick: fn }).onclick, fn);
+  });
+  test('id / data-* / aria-* が透過される', () => {
+    const n = ui_page({ id: 'main', 'data-role': 'page', 'aria-label': 'App' });
+    assert.equal(n.id, 'main');
+    assert.equal(n['data-role'], 'page');
+    assert.equal(n['aria-label'], 'App');
+  });
+  test('class が ric-page の後ろに連結される', () => {
+    assert.equal(ui_page({ class: 'theme-x' }).class, 'ric-page theme-x');
+  });
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_page({ tag: 'span' }).tag, 'div');
+  });
+  test('rest で ctx を上書きしようとしても style タグ + 指定 ctx の構造が保たれる', () => {
+    const child = { tag: 'div' };
+    const n = ui_page({ ctx: [child] });
+    // ctx[0] は <style>、ctx[1] に渡した child が来る
+    assert.equal(n.ctx[0].tag, 'style');
+    assert.equal(n.ctx[1], child);
+  });
+});

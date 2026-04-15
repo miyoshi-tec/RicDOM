@@ -4,6 +4,10 @@
 
 'use strict';
 
+// rest: id / data-* / aria-* / style 等の任意属性を透過する
+//       （ui_button / ui_input / ui_panel 等と同じ流儀）
+// rest は外側のラッパー <div class="ric-range"> に付く。
+// oninput / min / max / step / value は input 要素に掛けるため rest には入れない。
 const ui_range = ({
   value    = 0,
   min      = 0,
@@ -11,6 +15,7 @@ const ui_range = ({
   step     = 1,
   oninput  = null,
   disabled = false,
+  ...rest
 } = {}) => {
   const step_num = Number(step) || 1;
   const min_num  = Number(min);
@@ -24,7 +29,10 @@ const ui_range = ({
   };
 
   return {
-    tag: 'div', class: 'ric-range', ctx: [
+    ...rest,
+    tag: 'div',
+    class: rest.class ? 'ric-range ' + rest.class : 'ric-range',
+    ctx: [
       {
         tag: 'input', type: 'range',
         min: String(min), max: String(max), step: String(step),

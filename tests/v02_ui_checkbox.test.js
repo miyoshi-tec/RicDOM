@@ -127,6 +127,31 @@ describe('ui_checkbox: onchange', () => {
   });
 });
 
+describe('ui_checkbox: rest スプレッド', () => {
+  test('onclick が label に透過される', () => {
+    const fn = () => {};
+    assert.equal(ui_checkbox({ onclick: fn }).onclick, fn);
+  });
+  test('id / data-* / aria-* が label に透過される', () => {
+    const n = ui_checkbox({ id: 'cb1', 'data-x': '1', 'aria-label': 'L' });
+    assert.equal(n.id, 'cb1');
+    assert.equal(n['data-x'], '1');
+    assert.equal(n['aria-label'], 'L');
+  });
+  test('class が ric-checkbox の後ろに連結される', () => {
+    assert.equal(ui_checkbox({ class: 'my' }).class, 'ric-checkbox my');
+  });
+  test('disabled=true + class 連結', () => {
+    assert.equal(
+      ui_checkbox({ disabled: true, class: 'my' }).class,
+      'ric-checkbox ric-checkbox--disabled my',
+    );
+  });
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_checkbox({ tag: 'div' }).tag, 'label');
+  });
+});
+
 // =====================================================================
 // 2. DOM テスト：bind_checkbox
 // =====================================================================
