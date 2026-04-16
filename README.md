@@ -5,7 +5,7 @@ Electron・社内ツール・IoT デバイス UI 向け。JSON で書く 8KB の
 | レイヤー | サイズ | 役割 |
 |---------|------:|------|
 | **RicDOM** | 8KB | コア — JSON → DOM 差分更新 + Proxy リアクティビティ |
-| **RicUI** | 54KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
+| **RicUI** | 55KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
 
 Virtual DOM を持たず、JSON オブジェクトの差分から実 DOM を直接パッチします。
 Electron やブラウザで、リアルタイムなダッシュボード・パラメータ調整 UI・データ可視化ツールを素早く構築できます。
@@ -48,7 +48,7 @@ npm パッケージとしては公開していません。
 | バンドル | サイズ | 内容 |
 |---------|------:|------|
 | `RicDOM.min.js` | 8KB | コア（必須） |
-| `RicUI.min.js` | 54KB | UI コンポーネント集 + パラメータ調整パネル |
+| `RicUI.min.js` | 55KB | UI コンポーネント集 + パラメータ調整パネル |
 
 ### Hello World（RicDOM のみ）
 
@@ -340,6 +340,11 @@ s.cfg({ icon: '⋯', ghost: true, ctx: [...] })
 s.dlg({ trigger_ctx: ['開く'], title: '確認', ctx: [...],
         actions: [ui_button({ ctx: ['OK'], onclick: () => s.dlg.close() })] })
 
+// ダイアログ（controlled — 外部 state で開閉を管理）
+s.dlg({ open: s.page.show_dlg, on_close: () => { s.page.show_dlg = false; },
+        title: '確認', ctx: [...] })
+// → 戻り値 null（トリガーボタンなし）。ESC キーでも on_close が発火する。
+
 // トースト通知（render 内で s.toast() を呼び、任意のタイミングで show）
 s.toast = create_ui_toast();
 s.toast.show('保存しました', { type: 'success', duration: 3000 });
@@ -349,7 +354,7 @@ s.toast.show('保存しました', { type: 'success', duration: 3000 });
 |------|------|------|
 | `create_ui_popup()` | 汎用ポップアップ（label / icon / ghost） | `inst.close()` |
 | `create_ui_tooltip()` | ツールチップ | — |
-| `create_ui_dialog()` | モーダルダイアログ | `inst.close()` |
+| `create_ui_dialog()` | モーダルダイアログ | `inst.close()` / `inst.open()` |
 | `create_ui_toast()` | トースト通知 | `inst.show(msg, opts)` |
 
 全て引数なし。popup の排他制御（1つ開くと他を閉じる）は自動管理。
@@ -370,7 +375,7 @@ s.toast.show('保存しました', { type: 'success', duration: 3000 });
 |---------|:-------:|------|
 | `ui_xxx()` | なし | 純粋な描画（ボタン、テキスト等） |
 | `bind_xxx(s, key)` | なし | `ui_xxx` + state 双方向バインドのショートカット |
-| `create_ui_xxx()` | **あり** | 開閉・テーマ・位置等の内部状態を持つ部品 |
+| `create_ui_xxx()` | **あり** | 開閉・テーマ・位置等の内部状態を持つ部品。dialog / splitter は controlled mode（外部 state 管理）にも対応 |
 
 `create_ui_xxx()` の戻り値は `s` のトップレベルに格納する：
 
