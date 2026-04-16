@@ -13,6 +13,8 @@
 //   create_ui_tweak_panel({ title?, data?, keys?, ctx?, width?, style?, class? })
 //     → inst() を返す factory（① ②向け）。s のトップレベルに格納すると
 //       RicDOM が inst.__notify を自動注入し、data のプロパティ書き換えで再描画される。
+//     keys はオブジェクトまたは関数。関数なら毎 render で評価され、
+//     パラメータの値に応じた動的 disabled / options 切り替え等が可能。
 //   ui_tweak_panel({ title?, ctx, width?, style?, class? })
 //     → stateless wrapper（③向け）。render() 内で毎回呼び出す。
 //   ui_tweak_folder({ label, open?, ctx })
@@ -287,7 +289,9 @@ const create_ui_tweak_panel = ({
 } = {}) => {
   const inst = () => {
     const notify = () => inst.__notify?.();
-    const auto_rows = data ? _generate_rows(data, keys, notify) : [];
+    // keys が関数なら毎 render で評価する（動的 disabled / min / max 等に対応）
+    const resolved_keys = typeof keys === 'function' ? keys() : keys;
+    const auto_rows = data ? _generate_rows(data, resolved_keys, notify) : [];
     return _build_panel_vdom({ title, rows: auto_rows, ctx, width, style, cls });
   };
   return inst;

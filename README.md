@@ -430,6 +430,16 @@ s.tw = create_ui_tweak_panel({
 });
 ```
 
+`keys` にはオブジェクトの代わりに関数を渡せます。毎描画で評価されるため、
+パラメータの値に応じた動的な `disabled` / `options` 切り替え等が可能です。
+
+```javascript
+keys: () => ({
+  symmetric: {},
+  cx: { type: 'range', ...(params.symmetric ? { disabled: true } : {}) },
+}),
+```
+
 ### Tier 3: 自由な vdom で組み立て
 
 ```javascript

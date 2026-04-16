@@ -638,6 +638,25 @@ ui_tweak_folder({ label: 'Advanced', open: true, ctx: [...] })
 | `{ type, label, ... }` | ui_tweak_row のオプションを上書き |
 | `{ open, keys, ctx }` (folder) | ネストオブジェクトの folder 設定。ctx 指定時はそれを使用 |
 
+#### keys を関数で渡す（動的 keys）
+
+`keys` にオブジェクトの代わりに **関数** を渡すと、毎 render で評価される。
+パラメータの値に応じて他の行を `disabled` にする、`options` を切り替える等に使う。
+
+```javascript
+s.tw = create_ui_tweak_panel({
+  data: params,
+  keys: () => ({
+    symmetric: {},
+    cx_left:  { type: 'range', ...(params.symmetric ? { disabled: true } : {}) },
+    cy_left:  { type: 'range', ...(params.symmetric ? { disabled: true } : {}) },
+  }),
+});
+```
+
+関数は `inst()` が呼ばれるたびに実行される。戻り値は通常の keys オブジェクトと
+同じ形式（`false` / vdom / options object / folder config）。
+
 ---
 
 ## 5. コーディング規約
