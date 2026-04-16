@@ -335,25 +335,34 @@ s.menu({ icon: '⚙', ctx: [...] })
 
 // ghost: ホバーまで枠を隠す
 s.cfg({ icon: '⋯', ghost: true, ctx: [...] })
+
+// ダイアログ（trigger_variant / title / actions でカスタマイズ）
+s.dlg({ trigger_ctx: ['開く'], title: '確認', ctx: [...],
+        actions: [ui_button({ ctx: ['OK'], onclick: () => s.dlg.close() })] })
+
+// トースト通知（render 内で s.toast() を呼び、任意のタイミングで show）
+s.toast = create_ui_toast();
+s.toast.show('保存しました', { type: 'success', duration: 3000 });
 ```
 
-| 関数 | 説明 |
-|------|------|
-| `create_ui_popup()` | 汎用ポップアップ（label / icon / ghost） |
-| `create_ui_tooltip()` | ツールチップ |
-| `create_ui_dialog()` | モーダルダイアログ |
-| `create_ui_toast()` | トースト通知 |
+| 関数 | 説明 | 公開メソッド |
+|------|------|------|
+| `create_ui_popup()` | 汎用ポップアップ（label / icon / ghost） | `inst.close()` |
+| `create_ui_tooltip()` | ツールチップ | — |
+| `create_ui_dialog()` | モーダルダイアログ | `inst.close()` |
+| `create_ui_toast()` | トースト通知 | `inst.show(msg, opts)` |
 
 全て引数なし。popup の排他制御（1つ開くと他を閉じる）は自動管理。
+呼び出し時に `theme` / `density` / `font_size` を渡すとポータル要素のテーマを個別に上書きできる。
 
 #### Composite
 
-| 関数 | 説明 |
-|------|------|
-| `create_ui_accordion(options)` | アコーディオン（折りたたみ。open 状態は内部管理） |
-| `ui_tabs({ items, active, onchange })` | タブナビゲーション（純粋関数） |
-| `bind_tabs(s, key, options)` | state とバインドされた tabs（推奨） |
-| `create_ui_splitter(options)` | ドラッグ可能なペイン分割 |
+| 関数 | 説明 | 公開メソッド |
+|------|------|------|
+| `create_ui_accordion(options)` | アコーディオン（折りたたみ） | — |
+| `ui_tabs({ items, active, onchange })` | タブナビゲーション | — |
+| `bind_tabs(s, key, options)` | state とバインドされた tabs | — |
+| `create_ui_splitter(options)` | ドラッグ可能なペイン分割 | `toggle()` / `collapsed()` / `get_size()` / `set_size(px)` |
 
 ### 3 種類のコンポーネントパターン
 

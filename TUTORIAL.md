@@ -197,6 +197,38 @@ create_RicDOM('#app', {
 > **テーマを変えてみよう**: `'light'` を `'dark'`、`'teal'`、`'cyber'`、`'aqua'` に変えて
 > ブラウザをリロードしてみてください。コード変更なしで見た目が切り替わります。
 
+### なぜ `s.page({ ctx: [...] })` と書くのか
+
+初見だと `s.page({ ctx: [...] })` という書き方に驚くかもしれません。React の
+`<Page>...</Page>` や Vue の `<template>` とは違う見た目ですが、理由はシンプルです。
+
+- RicDOM は **ビルドツール不要** が最優先。JSX やテンプレートはトランスパイラが必要
+- `s.page` は **ただの関数** — 呼ぶと JSON（VDOM ノード）を返す
+- `{ tag: 'div', class: 'ric-page', ctx: [...] }` のような JSON を手書きする代わりに、
+  関数が内部状態（テーマ・密度等）を含めて組み立ててくれる
+
+つまり `s.page({ ctx: [...] })` は「page 関数に子要素を渡して、完成した JSON を受け取る」
+だけです。JSX の `<Page>` に相当するものが、ビルドなしで動く関数呼び出しになっている
+と考えてください。
+
+```javascript
+// これと同じことを手書きすると…
+return {
+  tag: 'div', class: 'ric-page',
+  style: '--ric-color-bg:#f9fafb; --ric-color-fg:#111318; ...',
+  ctx: [
+    { tag: 'style', ctx: ['.ric-page { ... } .ric-button { ... }'] },
+    // ...子要素
+  ],
+};
+
+// s.page() が全部やってくれる
+return s.page({ ctx: [/* 子要素だけ書けばいい */] });
+```
+
+他の `create_ui_xxx()` 系（`create_ui_popup` / `create_ui_dialog` / `create_ui_splitter` 等）
+もすべて同じパターンです。`s` のトップレベルに格納し、render 内で関数として呼びます。
+
 ### テーマの動的切替
 
 テーマはプログラムからも変更できます:
