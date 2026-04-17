@@ -437,6 +437,7 @@ s.tw = create_ui_tweak_panel({
 
 `keys` にはオブジェクトの代わりに関数を渡せます。毎描画で評価されるため、
 パラメータの値に応じた動的な `disabled` / `options` 切り替え等が可能です。
+ネストしたフォルダ内の `keys` も関数を許容します（全階層で動的評価）。
 
 ```javascript
 keys: () => ({

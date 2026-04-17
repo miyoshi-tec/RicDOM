@@ -711,6 +711,24 @@ s.tw = create_ui_tweak_panel({
 関数は `inst()` が呼ばれるたびに実行される。戻り値は通常の keys オブジェクトと
 同じ形式（`false` / vdom / options object / folder config）。
 
+ネストしたフォルダ内の `keys` も関数を許容する（全階層で動的評価）:
+
+```javascript
+s.tw = create_ui_tweak_panel({
+  data: params,
+  keys: {
+    shape: {
+      open: true,
+      keys: () => ({
+        symmetric: {},
+        cx_left:  { type: 'range', ...(params.shape.symmetric ? { disabled: true } : {}) },
+        cx_right: { type: 'range', ...(params.shape.symmetric ? { disabled: true } : {}) },
+      }),
+    },
+  },
+});
+```
+
 ---
 
 ## 5. コーディング規約

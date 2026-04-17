@@ -385,4 +385,94 @@ describe('create_ui_tweak_panel (factory)', () => {
     const rows2 = find_by_class(root2, 'ric-tweak-row');
     assert.strictEqual(rows2.length, 2);
   });
+
+  // ── ネストした keys 関数（全階層動的評価）──────────────────
+  it('ネストした keys 関数: フォルダ内でも毎 render で評価される', () => {
+    const data = { shape: { symmetric: true, cx_left: 10, cx_right: 20 } };
+    const inst = create_ui_tweak_panel({
+      data,
+      keys: {
+        shape: {
+          open: true,
+          keys: () => ({
+            symmetric: {},
+            cx_left:  { type: 'number', ...(data.shape.symmetric ? { disabled: true } : {}) },
+            cx_right: { type: 'number', ...(data.shape.symmetric ? { disabled: true } : {}) },
+          }),
+        },
+      },
+    });
+
+    // symmetric=true → cx_left / cx_right は disabled
+    const root1 = inst();
+    const inputs1 = find_by_tag(root1, 'input').filter(n => n.type === 'number');
+    assert.strictEqual(inputs1.length, 2);
+    assert.strictEqual(inputs1[0].disabled, true);
+    assert.strictEqual(inputs1[1].disabled, true);
+
+    // symmetric=false → disabled なし
+    data.shape.symmetric = false;
+    const root2 = inst();
+    const inputs2 = find_by_tag(root2, 'input').filter(n => n.type === 'number');
+    assert.strictEqual(inputs2.length, 2);
+    assert.strictEqual(inputs2[0].disabled, undefined);
+    assert.strictEqual(inputs2[1].disabled, undefined);
+  });
+
+  it('ネストした keys 関数: false でネスト行も非表示になる', () => {
+    const data = { shape: { mode: 'simple', advanced_val: 99 } };
+    const inst = create_ui_tweak_panel({
+      data,
+      keys: {
+        shape: {
+          open: true,
+          keys: () => ({
+            mode: { type: 'select', options: ['simple', 'advanced'] },
+            advanced_val: data.shape.mode === 'simple' ? false : {},
+          }),
+        },
+      },
+    });
+
+    // mode=simple → advanced_val は非表示
+    const root1 = inst();
+    const rows1 = find_by_class(root1, 'ric-tweak-row');
+    assert.strictEqual(rows1.length, 1);
+
+    // mode=advanced → advanced_val が表示
+    data.shape.mode = 'advanced';
+    const root2 = inst();
+    const rows2 = find_by_class(root2, 'ric-tweak-row');
+    assert.strictEqual(rows2.length, 2);
+  });
+
+  it('ネストした keys 関数: 深い階層（3 段）でも動的評価される', () => {
+    const data = { view: { display: { show: true, opacity: 0.5 } } };
+    const inst = create_ui_tweak_panel({
+      data,
+      keys: () => ({
+        view: {
+          open: true,
+          keys: () => ({
+            display: {
+              open: true,
+              keys: () => ({
+                show: {},
+                opacity: { type: 'number', ...(data.view.display.show ? {} : { disabled: true }) },
+              }),
+            },
+          }),
+        },
+      }),
+    });
+
+    const root1 = inst();
+    const inputs1 = find_by_tag(root1, 'input').filter(n => n.type === 'number');
+    assert.strictEqual(inputs1[0].disabled, undefined);
+
+    data.view.display.show = false;
+    const root2 = inst();
+    const inputs2 = find_by_tag(root2, 'input').filter(n => n.type === 'number');
+    assert.strictEqual(inputs2[0].disabled, true);
+  });
 });

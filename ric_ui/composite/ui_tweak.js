@@ -15,6 +15,7 @@
 //       RicDOM が inst.__notify を自動注入し、data のプロパティ書き換えで再描画される。
 //     keys はオブジェクトまたは関数。関数なら毎 render で評価され、
 //     パラメータの値に応じた動的 disabled / options 切り替え等が可能。
+//     ネストしたフォルダ内の keys も同様に関数を許容する（全階層で動的評価）。
 //   ui_tweak_panel({ title?, ctx, width?, style?, class? })
 //     → stateless wrapper（③向け）。render() 内で毎回呼び出す。
 //   ui_tweak_folder({ label, open?, ctx })
@@ -204,6 +205,10 @@ const ui_tweak_folder = ({ label = '', open = false, ctx = [] } = {}) => ({
 const _looks_like_vdom = (v) =>
   v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.tag === 'string';
 
+// keys は object または () => object を許容する。
+// ネスト階層でも再帰的に関数を解決するため、各レベルで評価する。
+const _resolve_keys = (k) => (typeof k === 'function' ? k() : k) ?? {};
+
 const _generate_rows = (data, keys, notify) => {
   const rows = [];
   for (const k of Object.keys(data)) {
@@ -216,8 +221,9 @@ const _generate_rows = (data, keys, notify) => {
       // ── nested folder ──
       const folder_label = ov?.label ?? k;
       const folder_open  = ov?.open ?? false;
-      // ctx 明示があればそれを使う、なければ keys ネスト付きで再帰生成
-      const folder_ctx = ov?.ctx ?? _generate_rows(v, ov?.keys ?? {}, notify);
+      // ctx 明示があればそれを使う、なければ keys ネスト付きで再帰生成。
+      // ネストした keys も関数を許容する（全階層で動的評価）。
+      const folder_ctx = ov?.ctx ?? _generate_rows(v, _resolve_keys(ov?.keys), notify);
       rows.push(ui_tweak_folder({ label: folder_label, open: folder_open, ctx: folder_ctx }));
     } else {
       // 子プロパティ書き換えは RicDOM のトップレベル Proxy では検知できないので、
@@ -289,9 +295,9 @@ const create_ui_tweak_panel = ({
 } = {}) => {
   const inst = () => {
     const notify = () => inst.__notify?.();
-    // keys が関数なら毎 render で評価する（動的 disabled / min / max 等に対応）
-    const resolved_keys = typeof keys === 'function' ? keys() : keys;
-    const auto_rows = data ? _generate_rows(data, resolved_keys, notify) : [];
+    // keys が関数なら毎 render で評価する（動的 disabled / min / max 等に対応）。
+    // ネストした keys も _generate_rows 内で再帰的に解決される。
+    const auto_rows = data ? _generate_rows(data, _resolve_keys(keys), notify) : [];
     return _build_panel_vdom({ title, rows: auto_rows, ctx, width, style, cls });
   };
   return inst;
