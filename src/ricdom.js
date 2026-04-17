@@ -466,7 +466,9 @@ const patch_children_by_position = (prev_children, next_children, parent_el, pre
       }
     } else if (prev_node === undefined) {
       // 新規ノードを追加する
-      const new_el = build_dom_node(next_node);
+      // 親の namespaceURI を引き継ぐ（SVG サブツリーへの動的追加で
+      // 子要素が HTML namespace で生成されないようにするため）
+      const new_el = build_dom_node(next_node, parent_el.namespaceURI);
       if (new_el) parent_el.appendChild(new_el);
     } else {
       const prev_normalized = normalize_ric_node(prev_node);
@@ -491,7 +493,8 @@ const patch_children_by_position = (prev_children, next_children, parent_el, pre
       const prev_key = prev_serial_keys[i];
       const next_key = next_serial_keys[i];
       if (prev_key !== next_key) {
-        const new_el = build_dom_node(next_node);
+        // 親の namespaceURI を引き継ぐ（追加パスと同じ理由）
+        const new_el = build_dom_node(next_node, parent_el.namespaceURI);
         if (new_el && dom_el) {
           parent_el.replaceChild(new_el, dom_el);
         } else if (new_el) {
