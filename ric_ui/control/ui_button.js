@@ -8,22 +8,27 @@
 //
 // CSS テンプレートがすべてのバリアントを網羅しているため、
 // JS 側では class 文字列を付与するだけでよい。
-// style / class 等の追加属性は rest スプレッドで透過する。
+//
+// rest スプレッド:
+//   onclick / id / data-* / aria-* / style 等の任意属性を透過する。
+//   rest を先頭に展開してから計算済み tag / class / ctx / onclick / disabled で
+//   上書きするため、rest から tag や class を渡しても基底クラスは保たれる。
+//   （rest を最後に置くと class: 'ric-button foo' が rest.class='foo' で上書きされる）
 
 'use strict';
 
 const ui_button = ({ ctx = [], variant = 'default', onclick = null, disabled = false, ...rest } = {}) => {
   // バリアントクラスを付与する（default の場合は付与しない）
-  const cls = variant !== 'default'
+  const cls_base = variant !== 'default'
     ? `ric-button ric-button--${variant}`
     : 'ric-button';
 
   return {
+    ...rest,
     tag: 'button',
-    class: rest.class ? cls + ' ' + rest.class : cls,
+    class: rest.class ? cls_base + ' ' + rest.class : cls_base,
     ...(onclick   ? { onclick }        : {}),
     ...(disabled  ? { disabled: true } : {}),
-    ...rest,
     ctx,
   };
 };

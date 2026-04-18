@@ -16,12 +16,17 @@
 
 'use strict';
 
+// rest: id / data-* / aria-* / style 等の任意属性を透過する
+//       （ui_button / ui_input / ui_panel 等と同じ流儀）
+// rest は外側のラッパー <div class="ric-radiogroup"> に付く。
+// onchange は input 要素に掛ける必要があるため rest には入れない。
 const ui_radiobutton = ({
   name     = '',
   value    = '',
   options  = [],
   onchange = null,
   disabled = false,
+  ...rest
 } = {}) => {
   const str_val = String(value);
 
@@ -53,8 +58,9 @@ const ui_radiobutton = ({
   });
 
   return {
+    ...rest,
     tag:   'div',
-    class: 'ric-radiogroup',
+    class: rest.class ? 'ric-radiogroup ' + rest.class : 'ric-radiogroup',
     ctx:   radio_nodes,
   };
 };

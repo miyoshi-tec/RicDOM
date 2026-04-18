@@ -93,6 +93,39 @@ describe('ui_input: vdom 構造', () => {
 });
 
 // =====================================================================
+// rest スプレッド（ui_panel と同じ流儀：rest 先頭 → 計算済みが上書き）
+// =====================================================================
+
+describe('ui_input: rest スプレッド', () => {
+
+  test('id / data-* / aria-* が透過される', () => {
+    const n = ui_input({ id: 'in1', 'data-role': 'email', 'aria-label': 'Email' });
+    assert.equal(n.id, 'in1');
+    assert.equal(n['data-role'], 'email');
+    assert.equal(n['aria-label'], 'Email');
+  });
+
+  // 基底クラスが消えないことを保証する回帰テスト（rest 末尾置きバグの再発防止）
+  test('class が ric-input の後ろに連結される（基底クラスが消えない）', () => {
+    assert.equal(ui_input({ class: 'my-input' }).class, 'ric-input my-input');
+  });
+
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_input({ tag: 'div' }).tag, 'input');
+  });
+
+  test('rest で type を上書きできない（明示引数が勝つ）', () => {
+    assert.equal(ui_input({ type: 'password' }).type, 'password');
+  });
+
+  test('onchange が透過される（input 要素に直接付く）', () => {
+    const fn = () => {};
+    const n = ui_input({ onchange: fn });
+    assert.equal(n.onchange, fn);
+  });
+});
+
+// =====================================================================
 // 2. DOM テスト：bind_input の初期描画と双方向バインド
 // =====================================================================
 

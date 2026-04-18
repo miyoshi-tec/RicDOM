@@ -35,7 +35,9 @@ const _style_to_str = (s) => typeof s === 'object' && !Array.isArray(s)
   : String(s || '');
 
 const create_ui_page = (initial = {}) => {
-  const inst = ({ ctx = [], style: extra_style = '' } = {}) => {
+  // rest: onclick / id / data-* / aria-* 等の任意属性を透過する
+  //       （ui_button / ui_input / ui_panel 等と同じ流儀）
+  const inst = ({ ctx = [], style: extra_style = '', ...rest } = {}) => {
 
     // ポータルキューを取り出す（drain: create_ui_page 経由では begin() 済み）
     const portals = _portal.drain();
@@ -61,9 +63,12 @@ const create_ui_page = (initial = {}) => {
     });
     const page_style = extra_style ? base_style + ';' + _style_to_str(extra_style) : base_style;
 
+    // rest を先に展開してから、計算済みの tag/class/style/ctx で上書きする。
+    // これにより onclick / id / data-* 等が DOM に透過される。
     return {
+      ...rest,
       tag: 'div',
-      class: 'ric-page',
+      class: rest.class ? 'ric-page ' + rest.class : 'ric-page',
       // CSS variables + ユーザー style をルート div に注入する
       // 子孫は CSS 変数を通じてテーマ・密度を受け取る
       style: page_style,

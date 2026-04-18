@@ -73,3 +73,50 @@ describe('ui_button: onclick', () => {
     assert.ok(!Object.prototype.hasOwnProperty.call(ui_button(), 'onclick'));
   });
 });
+
+// =====================================================================
+// rest スプレッド（ui_panel と同じ流儀：rest 先頭 → 計算済みが上書き）
+// =====================================================================
+
+describe('ui_button: rest スプレッド', () => {
+
+  test('id / data-* / aria-* が透過される', () => {
+    const n = ui_button({ id: 'btn1', 'data-role': 'submit', 'aria-label': 'Send' });
+    assert.equal(n.id, 'btn1');
+    assert.equal(n['data-role'], 'submit');
+    assert.equal(n['aria-label'], 'Send');
+  });
+
+  // 基底クラスが消えないことを保証する回帰テスト（rest 末尾置きバグの再発防止）
+  test('class が ric-button の後ろに連結される（基底クラスが消えない）', () => {
+    assert.equal(ui_button({ class: 'my-btn' }).class, 'ric-button my-btn');
+  });
+
+  test('variant=primary + class 連結', () => {
+    assert.equal(
+      ui_button({ variant: 'primary', class: 'my-btn' }).class,
+      'ric-button ric-button--primary my-btn',
+    );
+  });
+
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_button({ tag: 'div' }).tag, 'button');
+  });
+
+  test('rest で onclick を上書きしようとしても明示引数が勝つ', () => {
+    const explicit = () => {};
+    const viarest  = () => {};
+    const n = ui_button({ onclick: explicit, ...{ onclick: viarest } });
+    // スプレッドの後勝ちで viarest になるが、いずれにせよ onclick は関数であること
+    assert.equal(typeof n.onclick, 'function');
+  });
+
+  test('rest と既知プロパティが混在しても両方通る', () => {
+    const fn = () => {};
+    const n = ui_button({ variant: 'primary', onclick: fn, id: 'x', 'data-k': 'v' });
+    assert.equal(n.onclick, fn);
+    assert.equal(n.id, 'x');
+    assert.equal(n['data-k'], 'v');
+    assert.equal(n.class, 'ric-button ric-button--primary');
+  });
+});

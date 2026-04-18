@@ -5,7 +5,7 @@ Electron・社内ツール・IoT デバイス UI 向け。JSON で書く 8KB の
 | レイヤー | サイズ | 役割 |
 |---------|------:|------|
 | **RicDOM** | 8KB | コア — JSON → DOM 差分更新 + Proxy リアクティビティ |
-| **RicUI** | 52KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
+| **RicUI** | 55KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
 
 Virtual DOM を持たず、JSON オブジェクトの差分から実 DOM を直接パッチします。
 Electron やブラウザで、リアルタイムなダッシュボード・パラメータ調整 UI・データ可視化ツールを素早く構築できます。
@@ -48,7 +48,7 @@ npm パッケージとしては公開していません。
 | バンドル | サイズ | 内容 |
 |---------|------:|------|
 | `RicDOM.min.js` | 8KB | コア（必須） |
-| `RicUI.min.js` | 52KB | UI コンポーネント集 + パラメータ調整パネル |
+| `RicUI.min.js` | 55KB | UI コンポーネント集 + パラメータ調整パネル |
 
 ### Hello World（RicDOM のみ）
 
@@ -272,6 +272,16 @@ create_ui_page ─ テーマの入口。CSS 変数を注入する
 
 ### コンポーネント一覧
 
+すべての `ui_xxx` コンポーネントは、表に記載の引数に加えて任意の DOM 属性
+（`onclick` / `id` / `data-*` / `aria-*` / `style` / `class`）を**外側要素に透過**します。
+`class` は基底クラスの後ろに自動連結されます（例: `ui_button({ class: 'my' }).class` → `"ric-button my"`）。
+詳細は [SPEC.md の rest スプレッド契約](SPEC.md#任意属性の透過rest-スプレッド契約) を参照。
+
+```javascript
+ui_button({ ctx: ['Save'], onclick: save, id: 'save-btn', 'data-role': 'primary' }),
+ui_panel({ id: 'main', onmouseenter: hover, ctx: [...] }),
+```
+
 #### Control
 
 | 関数 | 説明 |
@@ -325,25 +335,39 @@ s.menu({ icon: '⚙', ctx: [...] })
 
 // ghost: ホバーまで枠を隠す
 s.cfg({ icon: '⋯', ghost: true, ctx: [...] })
+
+// ダイアログ（trigger_variant / title / actions でカスタマイズ）
+s.dlg({ trigger_ctx: ['開く'], title: '確認', ctx: [...],
+        actions: [ui_button({ ctx: ['OK'], onclick: () => s.dlg.close() })] })
+
+// ダイアログ（controlled — 外部 state で開閉を管理）
+s.dlg({ open: s.page.show_dlg, on_close: () => { s.page.show_dlg = false; },
+        title: '確認', ctx: [...] })
+// → 戻り値 null（トリガーボタンなし）。ESC キーでも on_close が発火する。
+
+// トースト通知（render 内で s.toast() を呼び、任意のタイミングで show）
+s.toast = create_ui_toast();
+s.toast.show('保存しました', { type: 'success', duration: 3000 });
 ```
 
-| 関数 | 説明 |
-|------|------|
-| `create_ui_popup()` | 汎用ポップアップ（label / icon / ghost） |
-| `create_ui_tooltip()` | ツールチップ |
-| `create_ui_dialog()` | モーダルダイアログ |
-| `create_ui_toast()` | トースト通知 |
+| 関数 | 説明 | 公開メソッド |
+|------|------|------|
+| `create_ui_popup()` | 汎用ポップアップ（label / icon / ghost） | `inst.close()` |
+| `create_ui_tooltip()` | ツールチップ | — |
+| `create_ui_dialog()` | モーダルダイアログ | `inst.close()` / `inst.open()` |
+| `create_ui_toast()` | トースト通知 | `inst.show(msg, opts)` |
 
 全て引数なし。popup の排他制御（1つ開くと他を閉じる）は自動管理。
+呼び出し時に `theme` / `density` / `font_size` を渡すとポータル要素のテーマを個別に上書きできる。
 
 #### Composite
 
-| 関数 | 説明 |
-|------|------|
-| `create_ui_accordion(options)` | アコーディオン（折りたたみ。open 状態は内部管理） |
-| `ui_tabs({ items, active, onchange })` | タブナビゲーション（純粋関数） |
-| `bind_tabs(s, key, options)` | state とバインドされた tabs（推奨） |
-| `create_ui_splitter(options)` | ドラッグ可能なペイン分割 |
+| 関数 | 説明 | 公開メソッド |
+|------|------|------|
+| `create_ui_accordion(options)` | アコーディオン（折りたたみ） | — |
+| `ui_tabs({ items, active, onchange })` | タブナビゲーション | — |
+| `bind_tabs(s, key, options)` | state とバインドされた tabs | — |
+| `create_ui_splitter(options)` | ドラッグ可能なペイン分割 | `toggle()` / `collapsed()` / `get_size()` / `set_size(px)` |
 
 ### 3 種類のコンポーネントパターン
 
@@ -351,7 +375,7 @@ s.cfg({ icon: '⋯', ghost: true, ctx: [...] })
 |---------|:-------:|------|
 | `ui_xxx()` | なし | 純粋な描画（ボタン、テキスト等） |
 | `bind_xxx(s, key)` | なし | `ui_xxx` + state 双方向バインドのショートカット |
-| `create_ui_xxx()` | **あり** | 開閉・テーマ・位置等の内部状態を持つ部品 |
+| `create_ui_xxx()` | **あり** | 開閉・テーマ・位置等の内部状態を持つ部品。dialog / splitter は controlled mode（外部 state 管理）にも対応 |
 
 `create_ui_xxx()` の戻り値は `s` のトップレベルに格納する：
 
@@ -409,6 +433,17 @@ s.tw = create_ui_tweak_panel({
     }},
   },
 });
+```
+
+`keys` にはオブジェクトの代わりに関数を渡せます。毎描画で評価されるため、
+パラメータの値に応じた動的な `disabled` / `options` 切り替え等が可能です。
+ネストしたフォルダ内の `keys` も関数を許容します（全階層で動的評価）。
+
+```javascript
+keys: () => ({
+  symmetric: {},
+  cx: { type: 'range', ...(params.symmetric ? { disabled: true } : {}) },
+}),
 ```
 
 ### Tier 3: 自由な vdom で組み立て

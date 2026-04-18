@@ -15,7 +15,7 @@
 //   `] })
 //
 // 対応構文：
-//   # ## ###           見出し（h1 / h2 / h3）
+//   # 〜 ######        見出し（h1〜h6）
 //   **text**           太字
 //   *text*             斜体
 //   `code`             インラインコード
@@ -23,6 +23,7 @@
 //   - item             箇条書きリスト（ネストなし）
 //   > quote            引用
 //   [text](url)        リンク
+//   | a | b |          テーブル（ヘッダ＋区切り＋本体）
 //   ---                水平線
 //   空行               段落区切り
 //
@@ -120,12 +121,15 @@ const _parse_blocks = (src) => {
       continue;
     }
 
-    // ── 見出し # ## ### ──
-    const heading_match = line.match(/^(#{1,3})\s+(.+)/);
+    // ── 見出し # 〜 ###### ──
+    const heading_match = line.match(/^(#{1,6})\s+(.+)/);
     if (heading_match) {
       const level = heading_match[1].length;
+      // h4〜h6 は h3 と同じスタイルで表示
+      const tag = level <= 3 ? 'h' + level : 'h' + level;
+      const cls = level <= 3 ? 'ric-md-pre__h' + level : 'ric-md-pre__h3';
       blocks.push({
-        tag: 'h' + level, class: 'ric-md-pre__h' + level,
+        tag, class: cls,
         ctx: _parse_inline(heading_match[2]),
       });
       i++;
@@ -158,14 +162,73 @@ const _parse_blocks = (src) => {
       continue;
     }
 
+    // ── テーブル | ... | ──
+    // ヘッダ行 + 区切り行（|---|---| or ---|---）+ 本体行のパターン
+    if (line.trim().startsWith('|') && i + 1 < lines.length &&
+        /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(lines[i + 1].trim())) {
+      // ヘルパー: | で分割してセル文字列の配列を返す
+      const _split_row = (row) => {
+        let s = row.trim();
+        if (s.startsWith('|')) s = s.slice(1);
+        if (s.endsWith('|')) s = s.slice(0, -1);
+        return s.split('|').map(c => c.trim());
+      };
+      // アライメント解析（区切り行の :--- / :---: / ---: パターン）
+      const _parse_align = (sep) => {
+        return _split_row(sep).map(c => {
+          const t = c.trim().replace(/\s/g, '');
+          if (t.startsWith(':') && t.endsWith(':')) return 'center';
+          if (t.endsWith(':')) return 'right';
+          return 'left';
+        });
+      };
+      const header_cells = _split_row(lines[i]);
+      const aligns = _parse_align(lines[i + 1]);
+      i += 2; // ヘッダ行 + 区切り行をスキップ
+      // ヘッダ行
+      const thead = {
+        tag: 'thead', ctx: [{
+          tag: 'tr', ctx: header_cells.map((cell, ci) => ({
+            tag: 'th', class: 'ric-md-pre__th',
+            style: aligns[ci] !== 'left' ? `text-align:${aligns[ci]}` : undefined,
+            ctx: _parse_inline(cell),
+          })),
+        }],
+      };
+      // 本体行（| で始まる連続行を消費）
+      const body_rows = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        const cells = _split_row(lines[i]);
+        body_rows.push({
+          tag: 'tr', ctx: cells.map((cell, ci) => ({
+            tag: 'td', class: 'ric-md-pre__td',
+            style: aligns[ci] !== 'left' ? `text-align:${aligns[ci]}` : undefined,
+            ctx: _parse_inline(cell),
+          })),
+        });
+        i++;
+      }
+      blocks.push({
+        tag: 'table', class: 'ric-md-pre__table',
+        ctx: [thead, { tag: 'tbody', ctx: body_rows }],
+      });
+      continue;
+    }
+
     // ── 段落（連続する非空行をまとめる）──
+    // 段落の終端条件（次のブロックが始まる条件）は、上の if チェインと一致させる。
+    // 注意：「# で始まる」だけで終端にしてはいけない。`#hello` や `#` のように
+    // 上のヘッダー判定に失敗したトークンまで段落から追い出すと、どのブロックにも
+    // 拾われず i++ が走らず無限ループになる。ここでは「正しい見出しパターン」に
+    // 限定して終端判定する。
     const para_lines = [];
     while (i < lines.length && lines[i].trim() !== '' &&
-           !lines[i].trimStart().startsWith('#') &&
+           !/^#{1,6}\s+\S/.test(lines[i].trimStart()) &&
            !lines[i].trimStart().startsWith('```') &&
            !lines[i].trimStart().startsWith('> ') &&
            !/^\s*[-*]\s+/.test(lines[i]) &&
-           !/^-{3,}\s*$/.test(lines[i].trim())) {
+           !/^-{3,}\s*$/.test(lines[i].trim()) &&
+           !lines[i].trim().startsWith('|')) {
       para_lines.push(lines[i]);
       i++;
     }
@@ -174,7 +237,18 @@ const _parse_blocks = (src) => {
         tag: 'p', class: 'ric-md-pre__p',
         ctx: _parse_inline(para_lines.join('\n')),
       });
+      continue;
     }
+
+    // ── セーフティネット（無限ループ防止）──
+    // どの分岐でも line を消費できなかった場合は、その 1 行を素の段落として
+    // 吐き出し、必ず i++ する。将来同じ形のバグが混入しても落ちないように
+    // while ループの終端を保証する。
+    blocks.push({
+      tag: 'p', class: 'ric-md-pre__p',
+      ctx: _parse_inline(lines[i]),
+    });
+    i++;
   }
 
   return blocks;

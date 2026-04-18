@@ -28,10 +28,15 @@ const _hex_to_rgb = (hex) => ({
   r: parseInt(hex.slice(1, 3), 16), g: parseInt(hex.slice(3, 5), 16), b: parseInt(hex.slice(5, 7), 16),
 });
 
+// rest: id / data-* / aria-* / style 等の任意属性を透過する
+//       （ui_button / ui_input / ui_panel 等と同じ流儀）
+// rest は外側のラッパー <div class="ric-color"> に付く。
+// oninput / value は内部 input に掛ける必要があるため rest には入れない。
 const ui_color = ({
   value    = '#000000',
   oninput  = null,
   disabled = false,
+  ...rest
 } = {}) => {
   const current = String(value);
   const rgba = _parse_rgba(current);
@@ -70,7 +75,9 @@ const ui_color = ({
   // hex モード: [picker] [value]
   if (!is_rgba) {
     return {
-      tag: 'div', class: 'ric-color',
+      ...rest,
+      tag: 'div',
+      class: rest.class ? 'ric-color ' + rest.class : 'ric-color',
       ctx: [
         picker_node,
         { tag: 'span', class: 'ric-color__value', ctx: [current || '—'] },
@@ -82,7 +89,9 @@ const ui_color = ({
   //   上段: picker（幅 100%）
   //   下段: slider（幅 100%） + α ラベル
   return {
-    tag: 'div', class: 'ric-color ric-color--rgba',
+    ...rest,
+    tag: 'div',
+    class: rest.class ? 'ric-color ric-color--rgba ' + rest.class : 'ric-color ric-color--rgba',
     ctx: [
       picker_node,
       { tag: 'div', class: 'ric-color__alpha-row', ctx: [

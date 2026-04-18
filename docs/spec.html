@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API リファレンス — RicDOM</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  </style>
+  <script src="RicDOM.min.js"></script>
+  <script src="RicUI.min.js"></script>
+</head>
+<body>
+<div id="nav_bar" data-doc="API リファレンス"></div>
+<div id="app"></div>
+
+<script src="samples/_nav_bar.js"></script>
+<script>
+const { create_RicDOM } = RicDOM;
+const { create_ui_page, ui_md_pre, ui_panel } = RicUI;
+
+const handle = create_RicDOM('#app', {
+  md: '',
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  render(s) {
+    return s.page({ style: 'max-width:860px;margin:0 auto;padding:20px', ctx: [
+      s.md
+        ? ui_panel({ ctx: [ ui_md_pre({ ctx: [s.md] }) ] })
+        : { tag: 'p', style: 'text-align:center;padding:40px;opacity:0.5', ctx: ['読み込み中...'] },
+    ]});
+  },
+});
+
+fetch('SPEC.md').then(r => r.text()).then(md => { handle.md = md; });
+</script>
+</body>
+</html>

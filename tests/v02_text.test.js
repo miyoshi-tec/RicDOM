@@ -103,3 +103,29 @@ describe('ui_text variant: label', () => {
     assert.deepEqual(ui_text({ variant: 'label', ctx: ['名前'] }).ctx, ['名前']);
   });
 });
+
+// =====================================================================
+// rest スプレッド
+// =====================================================================
+
+describe('ui_text: rest スプレッド', () => {
+  test('onclick が透過される', () => {
+    const fn = () => {};
+    assert.equal(ui_text({ onclick: fn }).onclick, fn);
+  });
+  test('id / data-* / aria-* が透過される', () => {
+    const n = ui_text({ id: 'a', 'data-x': '1', 'aria-label': 'L' });
+    assert.equal(n.id, 'a');
+    assert.equal(n['data-x'], '1');
+    assert.equal(n['aria-label'], 'L');
+  });
+  test('class が ric-text の後ろに連結される', () => {
+    assert.equal(ui_text({ class: 'my' }).class, 'ric-text my');
+  });
+  test('variant=muted + class 連結', () => {
+    assert.equal(ui_text({ variant: 'muted', class: 'my' }).class, 'ric-text ric-text--muted my');
+  });
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_text({ tag: 'div' }).tag, 'span');
+  });
+});

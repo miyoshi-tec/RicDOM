@@ -16,6 +16,14 @@
 //     main: { ctx: [...] },   // メインパネル（残り全部）
 //   })
 //
+//   // controlled mode（折り畳み状態を外部管理）:
+//   split({
+//     collapsed:          s.page.sidebar_collapsed,
+//     on_collapse_change: (v) => { s.page.sidebar_collapsed = v; },
+//     side: { ctx: [...] },
+//     main: { ctx: [...] },
+//   })
+//
 // 内部状態（短縮名 → 原名）:
 //   _sz — size       現在のサイドパネルサイズ (px)
 //   _cl — collapsed  折り畳み状態
@@ -100,13 +108,18 @@ const create_ui_splitter = ({
   // ── 折り畳みトグル ────────────────────────────────────────────────
 
   const _toggle = () => {
-    inst._cl = !inst._cl;
-    // トグル時のみ flex-basis transition を有効化する。
-    // CSS クラスには transition を持たせず、この inline style フラグで制御する。
-    // タブ切り替えなど「意図しない flex-basis 変化」でアニメーションが走るのを防ぐため。
-    inst._tg = true;
-    inst.__notify?.();
-    // transitionend イベントで _tg フラグをリセット
+    if (inst._is_controlled) {
+      // controlled: 親に提案値を通知（内部状態は変更しない）
+      inst._on_collapse_change?.(!inst._cl);
+    } else {
+      // uncontrolled: 内部状態を直接変更
+      inst._cl = !inst._cl;
+      // トグル時のみ flex-basis transition を有効化する。
+      // CSS クラスには transition を持たせず、この inline style フラグで制御する。
+      // タブ切り替えなど「意図しない flex-basis 変化」でアニメーションが走るのを防ぐため。
+      inst._tg = true;
+      inst.__notify?.();
+    }
   };
 
   // 折り畳み状態に応じた矢印文字（「どちらに閉じるか」を示す向き）
@@ -119,7 +132,19 @@ const create_ui_splitter = ({
 
   // ── レンダー ──────────────────────────────────────────────────────
 
-  const inst = ({ main: main_arg = {}, side: side_arg = {} } = {}) => {
+  const inst = ({ main: main_arg = {}, side: side_arg = {},
+                  collapsed, on_collapse_change } = {}) => {
+
+    // ── controlled 判定 ──
+    const is_controlled = collapsed !== undefined;
+    inst._is_controlled = is_controlled;
+    inst._on_collapse_change = is_controlled ? on_collapse_change : null;
+
+    // controlled: collapsed の変化を検出してアニメーションを有効化
+    if (is_controlled && collapsed !== inst._cl) {
+      inst._tg = true;
+      inst._cl = collapsed;
+    }
 
     // サイドパネル（固定サイズ側）
     // flex-basis で幅/高さを制御。collapsed 時は 0 に。
@@ -133,7 +158,7 @@ const create_ui_splitter = ({
       style: 'flex-shrink:0;flex-basis:' + (inst._cl ? 0 : inst._sz) + 'px'
            + ';overflow:' + (inst._cl || inst._tg ? 'hidden' : 'auto')
            + (inst._tg ? ';transition:flex-basis var(--ric-duration, 200ms) var(--ric-easing, ease)' : ''),
-      ontransitionend: inst._tg ? () => { inst._tg = false; } : undefined,
+      ontransitionend: inst._tg ? () => { inst._tg = false; inst.__notify?.(); } : undefined,
       ctx:   side_arg.ctx || [],
     };
 
@@ -184,6 +209,8 @@ const create_ui_splitter = ({
   inst._se = null;   // side_el: サイドパネル DOM 要素（初回取得後キャッシュ）
   inst._de = null;   // div_el: 仕切り線 DOM 要素
   inst._tg = false;  // toggling: トグルアニメーション中フラグ
+  inst._is_controlled      = false; // controlled mode フラグ（render 時に更新）
+  inst._on_collapse_change = null;  // controlled mode コールバック（render 時に更新）
 
   // ── 公開 API ─────────────────────────────────────────────────────
 
@@ -195,7 +222,7 @@ const create_ui_splitter = ({
   inst.get_size = () => inst._sz;
   inst.set_size = (px) => {
     inst._sz = Math.max(min, max !== null ? Math.min(max, px) : px);
-    _fetch_els();
+    // キャッシュ済み DOM 要素があれば即時反映。なければ次の再レンダーで反映。
     if (inst._se && !inst._cl) inst._se.style.flexBasis = inst._sz + 'px';
   };
 

@@ -567,3 +567,120 @@ test('新APIの2引数パターン（render内蔵）が動作する', async () =
 
   assert.ok(target.textContent.includes('updated'), `再描画: "${target.textContent}"`);
 });
+
+// =====================================================================
+// SVG namespace
+// =====================================================================
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+test('SVG: 初回マウントで svg/子孫が SVG namespace で作られる', () => {
+  const dom = setup_jsdom();
+  const { create_RicDOM } = require('../src/ricdom');
+
+  const target = dom.window.document.querySelector('#app');
+  create_RicDOM(target, { render: () => ({
+    tag: 'svg', viewBox: '0 0 100 100',
+    ctx: [{ tag: 'circle', cx: 50, cy: 50, r: 40, fill: 'red' }],
+  })});
+
+  const svg = target.querySelector('svg');
+  const circle = target.querySelector('circle');
+  assert.equal(svg.namespaceURI, SVG_NS, 'svg は SVG namespace');
+  assert.equal(circle.namespaceURI, SVG_NS, 'circle も SVG namespace を継承');
+});
+
+test('SVG: 差分更新で新規追加される子要素も SVG namespace で作られる', async () => {
+  const dom = setup_jsdom();
+  const { create_RicDOM } = require('../src/ricdom');
+
+  const target = dom.window.document.querySelector('#app');
+  const s = create_RicDOM(target, { count: 0, render: (s) => ({
+    tag: 'svg', viewBox: '0 0 100 100',
+    ctx: s.count === 0
+      ? []
+      : [{ tag: 'circle', cx: 50, cy: 50, r: 40, fill: 'red' }],
+  })});
+
+  // 初回: 子なし
+  assert.equal(target.querySelector('circle'), null);
+
+  // 差分更新で circle を追加
+  s.count = 1;
+  await flush_raf();
+
+  const circle = target.querySelector('circle');
+  assert.ok(circle, 'circle が追加される');
+  assert.equal(circle.namespaceURI, SVG_NS,
+    '差分追加された circle も SVG namespace で生成される');
+});
+
+test('SVG: serial key が変わった子要素の置換でも SVG namespace が維持される', async () => {
+  const dom = setup_jsdom();
+  const { create_RicDOM } = require('../src/ricdom');
+
+  const target = dom.window.document.querySelector('#app');
+  const s = create_RicDOM(target, { shape: 'circle', render: (s) => ({
+    tag: 'svg', viewBox: '0 0 100 100',
+    ctx: [
+      s.shape === 'circle'
+        ? { tag: 'circle', cx: 50, cy: 50, r: 40, fill: 'red' }
+        : { tag: 'rect',   x: 10, y: 10, width: 80, height: 80, fill: 'blue' },
+    ],
+  })});
+
+  // 初回: circle
+  assert.equal(target.querySelector('circle').namespaceURI, SVG_NS);
+
+  // 置換: rect (serial key が違うので replaceChild 経由)
+  s.shape = 'rect';
+  await flush_raf();
+
+  const rect = target.querySelector('rect');
+  assert.ok(rect, 'rect に置換される');
+  assert.equal(rect.namespaceURI, SVG_NS,
+    '置換された rect も SVG namespace を引き継ぐ');
+});
+
+test('SVG: 動的に要素数が変わっても全要素が SVG namespace で作られる', async () => {
+  const dom = setup_jsdom();
+  const { create_RicDOM } = require('../src/ricdom');
+
+  const target = dom.window.document.querySelector('#app');
+  const s = create_RicDOM(target, { n: 1, render: (s) => ({
+    tag: 'svg', viewBox: '0 0 100 100',
+    ctx: Array.from({ length: s.n }, (_, i) =>
+      ({ tag: 'circle', cx: 10 + i * 10, cy: 50, r: 4, fill: 'red' })
+    ),
+  })});
+
+  // n=3 に増やす
+  s.n = 3;
+  await flush_raf();
+
+  const circles = target.querySelectorAll('circle');
+  assert.equal(circles.length, 3);
+  for (const c of circles) {
+    assert.equal(c.namespaceURI, SVG_NS);
+  }
+});
+
+test('SVG: HTML 要素の差分更新は従来通り HTML namespace', async () => {
+  const dom = setup_jsdom();
+  const { create_RicDOM } = require('../src/ricdom');
+  const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+
+  const target = dom.window.document.querySelector('#app');
+  const s = create_RicDOM(target, { count: 0, render: (s) => ({
+    tag: 'div',
+    ctx: s.count === 0 ? [] : [{ tag: 'span', ctx: ['hello'] }],
+  })});
+
+  s.count = 1;
+  await flush_raf();
+
+  const span = target.querySelector('span');
+  assert.ok(span);
+  // parent.namespaceURI が XHTML でも、HTML 要素として正しく動作する
+  assert.equal(span.namespaceURI, XHTML_NS, 'span は HTML namespace のまま');
+});

@@ -125,6 +125,12 @@ ${_P}.ric-tweak-row__label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* checkbox 行は ui_checkbox 内蔵ラベルを使うため __label を持たない。
+   通常行とトーンを揃えるため、内部の .ric-checkbox にも同じ色・サイズを適用する。 */
+${_P}.ric-tweak-row--checkbox .ric-checkbox {
+  font-size: 0.85em;
+  color: ${_fm};
+}
 ${_P}.ric-tweak-row > .ric-input,
 ${_P}.ric-tweak-row > .ric-range,
 ${_P}.ric-tweak-row > .ric-select,
@@ -976,6 +982,19 @@ ${_P}.ric-tooltip { display: inline-flex; }
 .ric-md-pre__hr {
   border: none; border-top: ${_b1};
   margin: 1em 0;
+}
+.ric-md-pre__table {
+  margin: 0.5em 0; border-collapse: collapse; width: auto;
+  font-size: 0.95em;
+}
+.ric-md-pre__th {
+  padding: 0.35em 0.8em; font-weight: 700;
+  border-bottom: 2px solid ${_bd};
+  text-align: left; white-space: nowrap;
+}
+.ric-md-pre__td {
+  padding: 0.3em 0.8em;
+  border-bottom: ${_b1};
 }`,
 
   'ric-code-pre': () => `

@@ -11,16 +11,22 @@
 
 'use strict';
 
+// rest: onclick / id / data-* / aria-* 等の任意属性を透過する
+//       （ui_button / ui_input / ui_panel 等と同じ流儀）
+// 注意: checked / onchange は input 要素に掛ける必要があるため rest には入れない。
+//       rest は外側の <label> に付く（wrapper の click ハンドラ等を想定）。
 const ui_checkbox = ({
   ctx      = [],
   checked  = false,
   onchange = null,
   disabled = false,
+  ...rest
 } = {}) => {
-  const cls = disabled ? 'ric-checkbox ric-checkbox--disabled' : 'ric-checkbox';
+  const cls_base = disabled ? 'ric-checkbox ric-checkbox--disabled' : 'ric-checkbox';
   return {
+    ...rest,
     tag:   'label',
-    class: cls,
+    class: rest.class ? cls_base + ' ' + rest.class : cls_base,
     ctx: [
       {
         tag:  'input',
