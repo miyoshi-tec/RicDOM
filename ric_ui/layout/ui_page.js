@@ -39,7 +39,10 @@ const create_ui_page = (initial = {}) => {
   //       （ui_button / ui_input / ui_panel 等と同じ流儀）
   const inst = ({ ctx = [], style: extra_style = '', ...rest } = {}) => {
 
-    // ポータルキューを取り出す（drain: create_ui_page 経由では begin() 済み）
+    // ポータルキューを取り出す。
+    // 直前の children 評価で push() された popup/dialog/tooltip/toast の VDOM を
+    // 全部吸い上げる。複数 ui_page でも JS の評価順（左から順）で完結するため
+    // 単一バッファで正しく分離される。
     const portals = _portal.drain();
 
     // ポータルを ctx 末尾に展開する

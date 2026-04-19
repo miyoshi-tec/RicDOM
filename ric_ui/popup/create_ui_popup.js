@@ -54,7 +54,7 @@ const create_ui_popup = () => {
   const { apply_theme_to_portal } = require('./_wrap_portal');
 
   // inst(props) → VDOM
-  const inst = ({ label, icon, ghost = false, ctx = [], theme, density, font_size }) => {
+  const inst = ({ label, icon, ghost = false, ctx = [], theme, density, font_size } = {}) => {
     // label / icon どちらもなければデフォルトアイコン
     const is_label = !!label && !icon;
     const trigger_text = icon ?? (label ? undefined : '≡');

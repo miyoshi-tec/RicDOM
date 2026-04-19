@@ -1,6 +1,7 @@
 // RicUI — ポップアップ共通ユーティリティ
-// create_ui_dropdown / create_ui_menu / create_ui_tooltip が共有する
-// 位置計算・スタイル生成・排他制御ヘルパー群。
+// create_ui_popup / create_ui_tooltip が共有する位置計算・スタイル生成・
+// 排他制御ヘルパー群。（旧称 create_ui_dropdown / create_ui_menu は
+// create_ui_popup に統合済み）
 
 'use strict';
 

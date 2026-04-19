@@ -1,4 +1,5 @@
-// RicUI v0.2 — rest スプレッドテスト（ui_range / ui_color / ui_separator）
+// RicUI v0.2 — rest スプレッドテスト
+// ui_range / ui_color / ui_separator / ui_select / ui_md_pre / ui_code_pre
 //
 // ui_button / ui_input / ui_panel 等と同じ流儀で任意属性を透過するか検証する。
 // これらのコンポーネントは既存のテストファイルを持たないため、
@@ -7,7 +8,7 @@
 // テスト方針:
 //   - onclick が外側ラッパーに透過される
 //   - id / data-* / aria-* が外側ラッパーに透過される
-//   - class が基底クラスの後ろに連結される
+//   - class が基底クラスの後ろに連結される（基底クラス消失バグ回帰検知）
 //   - rest で tag を上書きできない（計算済みフィールドが勝つ）
 
 'use strict';
@@ -18,6 +19,9 @@ const assert = require('node:assert/strict');
 const { ui_range     } = require('../ric_ui/control/ui_range');
 const { ui_color     } = require('../ric_ui/control/ui_color');
 const { ui_separator } = require('../ric_ui/control/ui_separator');
+const { ui_select    } = require('../ric_ui/control/ui_select');
+const { ui_md_pre    } = require('../ric_ui/text/ui_md_pre');
+const { ui_code_pre  } = require('../ric_ui/text/ui_code_pre');
 
 // =====================================================================
 // ui_range
@@ -128,5 +132,97 @@ describe('ui_separator: rest スプレッド', () => {
   });
   test('rest で tag を上書きできない', () => {
     assert.equal(ui_separator({ tag: 'div' }).tag, 'hr');
+  });
+});
+
+// =====================================================================
+// ui_select
+// =====================================================================
+
+describe('ui_select: rest スプレッド', () => {
+  test('onclick がラッパー select に透過される', () => {
+    const fn = () => {};
+    assert.equal(ui_select({ onclick: fn }).onclick, fn);
+  });
+  test('id / data-* / aria-* がラッパー select に透過される', () => {
+    const n = ui_select({ id: 'sel', 'data-role': 'picker', 'aria-label': 'Pick' });
+    assert.equal(n.id, 'sel');
+    assert.equal(n['data-role'], 'picker');
+    assert.equal(n['aria-label'], 'Pick');
+  });
+  test('class が ric-select の後ろに連結される（基底クラス消失バグ回帰）', () => {
+    assert.equal(ui_select({ class: 'my' }).class, 'ric-select my');
+  });
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_select({ tag: 'div' }).tag, 'select');
+  });
+  test('rest で ctx（option_nodes）を上書きできない', () => {
+    const n = ui_select({ options: ['a', 'b'], ctx: ['EVIL'] });
+    assert.equal(n.ctx.length, 2);
+    assert.equal(n.ctx[0].tag, 'option');
+  });
+});
+
+// =====================================================================
+// ui_md_pre
+// =====================================================================
+
+describe('ui_md_pre: rest スプレッド', () => {
+  test('onclick がラッパー div に透過される', () => {
+    const fn = () => {};
+    assert.equal(ui_md_pre({ ctx: ['# H'], onclick: fn }).onclick, fn);
+  });
+  test('id / data-* / aria-* がラッパー div に透過される', () => {
+    const n = ui_md_pre({ ctx: ['# H'], id: 'md', 'data-x': '1', 'aria-label': 'MD' });
+    assert.equal(n.id, 'md');
+    assert.equal(n['data-x'], '1');
+    assert.equal(n['aria-label'], 'MD');
+  });
+  test('class が ric-md-pre の後ろに連結される（基底クラス消失バグ回帰）', () => {
+    assert.equal(ui_md_pre({ ctx: ['# H'], class: 'my' }).class, 'ric-md-pre my');
+  });
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_md_pre({ ctx: ['# H'], tag: 'span' }).tag, 'div');
+  });
+  test('rest で ctx（parsed blocks）を上書きできない', () => {
+    const n = ui_md_pre({ ctx: ['# Hello'] });
+    // 内部パース後の ctx は h1 ブロックを含む
+    assert.ok(Array.isArray(n.ctx) && n.ctx.length > 0);
+    assert.equal(n.ctx[0].tag, 'h1');
+  });
+});
+
+// =====================================================================
+// ui_code_pre
+// =====================================================================
+
+describe('ui_code_pre: rest スプレッド', () => {
+  test('onclick がラッパー pre に透過される', () => {
+    const fn = () => {};
+    assert.equal(ui_code_pre({ ctx: ['x'], onclick: fn }).onclick, fn);
+  });
+  test('id / data-* / aria-* がラッパー pre に透過される', () => {
+    const n = ui_code_pre({ ctx: ['x'], id: 'code', 'data-x': '1', 'aria-label': 'Code' });
+    assert.equal(n.id, 'code');
+    assert.equal(n['data-x'], '1');
+    assert.equal(n['aria-label'], 'Code');
+  });
+  test('class が ric-code-pre の後ろに連結される（基底クラス消失バグ回帰）', () => {
+    assert.equal(ui_code_pre({ ctx: ['x'], class: 'my' }).class, 'ric-code-pre my');
+  });
+  test('rest で tag を上書きできない', () => {
+    assert.equal(ui_code_pre({ ctx: ['x'], tag: 'div' }).tag, 'pre');
+  });
+  test('rest で ctx（code node）を上書きできない', () => {
+    const n = ui_code_pre({ ctx: ['const x = 1;'] });
+    assert.equal(n.ctx.length, 1);
+    assert.equal(n.ctx[0].tag, 'code');
+  });
+  test('max_height と rest.style がマージされる', () => {
+    const n = ui_code_pre({ ctx: ['x'], max_height: '200px', style: { color: 'red' } });
+    // style はオブジェクトマージされる（文字列化前のオブジェクト形式）
+    assert.equal(typeof n.style, 'object');
+    assert.equal(n.style.maxHeight, '200px');
+    assert.equal(n.style.color, 'red');
   });
 });

@@ -125,8 +125,8 @@ const _parse_blocks = (src) => {
     const heading_match = line.match(/^(#{1,6})\s+(.+)/);
     if (heading_match) {
       const level = heading_match[1].length;
-      // h4〜h6 は h3 と同じスタイルで表示
-      const tag = level <= 3 ? 'h' + level : 'h' + level;
+      // タグは実レベル通り。class は h4〜h6 を h3 と同じスタイルに統一する。
+      const tag = 'h' + level;
       const cls = level <= 3 ? 'ric-md-pre__h' + level : 'ric-md-pre__h3';
       blocks.push({
         tag, class: cls,
@@ -259,11 +259,13 @@ const ui_md_pre = ({ ctx = [], ...rest } = {}) => {
   const src = ctx.join('\n');
   const children = _parse_blocks(src);
 
+  // rest スプレッド契約: ...rest を先頭に置き、算出値（tag/class/ctx）で上書きする。
+  // rest.class を基底クラスに連結することで、呼び出し側の追加クラスも共存する。
   return {
+    ...rest,
     tag:   'div',
     class: rest.class ? 'ric-md-pre ' + rest.class : 'ric-md-pre',
-    ...rest,
-    ctx: children,
+    ctx:   children,
   };
 };
 

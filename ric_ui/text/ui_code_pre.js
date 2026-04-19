@@ -68,12 +68,14 @@ const ui_code_pre = ({
     ? { ...base_style, ...rest.style }
     : (rest.style ?? base_style);
 
+  // rest スプレッド契約: ...rest を先頭に置き、算出値（tag/class/style/ctx）で
+  // 上書きする。rest.class / rest.style は上の計算で既に統合済み。
   return {
+    ...rest,
     tag:   'pre',
     class: rest.class ? 'ric-code-pre ' + rest.class : 'ric-code-pre',
-    ...rest,
     style: merged_style,
-    ctx: [code_node],
+    ctx:   [code_node],
   };
 };
 
