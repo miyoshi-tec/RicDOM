@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controlled Mode — RicUI</title>
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
+                  border-bottom: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); }
+    .page-intro code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+                       font-family: ui-monospace, monospace; font-size: 12.5px; }
+  </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+<div id="nav_bar" data-sample="13"></div>
+<p class="page-intro">
+  <code>create_ui_dialog</code> と <code>create_ui_splitter</code> の
+  <strong>controlled mode</strong>（v0.3.2）を使うと、開閉状態を state として扱えるようになり、
+  他の UI との同期が宣言的に書けます。
+  このサンプルでは、2 つのチェックボックスと bottom スプリッターの<strong>双方向同期</strong>、
+  およびボタンから state 経由で開くダイアログを示します。
+</p>
+<div id="mount-rui" style="flex:1;min-height:0;overflow:hidden"></div>
+<script src="_nav_bar.js"></script>
+<script>
+'use strict';
+
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_splitter, create_ui_dialog,
+  ui_panel, ui_row, ui_text, ui_button,
+  ui_checkbox,
+} = RicUI;
+
+create_RicDOM('#mount-rui', {
+
+  // 全ての UI 状態を s.ui に集約する（1 階層目の代入で自動再描画）。
+  ui: {
+    show_graph: true,
+    show_stats: false,
+    error_dlg:  null,    // null = 閉じている、文字列 = その内容を表示
+  },
+
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  sp:   create_ui_splitter({ side: 'bottom', size: 180, min: 80, collapsible: true }),
+  dlg:  create_ui_dialog(),
+
+  render(s) {
+    const both_off = !s.ui.show_graph && !s.ui.show_stats;
+
+    return s.page({
+      style: { height: '100%', padding: 0, borderRadius: 0,
+               display: 'flex', flexDirection: 'column' },
+      ctx: [
+
+        // ── コントロール + state ライブビュー ──
+        ui_panel({
+          style: { margin: 0, borderRadius: 0, borderLeft: 0, borderRight: 0, borderTop: 0 },
+          ctx: [
+            ui_row({ style: { alignItems: 'center', gap: '16px', flexWrap: 'wrap' }, ctx: [
+              ui_text({ variant: 'label', ctx: ['スプリッター表示:'] }),
+              ui_checkbox({
+                checked: s.ui.show_graph ? 1 : 0,
+                ctx: ['📈 グラフ'],
+                onchange: (e) => { s.ui.show_graph = e.target.checked; },
+              }),
+              ui_checkbox({
+                checked: s.ui.show_stats ? 1 : 0,
+                ctx: ['📊 統計'],
+                onchange: (e) => { s.ui.show_stats = e.target.checked; },
+              }),
+              ui_button({
+                variant: 'primary',
+                ctx: ['⚠️ エラーを表示'],
+                onclick: () => { s.ui.error_dlg = 'ディスク容量が不足しています。'; },
+              }),
+            ]}),
+            ui_text({ variant: 'label', ctx: ['現在の state.ui（値の変化がそのまま UI に反映されます）:'] }),
+            { tag: 'pre',
+              style: 'margin:0;padding:10px 12px;background:rgba(0,0,0,0.05);'
+                   + 'border-radius:4px;font-size:12px;line-height:1.5;'
+                   + 'font-family:ui-monospace,Menlo,Consolas,monospace',
+              ctx: [JSON.stringify(s.ui, null, 2)],
+            },
+          ],
+        }),
+
+        // ── Splitter（controlled collapsed + 双方向同期）──
+        { tag: 'div', style: 'flex:1;min-height:0', ctx: [
+          s.sp({
+            // checkbox の OR 条件を collapsed に直接つなぐ。
+            // 両方 OFF → collapsed=true（自動で閉じアニメ再生）。
+            collapsed: both_off,
+
+            // 折り畳みボタンが押されたら、両 checkbox を同時にトグルする（双方向）。
+            // controlled mode では state は親の責任なので、ここで state を更新する。
+            on_collapse_change: (c) => {
+              s.ui = { ...s.ui, show_graph: !c, show_stats: !c };
+            },
+
+            main: {
+              ctx: [
+                ui_panel({
+                  style: { height: '100%', margin: 0, borderRadius: 0, border: 0 },
+                  ctx: [
+                    ui_text({ variant: 'title', ctx: ['Main View'] }),
+                    ui_text({ ctx: ['この部分は常に表示されます。'] }),
+                    ui_text({ ctx: [
+                      '上のチェックボックスを切り替えると、下の splitter が展開 / 折り畳みされます。',
+                    ]}),
+                    ui_text({ ctx: [
+                      'splitter 自身の折り畳みボタン（△）を押すと、両方のチェックボックスが OFF に戻ります（双方向同期）。',
+                    ]}),
+                  ],
+                }),
+              ],
+            },
+
+            // side の中身は state に応じて動的に切り替える。
+            // 両方 OFF の場合は splitter が collapsed なので描画されない。
+            side: {
+              ctx: [
+                ui_row({ style: { height: '100%', gap: '8px', padding: '8px' }, ctx: [
+                  s.ui.show_graph ? ui_panel({
+                    style: { flex: 1, margin: 0 },
+                    ctx: [
+                      ui_text({ variant: 'label', ctx: ['📈 グラフパネル'] }),
+                      ui_text({ ctx: ['(ここにグラフが描画される想定)'] }),
+                    ],
+                  }) : null,
+                  s.ui.show_stats ? ui_panel({
+                    style: { flex: 1, margin: 0 },
+                    ctx: [
+                      ui_text({ variant: 'label', ctx: ['📊 統計パネル'] }),
+                      ui_text({ ctx: ['(ここに統計が表示される想定)'] }),
+                    ],
+                  }) : null,
+                ]}),
+              ],
+            },
+          }),
+        ]},
+
+        // ── Dialog（controlled open + on_close）──
+        // open は state から算出、on_close / OK ボタン / ESC キーはすべて
+        // state をリセットする。これにより開閉の論理は state 側に完全に集約される。
+        s.dlg({
+          open:     s.ui.error_dlg !== null,
+          on_close: () => { s.ui.error_dlg = null; },
+          title:    'エラー',
+          ctx: [ ui_text({ ctx: [s.ui.error_dlg ?? ''] }) ],
+          actions: [
+            ui_button({
+              variant: 'primary',
+              ctx: ['OK'],
+              onclick: () => { s.ui.error_dlg = null; },
+            }),
+          ],
+        }),
+
+      ],
+    });
+  },
+});
+</script>
+</body>
+</html>
