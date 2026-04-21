@@ -868,9 +868,13 @@ ${_P}.ric-tooltip { display: inline-flex; }
   z-index: 1;
 }
 
-.ric-splitter--horizontal .ric-splitter__divider { cursor: col-resize; }
-.ric-splitter--vertical   .ric-splitter__divider { cursor: row-resize; }
-.ric-splitter--collapsed  .ric-splitter__divider { cursor: pointer; }
+/* variant クラスは *直接の* divider にのみ効かせる。
+   子孫セレクタ（空白区切り）だと、外側 vertical splitter の
+   中にある内側 horizontal splitter の divider にも vertical スタイルが
+   漏れるため、> で 1 階層に限定する。 */
+.ric-splitter--horizontal > .ric-splitter__divider { cursor: col-resize; }
+.ric-splitter--vertical   > .ric-splitter__divider { cursor: row-resize; }
+.ric-splitter--collapsed  > .ric-splitter__divider { cursor: pointer; }
 
 .ric-splitter__divider:hover,
 .ric-splitter__divider--dragging { background: ${_ac}; }
@@ -891,20 +895,21 @@ ${_P}.ric-tooltip { display: inline-flex; }
   transition: opacity 0.15s, background 0.1s, color 0.1s, border-color 0.1s;
 }
 
-.ric-splitter--vertical .ric-splitter__collapse-btn {
+/* vertical 用の縦長→横長ボタン切替も同じ理由で直下限定にする */
+.ric-splitter--vertical > .ric-splitter__divider > .ric-splitter__collapse-btn {
   width: 40px; height: 20px; border-radius: 10px;
 }
 
-.ric-splitter:hover .ric-splitter__collapse-btn,
-.ric-splitter__divider--dragging .ric-splitter__collapse-btn { opacity: 1; }
+.ric-splitter:hover > .ric-splitter__divider > .ric-splitter__collapse-btn,
+.ric-splitter__divider--dragging > .ric-splitter__collapse-btn { opacity: 1; }
 .ric-splitter__collapse-btn:hover {
   background: ${_ac};
   color: ${_af};
   border-color: ${_ac};
 }
 
-.ric-splitter__divider:hover .ric-splitter__collapse-btn,
-.ric-splitter__divider--dragging .ric-splitter__collapse-btn {
+.ric-splitter__divider:hover > .ric-splitter__collapse-btn,
+.ric-splitter__divider--dragging > .ric-splitter__collapse-btn {
   border-color: var(--ric-color-accent-fg, rgba(255,255,255,0.35));
 }`,
 
