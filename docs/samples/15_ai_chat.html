@@ -39,9 +39,9 @@
 
 const { create_RicDOM } = RicDOM;
 const {
-  create_ui_page, create_ui_scroll_pane,
+  create_ui_page, create_ui_scroll_pane, create_ui_splitter,
   ui_panel, ui_row, ui_col, ui_text, ui_button,
-  ui_textarea, ui_input, ui_select, focus_when,
+  ui_textarea, ui_input, ui_select, ui_md_pre, focus_when,
 } = RicUI;
 
 // ── プロバイダ定義 ──
@@ -168,6 +168,8 @@ const handle = create_RicDOM('#mount-demo', {
   ignore: { messages: [] }, // { role: 'user' | 'assistant', text: string }[]
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   pane: create_ui_scroll_pane({ follow: 'bottom', threshold: 40 }),
+  // 設定エリア（Provider/Model/API Key）を折り畳める内側 splitter
+  settings_sp: create_ui_splitter({ side: 'top', size: 170, min: 80, collapsible: true }),
 });
 
 // ── UI ──
@@ -176,48 +178,53 @@ handle.render = (s) => {
 
   const provider = PROVIDERS[s.ui.provider];
 
-  return s.page({
-    style: { height: '100%', padding: 0, borderRadius: 0,
-             display: 'flex', flexDirection: 'column' },
+  // 設定エリア（splitter の top side に置く）
+  const settings_panel = ui_panel({
+    style: { margin: 0, borderRadius: 0, border: 0, height: '100%',
+             display: 'flex', flexDirection: 'column', gap: '8px' },
     ctx: [
+      ui_row({ style: { alignItems: 'center', gap: '10px', flexWrap: 'wrap' }, ctx: [
+        ui_text({ variant: 'label', ctx: ['Provider:'] }),
+        ui_select({
+          value:    s.ui.provider,
+          options:  Object.entries(PROVIDERS).map(([k, p]) => ({ value: k, label: p.label })),
+          onchange: (e) => {
+            const pr = e.target.value;
+            // プロバイダ変更時はモデルもそのプロバイダの先頭にリセット
+            s.ui = { ...s.ui, provider: pr, model: PROVIDERS[pr].models[0] };
+          },
+          style: { minWidth: '180px' },
+        }),
+        ui_text({ variant: 'label', ctx: ['Model:'] }),
+        ui_select({
+          value:    s.ui.model,
+          options:  provider.models,
+          onchange: (e) => { s.ui.model = e.target.value; },
+          style: { minWidth: '180px' },
+        }),
+      ]}),
+      ui_row({ style: { alignItems: 'center', gap: '10px' }, ctx: [
+        ui_text({ variant: 'label', ctx: ['API Key:'] }),
+        { tag: 'div', style: 'flex:1', ctx: [
+          ui_input({
+            type:        'password',
+            value:       s.ui.api_key,
+            placeholder: 'sk-... / sk-ant-... / AIza... など',
+            oninput:     (e) => { s.ui.api_key = e.target.value; },
+          }),
+        ]},
+      ]}),
+      ui_text({ variant: 'muted', ctx: [
+        '↑ 折り畳みボタンで設定エリアを収納できます（API キー入力後は隠すとメッセージ領域が広がります）',
+      ]}),
+    ],
+  });
 
-      // ── プロバイダ選択 + API キー ──
-      ui_panel({
-        style: { margin: 0, borderRadius: 0, borderLeft: 0, borderRight: 0, borderTop: 0 },
-        ctx: [
-          ui_row({ style: { alignItems: 'center', gap: '10px', flexWrap: 'wrap' }, ctx: [
-            ui_text({ variant: 'label', ctx: ['Provider:'] }),
-            ui_select({
-              value:    s.ui.provider,
-              options:  Object.entries(PROVIDERS).map(([k, p]) => ({ value: k, label: p.label })),
-              onchange: (e) => {
-                const pr = e.target.value;
-                // プロバイダ変更時はモデルもそのプロバイダの先頭にリセット
-                s.ui = { ...s.ui, provider: pr, model: PROVIDERS[pr].models[0] };
-              },
-              style: { minWidth: '180px' },
-            }),
-            ui_text({ variant: 'label', ctx: ['Model:'] }),
-            ui_select({
-              value:    s.ui.model,
-              options:  provider.models,
-              onchange: (e) => { s.ui.model = e.target.value; },
-              style: { minWidth: '180px' },
-            }),
-          ]}),
-          ui_row({ style: { alignItems: 'center', gap: '10px', marginTop: '6px' }, ctx: [
-            ui_text({ variant: 'label', ctx: ['API Key:'] }),
-            { tag: 'div', style: 'flex:1', ctx: [
-              ui_input({
-                type:        'password',
-                value:       s.ui.api_key,
-                placeholder: 'sk-... / sk-ant-... / AIza... など',
-                oninput:     (e) => { s.ui.api_key = e.target.value; },
-              }),
-            ]},
-          ]}),
-        ],
-      }),
+  // メッセージ履歴 + 入力エリア（splitter の main に置く）
+  const chat_area = {
+    tag: 'div',
+    style: 'height:100%;display:flex;flex-direction:column;min-height:0',
+    ctx: [
 
       // ── エラー表示（あれば）──
       s.ui.error
@@ -241,7 +248,7 @@ handle.render = (s) => {
 
       // ── メッセージ履歴 ──
       s.pane({
-        style: 'flex:1;padding:16px',
+        style: 'flex:1;padding:16px;min-height:0',
         ctx: [
           ui_col({ style: { gap: '12px' }, ctx: [
             s.ignore.messages.length === 0
@@ -259,10 +266,18 @@ handle.render = (s) => {
                 color: m.role === 'user'
                   ? 'var(--ric-color-accent-fg, #fff)'
                   : 'var(--ric-color-fg)',
-                whiteSpace: 'pre-wrap',
+                whiteSpace: m.role === 'user' ? 'pre-wrap' : null,
               },
               ctx: [
-                ui_text({ ctx: [m.text || (m.role === 'assistant' && s.ui.busy ? '…' : '')] }),
+                // user: plain text（入力したまま表示）
+                // assistant: ui_md_pre で Markdown 整形（見出し・リスト・コードブロック対応）
+                m.role === 'assistant'
+                  ? ui_md_pre({
+                      ctx: [m.text || (s.ui.busy ? '…' : '')],
+                      style: { margin: 0, background: 'transparent',
+                               border: 0, padding: 0 },
+                    })
+                  : ui_text({ ctx: [m.text] }),
               ],
             })),
           ].filter(Boolean)}),
@@ -305,6 +320,18 @@ handle.render = (s) => {
         ],
       }),
 
+    ].filter(Boolean),
+  };
+
+  return s.page({
+    style: { height: '100%', padding: 0, borderRadius: 0,
+             display: 'flex', flexDirection: 'column' },
+    ctx: [
+      // 内側 splitter: top に設定、main に履歴+入力。折り畳みボタンで設定を収納できる。
+      s.settings_sp({
+        side: { ctx: [settings_panel] },
+        main: { ctx: [chat_area] },
+      }),
     ],
   });
 };
