@@ -44,8 +44,9 @@ try {
     { no: '11', file: '11_theme_override.html',   title: 'テーマ上書き' },
     { no: '12', file: '12_md_viewer.html',        title: 'Markdown ビューア' },
     { no: '13', file: '13_controlled_dialog_splitter.html', title: 'Controlled Mode' },
-    { no: '14', file: '14_chat_ui.html',          title: 'Chat UI (textarea + scroll_pane)' },
+    // 14 は欠番（旧 "Chat UI" は 15 "AI Chat" に完全に包含されたため削除）
     { no: '15', file: '15_ai_chat.html',           title: 'AI Chat (live, 4 providers)' },
+    { no: '16', file: '16_svg_editor.html',        title: 'SVG Tree Editor' },
   ];
 
   // ── 現在のページ検出 ──

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVG Tree Editor — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
+                  border-bottom: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); }
+    .page-intro code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+                       font-family: ui-monospace, monospace; font-size: 12.5px; }
+  </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+<div id="nav_bar" data-sample="16"></div>
+<p class="page-intro">
+  <strong>SVG ツリーエディタ</strong>。左のツリーでノードを選び、下の属性パネルで
+  値を編集するとリアルタイムで右の SVG が更新されます。「追加」モードで
+  新しいノードを挿入することもできます。state の VDOM オブジェクトがそのまま
+  SVG として描画される流れ（v0.4.0 で SVG namespace の差分伝播を修正）を確かめられます。
+  下ペインに実際のコードを表示しています。
+</p>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<script type="text/plain" id="src-demo">
+// ── SVG ツリーエディタ ──
+// state.tree が VDOM としてそのまま SVG に描画される。
+// ツリー操作は「不変更新」パターン: update_at(root, path, fn) で
+// path の位置のノードを fn で置き換えた新 tree を返す（top-level 代入で再描画）。
+
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_splitter,
+  ui_panel, ui_row, ui_col, ui_text, ui_button,
+  ui_input, ui_select, bind_radiobutton,
+} = RicUI;
+
+// ── ツリー操作ヘルパ ──
+// path = [i1, i2, ...] は root.ctx[i1].ctx[i2]... の位置。[] は root 自身。
+
+const get_at = (root, path) =>
+  path.reduce((node, i) => node.ctx[i], root);
+
+const update_at = (root, path, fn) => {
+  if (path.length === 0) return fn(root);
+  return {
+    ...root,
+    ctx: root.ctx.map((c, i) =>
+      i === path[0] && c && typeof c === 'object'
+        ? update_at(c, path.slice(1), fn)
+        : c),
+  };
+};
+
+const remove_at = (root, path) => {
+  if (path.length === 0) return root; // ルートは削除不可
+  const parent_path = path.slice(0, -1);
+  const idx         = path[path.length - 1];
+  return update_at(root, parent_path, parent => ({
+    ...parent,
+    ctx: parent.ctx.filter((_, i) => i !== idx),
+  }));
+};
+
+// タグ追加時のデフォルト属性
+const DEFAULT_ATTRS = {
+  circle:  { cx: 60,  cy: 60,  r: 30,                 fill: '#3b82f6' },
+  rect:    { x: 20,   y: 20,   width: 80, height: 50, fill: '#10b981' },
+  line:    { x1: 10,  y1: 10,  x2: 120, y2: 80,       stroke: '#111', 'stroke-width': 2 },
+  ellipse: { cx: 70,  cy: 50,  rx: 50, ry: 25,        fill: '#f59e0b' },
+  polygon: { points: '50,10 90,80 10,80',             fill: '#8b5cf6' },
+  text:    { x: 50,   y: 50,   fill: '#111', 'font-size': 16, ctx: ['Text'] },
+  g:       { ctx: [] },
+};
+const ADD_TAGS = Object.keys(DEFAULT_ATTRS);
+
+// ── state ──
+const handle = create_RicDOM('#mount-demo', {
+  ui: {
+    selected_path: [0],  // 初期選択: 最初の子
+    mode:          'edit',
+    add_tag:       'circle',
+  },
+  tree: {
+    tag: 'svg', viewBox: '0 0 300 200',
+    width: '100%', height: '100%',
+    style: 'display:block;max-width:100%;max-height:100%',
+    ctx: [
+      { tag: 'circle', cx: 80,  cy: 100, r: 40, fill: '#3b82f6' },
+      { tag: 'rect',   x: 160,  y: 50, width: 100, height: 100,
+                       fill: '#10b981', rx: 8 },
+      { tag: 'text',   x: 150,  y: 30,
+                       'text-anchor': 'middle', fill: '#111',
+                       'font-size': 16, ctx: ['Hello SVG'] },
+    ],
+  },
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  sp:   create_ui_splitter({ side: 'left', size: 380, min: 260, collapsible: true }),
+});
+
+// ── ツリー 1 行分（インデント + クリック選択）──
+const tree_line = (node, path, is_selected, onclick) => {
+  const attrs = Object.entries(node)
+    .filter(([k]) => k !== 'tag' && k !== 'ctx' && k !== 'style')
+    .map(([k, v]) => `${k}="${v}"`).join(' ');
+  const inner = (node.tag === 'text' && typeof node.ctx?.[0] === 'string')
+    ? node.ctx[0] + '</text>' : (node.tag === 'text' ? '</text>' : '');
+  const label = '<' + node.tag + (attrs ? ' ' + attrs : '') + '>' + inner;
+  return {
+    tag: 'div',
+    style: 'padding:2px 6px;border-radius:3px;cursor:pointer;'
+         + 'margin-left:' + (path.length * 14) + 'px;'
+         + 'font-family:ui-monospace,monospace;font-size:12px;'
+         + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+         + (is_selected
+             ? 'background:var(--ric-color-accent);color:var(--ric-color-accent-fg,#fff)'
+             : ''),
+    onclick,
+    ctx: [label],
+  };
+};
+
+const render_tree = (s) => {
+  const lines = [];
+  const walk = (node, path) => {
+    const is_selected = JSON.stringify(path) === JSON.stringify(s.ui.selected_path);
+    lines.push(tree_line(node, path, is_selected,
+      () => { s.ui = { ...s.ui, selected_path: path }; }));
+    if (Array.isArray(node.ctx)) {
+      node.ctx.forEach((c, i) => {
+        if (c && typeof c === 'object') walk(c, [...path, i]);
+      });
+    }
+  };
+  walk(s.tree, []);
+  return lines;
+};
+
+// ── render ──
+handle.render = (s) => {
+  const selected    = get_at(s.tree, s.ui.selected_path);
+  const attr_entries = Object.entries(selected)
+    .filter(([k]) => k !== 'tag' && k !== 'ctx');
+  const is_text      = selected.tag === 'text';
+  const text_content = is_text && typeof selected.ctx?.[0] === 'string'
+    ? selected.ctx[0] : '';
+  const can_contain  = ['svg', 'g'].includes(selected.tag);
+
+  // 左ペイン: ツリー + 編集 / 追加
+  const editor_panel = {
+    tag: 'div',
+    style: 'height:100%;overflow:auto;padding:12px;'
+         + 'display:flex;flex-direction:column;gap:10px',
+    ctx: [
+      // モード切替
+      ui_row({ style: { alignItems: 'center', gap: '10px' }, ctx: [
+        ui_text({ variant: 'label', ctx: ['モード:'] }),
+        bind_radiobutton(s.ui, 'mode', {
+          options: [
+            { value: 'edit', label: '編集' },
+            { value: 'add',  label: '追加' },
+          ],
+        }),
+      ]}),
+
+      // ツリー表示
+      ui_text({ variant: 'label', ctx: ['ツリー（クリックで選択）:'] }),
+      { tag: 'div',
+        style: 'border:1px solid var(--ric-color-border);border-radius:4px;'
+             + 'padding:6px;background:var(--ric-color-control);'
+             + 'max-height:220px;overflow:auto',
+        ctx: render_tree(s),
+      },
+
+      // 編集モード: 属性リスト
+      s.ui.mode === 'edit' ? ui_col({ style: { gap: '6px' }, ctx: [
+        ui_text({ variant: 'label',
+          ctx: ['選択中: <' + selected.tag + '> の属性'] }),
+
+        ...attr_entries.map(([k, v]) => ui_row({
+          style: { alignItems: 'center', gap: '6px' },
+          ctx: [
+            { tag: 'div', style: 'flex:0 0 110px', ctx: [
+              ui_text({ variant: 'muted', ctx: [k] }),
+            ]},
+            { tag: 'div', style: 'flex:1', ctx: [
+              ui_input({
+                value: String(v),
+                oninput: (e) => {
+                  s.tree = update_at(s.tree, s.ui.selected_path,
+                    node => ({ ...node, [k]: e.target.value }));
+                },
+              }),
+            ]},
+            ui_button({
+              variant: 'ghost', ctx: ['×'],
+              onclick: () => {
+                s.tree = update_at(s.tree, s.ui.selected_path, node => {
+                  const copy = { ...node };
+                  delete copy[k];
+                  return copy;
+                });
+              },
+            }),
+          ],
+        })),
+
+        // text タグだけテキスト本体を別枠で編集
+        is_text ? ui_row({
+          style: { alignItems: 'center', gap: '6px' },
+          ctx: [
+            { tag: 'div', style: 'flex:0 0 110px', ctx: [
+              ui_text({ variant: 'muted', ctx: ['(text 本体)'] }),
+            ]},
+            { tag: 'div', style: 'flex:1', ctx: [
+              ui_input({
+                value: text_content,
+                oninput: (e) => {
+                  s.tree = update_at(s.tree, s.ui.selected_path,
+                    node => ({ ...node, ctx: [e.target.value] }));
+                },
+              }),
+            ]},
+          ],
+        }) : null,
+
+        // ルート以外は削除ボタン
+        s.ui.selected_path.length > 0 ? ui_button({
+          variant: 'ghost', ctx: ['🗑 このノードを削除'],
+          onclick: () => {
+            s.tree = remove_at(s.tree, s.ui.selected_path);
+            s.ui = { ...s.ui, selected_path: [] };
+          },
+        }) : null,
+      ].filter(Boolean)}) : null,
+
+      // 追加モード: タグ選択 + 追加
+      s.ui.mode === 'add' ? ui_col({ style: { gap: '6px' }, ctx: [
+        ui_text({ variant: 'label', ctx: [
+          can_contain
+            ? ('<' + selected.tag + '> の子として追加:')
+            : ('<' + selected.tag + '> の隣（親の子）として追加:'),
+        ]}),
+        ui_row({ style: { alignItems: 'center', gap: '6px' }, ctx: [
+          ui_select({
+            value:    s.ui.add_tag,
+            options:  ADD_TAGS,
+            onchange: (e) => { s.ui.add_tag = e.target.value; },
+            style:    { flex: 1 },
+          }),
+          ui_button({
+            variant: 'primary', ctx: ['追加'],
+            onclick: () => {
+              // container でなければ親に追加（末尾に挿入）
+              const insert_path = can_contain
+                ? s.ui.selected_path
+                : s.ui.selected_path.slice(0, -1);
+              const new_node = { tag: s.ui.add_tag, ...DEFAULT_ATTRS[s.ui.add_tag] };
+              s.tree = update_at(s.tree, insert_path, node => ({
+                ...node,
+                ctx: [...(node.ctx || []), new_node],
+              }));
+              // 追加したノードを新たに選択
+              const parent = get_at(s.tree, insert_path);
+              const new_idx = (parent.ctx?.length ?? 1) - 1;
+              s.ui = { ...s.ui, selected_path: [...insert_path, new_idx] };
+            },
+          }),
+        ]}),
+      ]}) : null,
+    ].filter(Boolean),
+  };
+
+  // 右ペイン: SVG プレビュー
+  const preview_panel = {
+    tag: 'div',
+    style: 'height:100%;display:flex;align-items:center;justify-content:center;'
+         + 'padding:16px;background:repeating-linear-gradient(45deg,'
+         + '#f9fafb,#f9fafb 10px,#f3f4f6 10px,#f3f4f6 20px)',
+    ctx: [
+      { tag: 'div',
+        style: 'width:min(100%, 520px);aspect-ratio: 3 / 2;background:#fff;'
+             + 'border:1px solid var(--ric-color-border);'
+             + 'box-shadow:var(--ric-shadow);'
+             + 'display:flex;align-items:center;justify-content:center',
+        ctx: [s.tree],
+      },
+    ],
+  };
+
+  return s.page({
+    style: { height: '100%', padding: 0, borderRadius: 0,
+             display: 'flex', flexDirection: 'column' },
+    ctx: [
+      s.sp({
+        side: { ctx: [editor_panel] },
+        main: { ctx: [preview_panel] },
+      }),
+    ],
+  });
+};
+</script>
+
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 340, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => { new Function(demo_src)(); });
+})();
+</script>
+</body>
+</html>
