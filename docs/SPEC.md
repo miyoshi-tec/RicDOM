@@ -345,6 +345,9 @@ return {
 | `ui_button({ ctx, variant, onclick, disabled })` | variant: `default` / `primary` / `ghost` |
 | `ui_input({ value, oninput, placeholder, type, disabled })` | テキスト入力 |
 | `bind_input(s, key, options)` | `s[key]` と双方向バインド |
+| `ui_textarea({ value, oninput, rows, auto_resize })` | 複数行入力。`auto_resize: { min_rows, max_rows }` で高さ自動調整 |
+| `bind_textarea(s, key, options)` | `s[key]` と双方向バインド |
+| `focus_when(el, cond)` | 条件の立ち上がりエッジで `el.focus()`（`el` は `s.refs.get('name')` 等） |
 | `ui_checkbox({ checked, onchange, ctx, disabled })` | checked は 0/1（数値） |
 | `bind_checkbox(s, key, options)` | `s[key]` と双方向バインド |
 | `ui_radiobutton({ name, value, options, onchange })` | options: string[] or {value,label}[] |
@@ -551,6 +554,26 @@ controlled mode では `collapsed` の値変化でトランジションアニメ
 `on_collapse_change(新しい値)` は折り畳みボタンのクリック時に発火する。
 `toggle()` は controlled 時に `on_collapse_change(!current)` を呼ぶ。
 
+#### create_ui_scroll_pane(opts?)
+
+「最下部（または最上部）追従型のスクロール領域」を実現するファクトリ。チャット UI・ログビューア・メッセージ一覧で、内容が追加されたら自動で端までスクロール、ただしユーザーが途中を見ている間は動かさない、という挙動を宣言的に実現する。
+
+```javascript
+s.pane = create_ui_scroll_pane({
+  follow:    'bottom',   // 'bottom' | 'top' | 'none'
+  threshold: 50,         // 端からこの px 以内なら「追従対象」とみなす
+});
+
+// render 内
+s.pane({ ctx: [...messages] })
+
+// 強制スクロール
+s.pane.scroll_to_bottom();
+s.pane.scroll_to_top();
+```
+
+render 直前に現在の scrollTop を読んで「端にいるか」を判定し、描画完了（`requestAnimationFrame`）後に端まで scrollTop を更新する。インスタンスは `data-ric-sp` 属性で特定するため、minify 時のクラス短縮の影響を受けない。
+
 ### Controlled / Uncontrolled パターン
 
 `create_ui_dialog` と `create_ui_splitter` は **controlled / uncontrolled** の
@@ -610,6 +633,58 @@ const { theme, density, font_size } = export_settings(document.querySelector('.r
 
 - `fg-muted` と `border` は `fg` から `color-mix()` で自動導出（未指定時）
 - `--ric-duration`（デフォルト 200ms）と `--ric-easing`（デフォルト ease）は `make_css_vars` で自動注入
+
+### CSS 変数リファレンス
+
+RicUI が提供する CSS 変数。自作コンポーネントやカスタムスタイルで直接参照でき、テーマ切替時もそのまま追従する。
+
+#### 色
+
+| 変数名 | 用途 |
+|---|---|
+| `--ric-color-fg` | 前景（本文テキスト） |
+| `--ric-color-fg-muted` | 薄い前景（キャプション・プレースホルダ） |
+| `--ric-color-bg` | 背景 |
+| `--ric-color-border` | 枠線 |
+| `--ric-color-control` | 入力欄の背景（input / select / textarea 等） |
+| `--ric-color-accent` | アクセント（focus リング・primary ボタン等） |
+| `--ric-color-accent-fg` | アクセント背景上の前景（デフォルト `#fff`） |
+
+#### サイズ / 密度
+
+| 変数名 | 用途 |
+|---|---|
+| `--ric-radius` | 角丸半径 |
+| `--ric-gap` | コンポーネント間の標準 gap |
+| `--ric-gap-md` | やや大きい gap（page レベルなど） |
+| `--ric-pad-x` | 水平方向のパディング |
+| `--ric-pad-y` | 垂直方向のパディング |
+| `--ric-control-h` | 入力系コントロールの高さ |
+| `--ric-font-size` | 基準フォントサイズ（デフォルト 14px） |
+
+#### シャドウ / ブラー
+
+| 変数名 | 用途 |
+|---|---|
+| `--ric-shadow` | ポップアップ / ダイアログの影 |
+| `--ric-panel-shadow` | パネルの控えめな影 |
+| `--ric-popup-blur` | ポップアップの backdrop-filter |
+
+#### アニメーション
+
+| 変数名 | 用途 |
+|---|---|
+| `--ric-duration` | 標準トランジション時間（200ms） |
+| `--ric-easing` | 標準イージング（ease） |
+
+#### ツールチップ専用
+
+| 変数名 | 用途 |
+|---|---|
+| `--ric-tooltip-bg` | ツールチップ背景 |
+| `--ric-tooltip-fg` | ツールチップ前景 |
+
+自作コンポーネントは `background: var(--ric-color-bg)` のように直接参照すれば、テーマ切替（`s.page.theme = 'dark'` 等）で自動追従する。`create_theme` / `export_theme` で任意キーを上書きできる。
 
 ---
 

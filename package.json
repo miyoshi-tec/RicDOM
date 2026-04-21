@@ -1,6 +1,6 @@
 {
   "name": "ricdom",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "JSON-based real-time control DOM library for Electron/browser",
   "license": "SEE LICENSE IN LICENSE",
   "author": "miyoshi-tec",
@@ -20,7 +20,7 @@
   "main": "src/ricdom.js",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "build": "npm run build:core && npm run build:ui && node scripts/update_sizes.js",
+    "build": "node scripts/gen_version.js && npm run build:core && npm run build:ui && node scripts/update_sizes.js",
     "build:core": "npx esbuild src/ricdom_globals.js   --bundle --minify --outfile=RicDOM.min.js   --platform=browser",
     "build:ui": "npx esbuild src/ricui_globals.js    --bundle --minify --outfile=RicUI.min.js    --platform=browser && node scripts/shorten_css_classes.js RicUI.min.js && node scripts/compress_css_in_js.js RicUI.min.js",
     "build:docs": "npm run build && node scripts/copy_docs.js"

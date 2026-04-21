@@ -304,6 +304,52 @@ ${_P}.ric-input::placeholder {
   color: ${_fm};
 }`,
 
+  // スクロール領域（テーマに合うスクロールバー配色のみ提供）。
+  // 大部分の挙動は inline style（overflow-y:auto）で担う。
+  'ric-scroll-pane': () => `
+${_P}.ric-scroll-pane {
+  min-height: 0;
+  scrollbar-color: ${_fm} transparent;
+  scrollbar-width: thin;
+}
+${_P}.ric-scroll-pane::-webkit-scrollbar { width: 8px; height: 8px; }
+${_P}.ric-scroll-pane::-webkit-scrollbar-thumb {
+  background: ${_fm};
+  border-radius: 4px;
+}
+${_P}.ric-scroll-pane::-webkit-scrollbar-track { background: transparent; }`,
+
+  // textarea は ric-input のスタイルを下敷きにしつつ、
+  // 高さ可変・フォント統一・resize 無効（auto_resize 併用時の整合）を足す。
+  'ric-textarea': () => `
+${_P}.ric-textarea {
+  display: block;
+  width: 100%;
+  padding: ${_py} ${_px};
+  border: ${_b1};
+  border-radius: ${_r};
+  background: ${_ct};
+  color: ${_fg};
+  font-family: inherit;
+  font-size: 1em;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+  transition: background 0.1s, border-color 0.15s, box-shadow 0.15s;
+}
+${_P}.ric-textarea:hover:not(:disabled) {
+  background: ${_bd};
+  border-color: ${_fm};
+}
+${_P}.ric-textarea:focus {
+  background: ${_ct};
+  border-color: ${_ac};
+  box-shadow: 0 0 0 3px color-mix(in srgb, ${_ac} 20%, transparent);
+}
+${_P}.ric-textarea::placeholder {
+  color: ${_fm};
+}`,
+
   'ric-checkbox': () => `
 ${_P}.ric-checkbox {
   display: inline-flex;

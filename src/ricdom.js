@@ -584,14 +584,14 @@ const create_RicDOM = (target, raw_state = {}) => {
   //   render 後付け: handle.render = fn（per-instance）
   //
   // 第 1 引数が object だった過去の 3 引数 form（create_RicDOM(state, target, render)）
-  // は v0.3.3 で削除した。複数 instance + 共有 state + 独立 render は、
+  // は v0.4.0 で削除した。複数 instance + 共有 state + 独立 render は、
   // 2 引数 form + handle.render = fn で同じことが書ける。
   if (typeof target !== 'string'
       && !(typeof HTMLElement !== 'undefined' && target instanceof HTMLElement)) {
     console.error(
       'RicDOM: 第 1 引数は CSS セレクタ文字列または DOM 要素です。\n' +
       '✅ 正しい例: create_RicDOM(\'#app\', { count: 0, render: s => ({ tag: \'div\', ctx: [s.count] }) })\n' +
-      '⚠️ 旧 3 引数形式 create_RicDOM(state, target, render) は v0.3.3 で削除されました。',
+      '⚠️ 旧 3 引数形式 create_RicDOM(state, target, render) は v0.4.0 で削除されました。',
     );
     return NOOP_PROXY;
   }
@@ -722,9 +722,8 @@ const create_RicDOM = (target, raw_state = {}) => {
         // 注意: shared_proxy はキャッシュ（state_proxy_map）で複数 instance 間で共有されるが、
         // この `_render_fn` は **最初の create_RicDOM 呼び出しのクロージャ変数**。
         // そのため shared_proxy.render = fn は「最初の instance の render のみ」を変更する。
-        // 複数 instance で異なる render を使いたい場合は、以下のどちらかを使うこと:
-        //   1. 3 引数形式: create_RicDOM(raw_state, target, render_fn)
-        //   2. 2 引数形式 + handle.render = fn （instance_handle 側で per-instance 処理される）
+        // 複数 instance で異なる render を使いたい場合は `handle.render = fn` を使うこと
+        // （instance_handle 側の set トラップで per-instance に処理される）。
         if (key === 'render' && typeof value === 'function') {
           _render_fn = value;
           // target 解決済みなら同期で初回描画（FOUC 防止）
@@ -934,9 +933,11 @@ const create_RicDOM = (target, raw_state = {}) => {
 // エクスポート
 // =====================================================================
 
+const version = require('./version');
+
 // CommonJS 形式でエクスポートする（Node.js / Electron 対象）
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { create_RicDOM, NOOP_PROXY };
+  module.exports = { create_RicDOM, NOOP_PROXY, version };
 
   // テスト環境でのみ純粋関数を公開する（NODE_ENV=test のときだけ使える）
   // プロダクションコードからは直接参照しないこと

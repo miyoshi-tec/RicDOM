@@ -32,6 +32,8 @@ const { ui_panel, create_ui_panel } = require('./surface/ui_panel');
 const { ui_button   } = require('./control/ui_button');
 const { ui_input    } = require('./control/ui_input');
 const { bind_input  } = require('./control/bind_input');
+const { ui_textarea   } = require('./control/ui_textarea');
+const { bind_textarea } = require('./control/bind_textarea');
 const { ui_checkbox  } = require('./control/ui_checkbox');
 const { bind_checkbox } = require('./control/bind_checkbox');
 const { ui_select        } = require('./control/ui_select');
@@ -43,6 +45,7 @@ const { bind_range       } = require('./control/bind_range');
 const { ui_color         } = require('./control/ui_color');
 const { bind_color       } = require('./control/bind_color');
 const { ui_separator     } = require('./control/ui_separator');
+const { focus_when       } = require('./control/focus_when');
 
 const { ui_text     } = require('./text/ui_text');
 const { ui_code_pre } = require('./text/ui_code_pre');
@@ -54,14 +57,19 @@ const { create_ui_dialog   } = require('./popup/create_ui_dialog');
 const { create_ui_toast    } = require('./popup/create_ui_toast');
 
 const { create_ui_accordion } = require('./composite/create_ui_accordion');
-const { create_ui_splitter  } = require('./composite/create_ui_splitter');
+const { create_ui_splitter    } = require('./composite/create_ui_splitter');
+const { create_ui_scroll_pane } = require('./composite/create_ui_scroll_pane');
 const { ui_tabs             } = require('./composite/ui_tabs');
 const { bind_tabs           } = require('./composite/bind_tabs');
 const { create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row, infer_type: tweak_infer_type } = require('./composite/ui_tweak');
 
 const { create_theme, create_density, create_font_size, export_theme, export_settings } = require('./context');
 
+const version = require('../src/version');
+
 module.exports = {
+  // パッケージバージョン（RicDOM コアと同一、build 時に package.json から同期）
+  version,
   // テーマユーティリティ（上級者向け）
   create_theme,
   create_density,
@@ -79,6 +87,8 @@ module.exports = {
   ui_button,
   ui_input,
   bind_input,
+  ui_textarea,
+  bind_textarea,
   ui_checkbox,
   bind_checkbox,
   ui_radiobutton,
@@ -90,6 +100,7 @@ module.exports = {
   ui_separator,
   ui_select,
   bind_select,
+  focus_when,
   // text
   ui_text,
   ui_code_pre,
@@ -102,6 +113,7 @@ module.exports = {
   // composite
   create_ui_accordion,
   create_ui_splitter,
+  create_ui_scroll_pane,
   ui_tabs,
   bind_tabs,
   create_ui_tweak_panel,
