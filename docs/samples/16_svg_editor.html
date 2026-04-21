@@ -79,6 +79,36 @@ const DEFAULT_ATTRS = {
 };
 const ADD_TAGS = Object.keys(DEFAULT_ATTRS);
 
+// ── ドラッグ確定時に位置属性を整数に丸める ──
+// ドラッグ中は round2 で滑らかに動かし、mouseup で Math.round に切り替える。
+// 属性パネルの数字が 94.78 のような小数で残らないため、読みやすさが上がる。
+const round_positions = (node) => {
+  const POS_ATTRS = {
+    circle:  ['cx', 'cy'],
+    ellipse: ['cx', 'cy'],
+    rect:    ['x', 'y'],
+    text:    ['x', 'y'],
+    line:    ['x1', 'y1', 'x2', 'y2'],
+  };
+  const keys = POS_ATTRS[node.tag];
+  if (keys) {
+    const patch = {};
+    for (const k of keys) {
+      if (k in node) patch[k] = Math.round(+node[k] || 0);
+    }
+    return { ...node, ...patch };
+  }
+  if (node.tag === 'polygon') {
+    const nums = String(node.points || '').trim().split(/[\s,]+/).map(parseFloat);
+    const rounded = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      rounded.push(Math.round(nums[i]) + ',' + Math.round(nums[i + 1]));
+    }
+    return { ...node, points: rounded.join(' ') };
+  }
+  return node;
+};
+
 // ── ドラッグで位置属性を dx / dy シフト ──
 // start_node = ドラッグ開始時点のノードのスナップショット（累積誤差を防ぐ）。
 // 現在のノード (current) は他の属性が編集されているかもしれないので、
@@ -414,48 +444,78 @@ handle.render = (s) => {
   const DRAGGABLE = ['circle', 'ellipse', 'rect', 'text', 'line', 'polygon'];
   const can_drag  = bbox && DRAGGABLE.includes(selected.tag);
 
-  const preview_tree = bbox ? {
-    ...s.tree,
-    ctx: [...(s.tree.ctx || []), {
-      tag: 'rect',
-      x: bbox.x - PAD, y: bbox.y - PAD,
-      width:  Math.max(0, bbox.width)  + PAD * 2,
-      height: Math.max(0, bbox.height) + PAD * 2,
-      fill: 'rgba(0,0,0,0)',  // 透明塗りつぶし: bbox 内全体がマウスヒット対象
-      rx: 2,
-      style: 'stroke:#f59e0b;stroke-width:1.5;stroke-dasharray:4 2;'
-           + (can_drag ? 'cursor:move' : 'cursor:not-allowed;opacity:0.7'),
-      onmousedown: can_drag ? (e) => {
-        e.preventDefault();
-        const svg_el = e.target.ownerSVGElement;
-        if (!svg_el) return;
+  // プレビュー用にツリーを再構築する。
+  // 1. 既存シェイプに onclick を注入 → 右の SVG を直接クリックしても選択できる
+  // 2. 選択ノードに bbox を重ねる overlay rect を末尾に追加（最前面、ドラッグハンドル）
+  //    overlay が最後にあるので DOM 上では最前面 = 選択中の shape 上に出現。
+  //    他のシェイプは overlay の外側なので onclick が普通に届く。
+  const attach_click = (node, path) => {
+    if (!node || typeof node !== 'object') return node;
+    const wrapped_ctx = Array.isArray(node.ctx)
+      ? node.ctx.map((c, i) =>
+          c && typeof c === 'object' ? attach_click(c, [...path, i]) : c)
+      : node.ctx;
+    // ルート (svg) はクリック対象から除外（背景クリックは未定義扱い）
+    if (path.length === 0) return { ...node, ctx: wrapped_ctx };
+    return {
+      ...node,
+      style: (node.style ? String(node.style) + ';' : '') + 'cursor:pointer',
+      onclick: (e) => {
+        e.stopPropagation();
+        s.ui = { ...s.ui, selected_path: path };
+      },
+      ctx: wrapped_ctx,
+    };
+  };
 
-        // viewBox と実寸の比率でスケール。viewBox 未指定なら 1:1。
-        const dom = svg_el.getBoundingClientRect();
-        const vb  = svg_el.viewBox && svg_el.viewBox.baseVal;
-        const sx = (vb && vb.width  > 0 && dom.width  > 0) ? vb.width  / dom.width  : 1;
-        const sy = (vb && vb.height > 0 && dom.height > 0) ? vb.height / dom.height : 1;
+  const clickable_tree = attach_click(s.tree, []);
 
-        const start_mx = e.clientX;
-        const start_my = e.clientY;
-        const drag_path  = s.ui.selected_path;
-        const start_node = get_at(s.tree, drag_path);
+  const overlay_rect = bbox ? {
+    tag: 'rect',
+    x: bbox.x - PAD, y: bbox.y - PAD,
+    width:  Math.max(0, bbox.width)  + PAD * 2,
+    height: Math.max(0, bbox.height) + PAD * 2,
+    fill: 'rgba(0,0,0,0)',  // 透明塗りつぶし: bbox 内全体がマウスヒット対象
+    rx: 2,
+    style: 'stroke:#f59e0b;stroke-width:1.5;stroke-dasharray:4 2;'
+         + (can_drag ? 'cursor:move' : 'cursor:not-allowed;opacity:0.7'),
+    onmousedown: can_drag ? (e) => {
+      e.preventDefault();
+      const svg_el = e.target.ownerSVGElement;
+      if (!svg_el) return;
 
-        const on_move = (ev) => {
-          const dx = (ev.clientX - start_mx) * sx;
-          const dy = (ev.clientY - start_my) * sy;
-          s.tree = update_at(s.tree, drag_path,
-            (cur) => apply_move(cur, start_node, dx, dy));
-        };
-        const on_up = () => {
-          document.removeEventListener('mousemove', on_move);
-          document.removeEventListener('mouseup',   on_up);
-        };
-        document.addEventListener('mousemove', on_move);
-        document.addEventListener('mouseup',   on_up);
-      } : undefined,
-    }],
-  } : s.tree;
+      // viewBox と実寸の比率でスケール。viewBox 未指定なら 1:1。
+      const dom = svg_el.getBoundingClientRect();
+      const vb  = svg_el.viewBox && svg_el.viewBox.baseVal;
+      const sx = (vb && vb.width  > 0 && dom.width  > 0) ? vb.width  / dom.width  : 1;
+      const sy = (vb && vb.height > 0 && dom.height > 0) ? vb.height / dom.height : 1;
+
+      const start_mx = e.clientX;
+      const start_my = e.clientY;
+      const drag_path  = s.ui.selected_path;
+      const start_node = get_at(s.tree, drag_path);
+
+      const on_move = (ev) => {
+        const dx = (ev.clientX - start_mx) * sx;
+        const dy = (ev.clientY - start_my) * sy;
+        s.tree = update_at(s.tree, drag_path,
+          (cur) => apply_move(cur, start_node, dx, dy));
+      };
+      const on_up = () => {
+        document.removeEventListener('mousemove', on_move);
+        document.removeEventListener('mouseup',   on_up);
+        // 確定時に位置属性を整数へ丸める（ドラッグ中の小数蓄積を解消）
+        s.tree = update_at(s.tree, drag_path, round_positions);
+      };
+      document.addEventListener('mousemove', on_move);
+      document.addEventListener('mouseup',   on_up);
+    } : undefined,
+  } : null;
+
+  const preview_tree = overlay_rect ? {
+    ...clickable_tree,
+    ctx: [...(clickable_tree.ctx || []), overlay_rect],
+  } : clickable_tree;
 
   // 右ペイン: SVG プレビュー
   const preview_panel = {
