@@ -45,6 +45,7 @@ try {
     { no: '12', file: '12_md_viewer.html',        title: 'Markdown ビューア' },
     { no: '13', file: '13_controlled_dialog_splitter.html', title: 'Controlled Mode' },
     { no: '14', file: '14_chat_ui.html',          title: 'Chat UI (textarea + scroll_pane)' },
+    { no: '15', file: '15_ai_chat.html',           title: 'AI Chat (live, 4 providers)' },
   ];
 
   // ── 現在のページ検出 ──

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chat (live) — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
+                  border-bottom: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); }
+    .page-intro code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+                       font-family: ui-monospace, monospace; font-size: 12.5px; }
+    .page-intro strong.warn { color: #b45309; }
+  </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+<div id="nav_bar" data-sample="15"></div>
+<p class="page-intro">
+  <strong>実 AI と話せるチャット</strong>デモ。Claude / ChatGPT / Gemini / Grok のいずれかの
+  API キーを入力すると、その場でストリーミング応答が返ってきます。
+  <code>ui_textarea</code> + <code>create_ui_scroll_pane</code> + <code>focus_when</code>
+  のサンプル 14 をベースに、プロバイダ選択 UI と SSE ストリーム処理を足しています。
+  <br>
+  <strong class="warn">⚠ API キーは state にのみ保持します。localStorage / sessionStorage には
+  保存せず、リロード・タブを閉じれば消えます。</strong>
+  プロバイダ側へは CORS ヘッダーで直接リクエストします（本番アプリではサーバー経由を推奨）。
+  下ペインに実際のコードを表示しています。
+</p>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<script type="text/plain" id="src-demo">
+// ── AI Chat デモ ──
+// API キーを入力 → プロバイダ選択 → 送信でストリーミング応答。
+// キーは state に保持するだけで、どこにも永続化しない。
+
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_scroll_pane,
+  ui_panel, ui_row, ui_col, ui_text, ui_button,
+  ui_textarea, ui_input, ui_select, focus_when,
+} = RicUI;
+
+// ── プロバイダ定義 ──
+// 各プロバイダの URL / ヘッダー / リクエスト body / SSE delta 抽出を 1 テーブルに集約。
+// メッセージ形式の差（Anthropic/OpenAI: role+content、Gemini: role+parts[text]）もここで吸収。
+const PROVIDERS = {
+  anthropic: {
+    label:  'Claude (Anthropic)',
+    models: ['claude-haiku-4-5', 'claude-sonnet-4-5', 'claude-opus-4-5'],
+    build_url: () => 'https://api.anthropic.com/v1/messages',
+    headers: (key) => ({
+      'content-type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    }),
+    build_body: (msgs, model) => ({
+      model, max_tokens: 1024, stream: true,
+      messages: msgs.map((m) => ({ role: m.role, content: m.text })),
+    }),
+    extract_delta: (ev) =>
+      (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta')
+        ? ev.delta.text : null,
+  },
+  openai: {
+    label:  'ChatGPT (OpenAI)',
+    models: ['gpt-5-mini', 'gpt-5', 'gpt-4.1'],
+    build_url: () => 'https://api.openai.com/v1/chat/completions',
+    headers: (key) => ({
+      'content-type': 'application/json',
+      'authorization': 'Bearer ' + key,
+    }),
+    build_body: (msgs, model) => ({
+      model, stream: true,
+      messages: msgs.map((m) => ({ role: m.role, content: m.text })),
+    }),
+    extract_delta: (ev) => (ev.choices && ev.choices[0] && ev.choices[0].delta)
+      ? (ev.choices[0].delta.content || null) : null,
+  },
+  gemini: {
+    label:  'Gemini (Google)',
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+    build_url: (model, key) =>
+      'https://generativelanguage.googleapis.com/v1beta/models/'
+      + encodeURIComponent(model) + ':streamGenerateContent?alt=sse&key=' + encodeURIComponent(key),
+    headers: () => ({ 'content-type': 'application/json' }),
+    build_body: (msgs) => ({
+      contents: msgs.map((m) => ({
+        role:  m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.text }],
+      })),
+    }),
+    extract_delta: (ev) => {
+      const parts = ev.candidates && ev.candidates[0] && ev.candidates[0].content
+                 && ev.candidates[0].content.parts;
+      return parts && parts[0] ? (parts[0].text || null) : null;
+    },
+  },
+  xai: {
+    label:  'Grok (xAI)',
+    models: ['grok-3-mini', 'grok-3', 'grok-4'],
+    build_url: () => 'https://api.x.ai/v1/chat/completions',
+    headers: (key) => ({
+      'content-type': 'application/json',
+      'authorization': 'Bearer ' + key,
+    }),
+    build_body: (msgs, model) => ({
+      model, stream: true,
+      messages: msgs.map((m) => ({ role: m.role, content: m.text })),
+    }),
+    extract_delta: (ev) => (ev.choices && ev.choices[0] && ev.choices[0].delta)
+      ? (ev.choices[0].delta.content || null) : null,
+  },
+};
+
+// ── SSE ストリーム読込 ──
+// fetch の response.body を ReadableStream として読み、
+// "data: {...}" 行を 1 つずつ JSON.parse → extract_delta → on_chunk。
+async function stream_chat({ provider, model, api_key, history, on_chunk }) {
+  const p   = PROVIDERS[provider];
+  const url = p.build_url(model, api_key);
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: p.headers(api_key),
+    body:    JSON.stringify(p.build_body(history, model)),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error('HTTP ' + res.status + ': ' + txt.slice(0, 200));
+  }
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t || t.startsWith(':') || t.startsWith('event:')) continue;
+      if (t === 'data: [DONE]') return;
+      if (!t.startsWith('data:')) continue;
+      try {
+        const ev    = JSON.parse(t.slice(5).trim());
+        const delta = p.extract_delta(ev);
+        if (delta) on_chunk(delta);
+      } catch (_e) { /* SSE コメントや部分 JSON は無視 */ }
+    }
+  }
+}
+
+// ── state 初期化 ──
+const handle = create_RicDOM('#mount-demo', {
+  ui: {
+    provider: 'anthropic',
+    model:    PROVIDERS.anthropic.models[0],
+    api_key:  '',          // state にのみ保持、永続化なし
+    input:    '',
+    busy:     false,
+    error:    null,
+  },
+  ignore: { messages: [] }, // { role: 'user' | 'assistant', text: string }[]
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  pane: create_ui_scroll_pane({ follow: 'bottom', threshold: 40 }),
+});
+
+// ── UI ──
+handle.render = (s) => {
+  focus_when(handle.refs.get('chat_input'), !s.ui.busy && !!s.ui.api_key);
+
+  const provider = PROVIDERS[s.ui.provider];
+
+  return s.page({
+    style: { height: '100%', padding: 0, borderRadius: 0,
+             display: 'flex', flexDirection: 'column' },
+    ctx: [
+
+      // ── プロバイダ選択 + API キー ──
+      ui_panel({
+        style: { margin: 0, borderRadius: 0, borderLeft: 0, borderRight: 0, borderTop: 0 },
+        ctx: [
+          ui_row({ style: { alignItems: 'center', gap: '10px', flexWrap: 'wrap' }, ctx: [
+            ui_text({ variant: 'label', ctx: ['Provider:'] }),
+            ui_select({
+              value:    s.ui.provider,
+              options:  Object.entries(PROVIDERS).map(([k, p]) => ({ value: k, label: p.label })),
+              onchange: (e) => {
+                const pr = e.target.value;
+                // プロバイダ変更時はモデルもそのプロバイダの先頭にリセット
+                s.ui = { ...s.ui, provider: pr, model: PROVIDERS[pr].models[0] };
+              },
+              style: { minWidth: '180px' },
+            }),
+            ui_text({ variant: 'label', ctx: ['Model:'] }),
+            ui_select({
+              value:    s.ui.model,
+              options:  provider.models,
+              onchange: (e) => { s.ui.model = e.target.value; },
+              style: { minWidth: '180px' },
+            }),
+          ]}),
+          ui_row({ style: { alignItems: 'center', gap: '10px', marginTop: '6px' }, ctx: [
+            ui_text({ variant: 'label', ctx: ['API Key:'] }),
+            { tag: 'div', style: 'flex:1', ctx: [
+              ui_input({
+                type:        'password',
+                value:       s.ui.api_key,
+                placeholder: 'sk-... / sk-ant-... / AIza... など',
+                oninput:     (e) => { s.ui.api_key = e.target.value; },
+              }),
+            ]},
+          ]}),
+        ],
+      }),
+
+      // ── エラー表示（あれば）──
+      s.ui.error
+        ? ui_panel({
+            style: { margin: 0, borderRadius: 0, border: 0,
+                     background: 'rgba(239, 68, 68, 0.12)',
+                     color: 'rgb(153, 27, 27)', padding: '10px 16px' },
+            ctx: [
+              ui_row({ style: { alignItems: 'center', gap: '8px' }, ctx: [
+                ui_text({ ctx: ['⚠ ' + s.ui.error] }),
+                { tag: 'div', style: 'flex:1' },
+                ui_button({
+                  variant: 'ghost',
+                  ctx: ['✕'],
+                  onclick: () => { s.ui.error = null; },
+                }),
+              ]}),
+            ],
+          })
+        : null,
+
+      // ── メッセージ履歴 ──
+      s.pane({
+        style: 'flex:1;padding:16px',
+        ctx: [
+          ui_col({ style: { gap: '12px' }, ctx: [
+            s.ignore.messages.length === 0
+              ? ui_text({ variant: 'muted', ctx: [
+                  '↓ API キーを入力してメッセージを送信してください。応答は SSE でストリーミングされます。',
+                ]})
+              : null,
+            ...s.ignore.messages.map((m) => ui_panel({
+              style: {
+                margin: 0, maxWidth: '80%',
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                background: m.role === 'user'
+                  ? 'var(--ric-color-accent)'
+                  : 'var(--ric-color-control)',
+                color: m.role === 'user'
+                  ? 'var(--ric-color-accent-fg, #fff)'
+                  : 'var(--ric-color-fg)',
+                whiteSpace: 'pre-wrap',
+              },
+              ctx: [
+                ui_text({ ctx: [m.text || (m.role === 'assistant' && s.ui.busy ? '…' : '')] }),
+              ],
+            })),
+          ].filter(Boolean)}),
+        ],
+      }),
+
+      // ── 入力エリア ──
+      ui_panel({
+        style: { margin: 0, borderRadius: 0,
+                 borderLeft: 0, borderRight: 0, borderBottom: 0 },
+        ctx: [
+          ui_row({ style: { gap: '8px', alignItems: 'flex-end' }, ctx: [
+            { tag: 'div', style: 'flex:1', ctx: [
+              ui_textarea({
+                ref:         'chat_input',
+                value:       s.ui.input,
+                placeholder: s.ui.busy
+                  ? '応答中…'
+                  : !s.ui.api_key
+                    ? '上で API キーを入力してください'
+                    : 'メッセージを入力（Shift+Enter で改行）',
+                disabled:    s.ui.busy || !s.ui.api_key,
+                auto_resize: { min_rows: 1, max_rows: 6 },
+                oninput:     (e) => { s.ui.input = e.target.value; },
+                onkeydown:   (e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !s.ui.busy && s.ui.api_key) {
+                    e.preventDefault();
+                    send(s);
+                  }
+                },
+              }),
+            ]},
+            ui_button({
+              variant:  'primary',
+              disabled: s.ui.busy || !s.ui.input.trim() || !s.ui.api_key,
+              ctx:      ['送信'],
+              onclick:  () => send(s),
+            }),
+          ]}),
+        ],
+      }),
+
+    ],
+  });
+};
+
+// ── 送信処理 ──
+// 1. user メッセージと空の assistant メッセージを履歴に追加
+// 2. busy=true でロックし、textarea をクリア
+// 3. SSE stream でチャンクが届くたび assistant.text に追記 → state を触って再描画
+// 4. 完了で busy=false。エラーなら s.ui.error にメッセージを格納
+async function send(s) {
+  const text = s.ui.input.trim();
+  if (!text || s.ui.busy || !s.ui.api_key) return;
+
+  // history: user を含め、空の assistant は API 送信直前に除く
+  s.ignore.messages = [
+    ...s.ignore.messages,
+    { role: 'user',      text },
+    { role: 'assistant', text: '' },
+  ];
+  s.ui = { ...s.ui, input: '', busy: true, error: null };
+  s.pane.scroll_to_bottom();
+
+  try {
+    await stream_chat({
+      provider: s.ui.provider,
+      model:    s.ui.model,
+      api_key:  s.ui.api_key,
+      history:  s.ignore.messages.slice(0, -1), // 空の assistant を除く
+      on_chunk: (chunk) => {
+        const msgs = s.ignore.messages;
+        const last = msgs[msgs.length - 1];
+        // 末尾の assistant を差し替えて state トリガーで再描画
+        s.ignore.messages = [
+          ...msgs.slice(0, -1),
+          { role: 'assistant', text: last.text + chunk },
+        ];
+        s.pane.scroll_to_bottom();  // __notify → 再描画
+      },
+    });
+  } catch (e) {
+    // エラー時は空の assistant メッセージを削除してエラー表示
+    s.ignore.messages = s.ignore.messages.filter((m, i, a) =>
+      !(m.role === 'assistant' && m.text === '' && i === a.length - 1));
+    s.ui = { ...s.ui, error: String(e.message || e) };
+  }
+  s.ui = { ...s.ui, busy: false };
+}
+</script>
+
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 340, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => { new Function(demo_src)(); });
+})();
+</script>
+</body>
+</html>
