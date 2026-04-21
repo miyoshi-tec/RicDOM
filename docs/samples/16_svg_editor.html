@@ -79,6 +79,48 @@ const DEFAULT_ATTRS = {
 };
 const ADD_TAGS = Object.keys(DEFAULT_ATTRS);
 
+// ── ドラッグで位置属性を dx / dy シフト ──
+// start_node = ドラッグ開始時点のノードのスナップショット（累積誤差を防ぐ）。
+// 現在のノード (current) は他の属性が編集されているかもしれないので、
+// 位置属性だけ start からの delta で書き換えて current の他属性は維持。
+// 数値は小数 2 桁に丸めて無限小数の散らかりを防ぐ。
+const round2 = (v) => Math.round(v * 100) / 100;
+
+const apply_move = (current, start, dx, dy) => {
+  switch (start.tag) {
+    case 'circle':
+    case 'ellipse':
+      return { ...current,
+        cx: round2((+start.cx || 0) + dx),
+        cy: round2((+start.cy || 0) + dy),
+      };
+    case 'rect':
+    case 'text':
+      return { ...current,
+        x: round2((+start.x || 0) + dx),
+        y: round2((+start.y || 0) + dy),
+      };
+    case 'line':
+      return { ...current,
+        x1: round2((+start.x1 || 0) + dx),
+        y1: round2((+start.y1 || 0) + dy),
+        x2: round2((+start.x2 || 0) + dx),
+        y2: round2((+start.y2 || 0) + dy),
+      };
+    case 'polygon': {
+      const nums = String(start.points || '').trim().split(/[\s,]+/).map(parseFloat);
+      const moved = [];
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        moved.push(round2(nums[i] + dx) + ',' + round2(nums[i + 1] + dy));
+      }
+      return { ...current, points: moved.join(' ') };
+    }
+    default:
+      // g / svg などは移動非対応
+      return current;
+  }
+};
+
 // ── 選択中ノードのバウンディングボックスを属性から計算 ──
 // returns { x, y, width, height } または null（計測不能）
 // transform 属性は今回スコープ外（シンプルなサンプル用の近似）。
@@ -357,11 +399,21 @@ handle.render = (s) => {
     ].filter(Boolean),
   };
 
-  // 選択ノードのバウンディングボックスを計算 → preview 用 tree の末尾にマーカー rect を追加。
-  // マーカーは stroke のみの dashed rect で、pointer-events を殺してクリックを奪わない。
-  // s.tree 自体には足さない（左のツリー一覧に <rect> が紛れ込まないように）。
+  // ── 選択ノードのハイライトマーカー + ドラッグ ──
+  // 属性から計算した bbox に破線 rect を重ねる。
+  // - fill は完全透明（rgba(0,0,0,0)）で bbox 内全体がクリック / ドラッグ可能
+  // - stroke-dasharray で形状と区別、cursor:move でドラッグできることを示す
+  // - onmousedown でドラッグ開始、document の mousemove / mouseup で追従
+  // - スクリーン座標 → SVG 座標は viewBox / 実寸の比率で変換（スケール対応）
+  // - ドラッグ開始時のノード属性をスナップショットに取り、開始値からの delta を都度反映
+  //   （現在値 += delta だと描画ずれが累積する）
   const bbox = calc_bbox(selected);
   const PAD = 3;
+  // ドラッグで移動できるのは位置属性を持つ単体シェイプのみ。
+  // g / svg は子が多数あり delta 伝播が複雑になるので今回はスコープ外。
+  const DRAGGABLE = ['circle', 'ellipse', 'rect', 'text', 'line', 'polygon'];
+  const can_drag  = bbox && DRAGGABLE.includes(selected.tag);
+
   const preview_tree = bbox ? {
     ...s.tree,
     ctx: [...(s.tree.ctx || []), {
@@ -369,10 +421,39 @@ handle.render = (s) => {
       x: bbox.x - PAD, y: bbox.y - PAD,
       width:  Math.max(0, bbox.width)  + PAD * 2,
       height: Math.max(0, bbox.height) + PAD * 2,
-      fill: 'none',
+      fill: 'rgba(0,0,0,0)',  // 透明塗りつぶし: bbox 内全体がマウスヒット対象
       rx: 2,
-      style: 'stroke:#f59e0b;stroke-width:1.5;'
-           + 'stroke-dasharray:4 2;pointer-events:none',
+      style: 'stroke:#f59e0b;stroke-width:1.5;stroke-dasharray:4 2;'
+           + (can_drag ? 'cursor:move' : 'cursor:not-allowed;opacity:0.7'),
+      onmousedown: can_drag ? (e) => {
+        e.preventDefault();
+        const svg_el = e.target.ownerSVGElement;
+        if (!svg_el) return;
+
+        // viewBox と実寸の比率でスケール。viewBox 未指定なら 1:1。
+        const dom = svg_el.getBoundingClientRect();
+        const vb  = svg_el.viewBox && svg_el.viewBox.baseVal;
+        const sx = (vb && vb.width  > 0 && dom.width  > 0) ? vb.width  / dom.width  : 1;
+        const sy = (vb && vb.height > 0 && dom.height > 0) ? vb.height / dom.height : 1;
+
+        const start_mx = e.clientX;
+        const start_my = e.clientY;
+        const drag_path  = s.ui.selected_path;
+        const start_node = get_at(s.tree, drag_path);
+
+        const on_move = (ev) => {
+          const dx = (ev.clientX - start_mx) * sx;
+          const dy = (ev.clientY - start_my) * sy;
+          s.tree = update_at(s.tree, drag_path,
+            (cur) => apply_move(cur, start_node, dx, dy));
+        };
+        const on_up = () => {
+          document.removeEventListener('mousemove', on_move);
+          document.removeEventListener('mouseup',   on_up);
+        };
+        document.addEventListener('mousemove', on_move);
+        document.addEventListener('mouseup',   on_up);
+      } : undefined,
     }],
   } : s.tree;
 
