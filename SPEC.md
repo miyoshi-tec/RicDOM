@@ -53,9 +53,20 @@ create_RicDOM(target, state_with_render) → instance_handle
 | `target` | string \| HTMLElement | マウント先（CSS セレクタ or DOM 要素） |
 | `state_with_render` | object | 初期 state。`render: (s) => VDOM` を含めると描画関数として使われる |
 
-`render` は後から `handle.render = fn` でも設定可能（`render` 未指定で作成した場合、最初の代入まで描画は保留される）。
+`render` は後から `handle.render = fn` でも設定可能（`render` 未指定で作成した場合、最初の代入まで描画は保留される）。`handle.render = fn` の代入は **per-instance**：複数の instance が同じ `raw_state` を共有していても、各 instance は独立した render を持てる。
 
-旧 API `create_RicDOM(raw_state, target, render_fn)` も後方互換として受け付ける（第1引数が object の場合）。
+#### 複数 instance で state を共有する
+
+複数の instance が同じ state を共有したい場合は、同じ state オブジェクトを渡す。各 instance は独自の render を持てる:
+
+```javascript
+const state = { counter: 0 };
+const a = create_RicDOM('#mount-a', state);
+const b = create_RicDOM('#mount-b', state);
+a.render = (s) => ({ tag: 'span', ctx: [`A:${s.counter}`] });
+b.render = (s) => ({ tag: 'span', ctx: [`B:${s.counter}`] });
+state.counter = 7;   // 両 instance が再描画される
+```
 
 **戻り値** `instance_handle`:
 - state プロパティへのアクセス: `handle.count`, `handle.theme` 等
@@ -83,6 +94,8 @@ set(obj, key, value) {
   return true;
 }
 ```
+
+※ `render` キーの代入は上記に加えて `_render_fn` の書き換えも行う。ただし shared_proxy の `_render_fn` は最初の `create_RicDOM` 呼び出しのクロージャ変数なので、`handle.render = fn` は **`instance_handle` 側の set トラップ** で per-instance に処理される（各 instance 独自の `_render_fn` を書き換える）。複数 instance で異なる render を持ちたい場合は `handle.render = fn` を使う。
 
 #### 一段目 get トラップ（_wrap_child）
 ```javascript
@@ -731,7 +744,176 @@ s.tw = create_ui_tweak_panel({
 
 ---
 
-## 5. コーディング規約
+## 5. Performance & Scale
+
+RicDOM は「state 全体の再評価 + VDOM 差分 patch」モデルで、8KB のコアに収めるため局所 reactive（partial re-render）は持たない。本節では規模が大きくなった時の対処パターンと、現状で測定されている性能レンジを記録する。
+
+### 計測の推奨パターン
+
+```javascript
+render(s) {
+  const t0 = performance.now();
+  // ...前処理...
+  const t_prep = performance.now();
+  const vdom = /* VDOM 構築 */;
+  const t_build = performance.now();
+  // ...後処理...
+  const t_done = performance.now();
+
+  const log = (window.__render_log ||= []);
+  log.push({
+    total: (t_done  - t0).toFixed(2),
+    prep:  (t_prep  - t0).toFixed(2),
+    build: (t_build - t_prep).toFixed(2),
+    post:  (t_done  - t_build).toFixed(2),
+  });
+  if (log.length > 1000) log.shift();
+  return vdom;
+}
+
+// devtools console で統計を確認
+window.render_stats = () => {
+  const log = window.__render_log || [];
+  if (!log.length) return 'no samples';
+  const pct = (xs, p) => {
+    const s = xs.slice().sort((a, b) => a - b);
+    return s[Math.min(s.length - 1, Math.floor(s.length * p))];
+  };
+  return Object.keys(log[0]).map(f => {
+    const xs = log.map(r => Number(r[f])).filter(Number.isFinite);
+    return {
+      field: f, n: xs.length,
+      mean: (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2),
+      p50:  pct(xs, 0.5).toFixed(2),
+      p95:  pct(xs, 0.95).toFixed(2),
+      max:  Math.max(...xs).toFixed(2),
+    };
+  });
+};
+```
+
+目安: 60fps 予算 16.7ms の **10% 以内（1.7ms）** を維持できていれば体感遅延はほぼ生じない。
+
+### 実アプリの計測例
+
+外部ユーザー（production engineering tool、帰属詳細は非公開）による計測:
+
+**アプリ構成**: SVG ステージ 100+ ノード（path/circle/text）、時系列グラフ 3 本（各 40+ ノード）、tweak_panel 4 フォルダ 18 行、splitter × 2（controlled mode）、toast
+
+**スライダを 100 回連続 mutation した時の内訳（ms、36 サンプル）**:
+
+| phase | mean | p50 | p95 | max |
+|---|---|---|---|---|
+| total | 1.23 | 1.20 | 1.80 | 2.30 |
+| fetch dispatch | 0.23 | 0.20 | 0.30 | 0.40 |
+| SVG build_vdom | 0.19 | 0.20 | 0.40 | 0.40 |
+| graphs build_vdom × 3 | 0.66 | 0.60 | 0.90 | 1.40 |
+| layout tree | 0.14 | 0.10 | 0.40 | 0.40 |
+
+60fps 予算対比: 平均 7.4%、ピーク 14%。スクラブ中の体感遅延なし。
+
+### 規模が拡大した時の対処パターン
+
+#### パターン 1: 重い計算結果を `s.ignore` にキャッシュ
+
+`s.ignore` 以下は Proxy の再描画トリガーから除外される。重い derive 結果を保持しつつ、state 汚染を避けられる。
+
+```javascript
+render(s) {
+  // shape key が変わったときだけ再計算
+  const key = `${s.shape.n}-${s.shape.cd}`;
+  if (s.ignore.shape_key !== key) {
+    s.ignore.shape_key = key;
+    s.ignore.geometry = expensive_compute(s.shape);
+  }
+  return build_vdom(s.ignore.geometry);
+}
+```
+
+#### パターン 2: ユーザーランド memoize（参考実装）
+
+```javascript
+// 30 行の最小メモ化ヘルパ（ユーザーランドで書ける）
+const create_memo = (build, key_of) => {
+  let cache = { key: Symbol(), vdom: null };
+  return (input) => {
+    const key = key_of(input);
+    if (cache.key === key) return cache.vdom;
+    cache = { key, vdom: build(input) };
+    return cache.vdom;
+  };
+};
+
+// 使い方
+const build_stage = create_memo(
+  (shape) => build_stage_vdom(shape),
+  (shape) => `${shape.n}-${shape.cd}-${shape.cx}-${shape.cy}`,
+);
+render(s) {
+  return { tag: 'div', ctx: [build_stage(s.shape), /* ... */] };
+}
+```
+
+公式 API として `create_ui_memo` を用意するかは需要を見て検討（現時点では未定）。
+
+#### パターン 3: コード分割のための独立 `create_RicDOM`（共有 state）
+
+コードを複数ファイルに分けたいとき、mount point を ref で確保してそこに別 instance を生成する:
+
+```javascript
+const state = { title: 'Hello', /* ... */ };
+state.render = (s) => ({
+  tag: 'div', ctx: [
+    { tag: 'header', ctx: [`${s.title}`] },
+    { tag: 'div',    ref: 'main_mount' },   // ctx 省略 → child が保持される
+  ],
+});
+const parent = create_RicDOM('#app', state);
+// 別ファイルから、同じ state を共有する child を生成
+const child = create_RicDOM(parent.refs.get('main_mount'), state);
+child.render = render_main;
+```
+
+**重要**: 共有 state の mutation は **全 instance が再描画される**（subscriber set が共有されるため）。コード分離の目的には使えるが、**局所 re-render にはならない**。
+
+#### パターン 4: 真の局所 re-render（独立 state、手動同期）
+
+各 instance が独立 state を持てば、mutation はその instance だけで閉じる:
+
+```javascript
+const a = create_RicDOM('#mount-a', { counter: 0, render: render_a });
+const b = create_RicDOM('#mount-b', { counter: 0, render: render_b });
+
+a.counter = 1;   // a だけ再描画
+b.counter = 1;   // b だけ再描画
+```
+
+親子間でデータを同期したい場合は親の render で子のハンドルに書き込む:
+
+```javascript
+const child = create_RicDOM('#child', { shared: null, render: render_child });
+create_RicDOM('#parent', {
+  value: 0,
+  render(s) {
+    child.shared = s.value;   // 親の state 変更 → 子の state 変更 → 子が再描画
+    return { /* 親の VDOM */ };
+  }
+});
+```
+
+### 局所 reactive 用の公式 API（`create_ui_panel` 等）について
+
+現時点では **用意していない**。理由:
+
+- 上記のパターンで大半のユースケースをカバーできる
+- コアを 8KB に保つため、optimization API はユーザーランド / RicUI 側で書く方針
+- 計測データが示す通り、実アプリで render 評価自体がボトルネックになるケースは稀（1.23ms / SVG 100+ ノード規模）
+
+需要が積み上がってきたら改めて設計する。
+
+---
+
+## 6. コーディング規約
 
 - `var` 禁止、`const` 最大限、`let` 最小限
 - `class` 構文不使用、ファクトリ関数パターンで統一
@@ -744,13 +926,13 @@ s.tw = create_ui_tweak_panel({
 
 ---
 
-## 6. ビルド
+## 7. ビルド
 
 ```bash
 npm run build        # 全バンドル
 npm run build:core   # RicDOM.min.js
 npm run build:ui     # RicUI.min.js（調整パネル含む）
-npm test             # 451 テスト
+npm test             # 533 テスト
 ```
 
 esbuild でバンドル + minify。`--platform=browser`。

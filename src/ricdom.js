@@ -575,42 +575,42 @@ const resolve_target_element = (target) => {
 // create_RicDOM：メインのファクトリ関数
 // =====================================================================
 
-const create_RicDOM = (...args) => {
+const create_RicDOM = (target, raw_state = {}) => {
 
   // ── 引数の正規化 ─────────────────────────────────────────
-  // 新 API: create_RicDOM(target, state)
-  //   target が string or DOM → 新 API
-  //   state.render があれば描画関数として使用
+  // API: create_RicDOM(target, state_with_render)
+  //   target: CSS セレクタ文字列 or DOM 要素
+  //   state_with_render: 初期 state。render: (s) => VDOM を含めると描画関数として使われる
+  //   render 後付け: handle.render = fn（per-instance）
   //
-  // 旧 API（後方互換）: create_RicDOM(state, target, render_fn?)
-  //   第1引数が object → 旧 API
-  let raw_state, target, render_fn;
-
-  if (typeof args[0] === 'string' || (typeof HTMLElement !== 'undefined' && args[0] instanceof HTMLElement)) {
-    // 新 API: create_RicDOM(target, state)
-    target    = args[0];
-    raw_state = args[1] ?? {};
-    render_fn = raw_state.render;
-    // render は state のプロパティだが、raw_state からは削除しない
-    // （s.render の get/set trap で管理するため）
-  } else {
-    // 旧 API: create_RicDOM(state, target, render_fn?)
-    raw_state = args[0];
-    target    = args[1];
-    render_fn = args[2];
+  // 第 1 引数が object だった過去の 3 引数 form（create_RicDOM(state, target, render)）
+  // は v0.3.3 で削除した。複数 instance + 共有 state + 独立 render は、
+  // 2 引数 form + handle.render = fn で同じことが書ける。
+  if (typeof target !== 'string'
+      && !(typeof HTMLElement !== 'undefined' && target instanceof HTMLElement)) {
+    console.error(
+      'RicDOM: 第 1 引数は CSS セレクタ文字列または DOM 要素です。\n' +
+      '✅ 正しい例: create_RicDOM(\'#app\', { count: 0, render: s => ({ tag: \'div\', ctx: [s.count] }) })\n' +
+      '⚠️ 旧 3 引数形式 create_RicDOM(state, target, render) は v0.3.3 で削除されました。',
+    );
+    return NOOP_PROXY;
   }
+
+  const render_fn = raw_state.render;
+  // render は state のプロパティだが、raw_state からは削除しない
+  // （s.render の get/set trap で管理するため）
 
   // render_fn のバリデーション
   if (render_fn !== undefined && render_fn !== null && typeof render_fn !== 'function') {
     console.error(
       'RicDOM: render が関数ではありません。\n' +
       '✅ 正しい例: create_RicDOM(\'#app\', { count: 0, render: s => ({ tag: \'div\', ctx: [s.count] }) })\n' +
-      '✅ 省略も可: create_RicDOM(\'#app\', { count: 0 }) → s.render = fn で後設定',
+      '✅ 省略も可: create_RicDOM(\'#app\', { count: 0 }) → handle.render = fn で後設定',
     );
     return NOOP_PROXY;
   }
 
-  // render_fn 省略時は null。s.render = fn で設定するまで描画しない。
+  // render_fn 省略時は null。handle.render = fn で設定するまで描画しない。
   let _render_fn = typeof render_fn === 'function' ? render_fn : null;
   const _render_fn_provided = _render_fn !== null;
 
@@ -714,10 +714,17 @@ const create_RicDOM = (...args) => {
         return _wrap_child(val);
       },
       set(obj, key, value) {
-        // s.render = fn で描画関数を差し替え → 再描画トリガー
+        // s.render = fn（render 関数内から shared_proxy 経由）で描画関数を差し替え。
         // s.page = ... 等の代入で既に rAF がスケジュール済みの場合、
         // rAF コールバックは同期コード完了後に走るため、
         // この時点で _render_fn を設定しておけば rAF 内の do_render で使われる。
+        //
+        // 注意: shared_proxy はキャッシュ（state_proxy_map）で複数 instance 間で共有されるが、
+        // この `_render_fn` は **最初の create_RicDOM 呼び出しのクロージャ変数**。
+        // そのため shared_proxy.render = fn は「最初の instance の render のみ」を変更する。
+        // 複数 instance で異なる render を使いたい場合は、以下のどちらかを使うこと:
+        //   1. 3 引数形式: create_RicDOM(raw_state, target, render_fn)
+        //   2. 2 引数形式 + handle.render = fn （instance_handle 側で per-instance 処理される）
         if (key === 'render' && typeof value === 'function') {
           _render_fn = value;
           // target 解決済みなら同期で初回描画（FOUC 防止）
@@ -900,7 +907,18 @@ const create_RicDOM = (...args) => {
       return shared_proxy[key]; // それ以外は共有Proxy に委譲
     },
     set(_, key, value) {
-      shared_proxy[key] = value; // 共有Proxy の set トラップを経由 → 全員再描画
+      // render の代入は per-instance で処理する。
+      // shared_proxy.render = fn は最初の create_RicDOM のクロージャの _render_fn を
+      // 書き換えるため、複数 instance が同じ raw_state を共有するときに
+      // handle.render = fn_B が handle.render = fn_A を上書きしてしまう問題があった。
+      // instance_handle で受け止めれば、自分の _render_fn クロージャに書ける。
+      if (key === 'render' && typeof value === 'function') {
+        _render_fn = value;
+        if (target_el) do_render();   // 同期描画（shared_proxy.render = fn と同じ挙動）
+        else schedule_render();       // target 解決前なら rAF に任せる
+        return true;
+      }
+      shared_proxy[key] = value; // それ以外は共有Proxy 経由 → 全 instance 再描画
       return true;
     },
     deleteProperty(_, key) {
