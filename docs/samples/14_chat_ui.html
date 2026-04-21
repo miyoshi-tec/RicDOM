@@ -44,24 +44,25 @@ const FAKE_REPLIES = [
 ];
 const _fake_reply = () => FAKE_REPLIES[Math.floor(Math.random() * FAKE_REPLIES.length)];
 
-create_RicDOM('#mount-rui', {
-
+// 初期 state とファクトリを渡して handle を取得する。
+// render は後付けすることで、closure から handle.refs にアクセスできる
+// （render(s) の s は state Proxy のため、refs は持たない）。
+const handle = create_RicDOM('#mount-rui', {
   // 全 UI 状態を s.ui に集約
   ui: {
     input: '',
     busy:  false,
   },
-
   // メッセージ履歴は s.ignore に置くことで mutation 検知を避け、
   // 履歴更新時は `s.ui = { ...s.ui }` で明示的に再描画を起こす（後述の send()）。
   ignore: { messages: [] },
-
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   pane: create_ui_scroll_pane({ follow: 'bottom', threshold: 40 }),
+});
 
-  render(s) {
+handle.render = (s) => {
     // 応答完了後に入力欄へフォーカスを戻す（busy: true → false のエッジで発火）
-    focus_when(s.refs.get('chat_input'), !s.ui.busy);
+    focus_when(handle.refs.get('chat_input'), !s.ui.busy);
 
     return s.page({
       style: { height: '100%', padding: 0, borderRadius: 0,
@@ -133,8 +134,7 @@ create_RicDOM('#mount-rui', {
 
       ],
     });
-  },
-});
+};
 
 // 送信処理: ユーザー発言を追加 → busy=true → 500ms 後にダミー応答を追加 → busy=false
 function send(s) {
