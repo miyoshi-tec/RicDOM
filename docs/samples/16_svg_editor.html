@@ -79,6 +79,87 @@ const DEFAULT_ATTRS = {
 };
 const ADD_TAGS = Object.keys(DEFAULT_ATTRS);
 
+// ── 選択中ノードのバウンディングボックスを属性から計算 ──
+// returns { x, y, width, height } または null（計測不能）
+// transform 属性は今回スコープ外（シンプルなサンプル用の近似）。
+const calc_bbox = (node) => {
+  if (!node) return null;
+  switch (node.tag) {
+    case 'circle': {
+      const cx = +node.cx || 0, cy = +node.cy || 0, r = +node.r || 0;
+      return { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r };
+    }
+    case 'rect':
+      return { x: +node.x || 0, y: +node.y || 0,
+               width: +node.width || 0, height: +node.height || 0 };
+    case 'ellipse': {
+      const cx = +node.cx || 0, cy = +node.cy || 0,
+            rx = +node.rx || 0, ry = +node.ry || 0;
+      return { x: cx - rx, y: cy - ry, width: 2 * rx, height: 2 * ry };
+    }
+    case 'line': {
+      const x1 = +node.x1 || 0, y1 = +node.y1 || 0,
+            x2 = +node.x2 || 0, y2 = +node.y2 || 0;
+      return { x: Math.min(x1, x2), y: Math.min(y1, y2),
+               width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+    }
+    case 'polygon': {
+      const nums = String(node.points || '').trim().split(/[\s,]+/).map(parseFloat);
+      if (nums.length < 2) return null;
+      let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        const x = nums[i], y = nums[i + 1];
+        if (Number.isFinite(x)) { xmin = Math.min(xmin, x); xmax = Math.max(xmax, x); }
+        if (Number.isFinite(y)) { ymin = Math.min(ymin, y); ymax = Math.max(ymax, y); }
+      }
+      if (!Number.isFinite(xmin)) return null;
+      return { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
+    }
+    case 'text': {
+      // text の正確な幅は DOM 計測が必要。ここでは font-size と文字数から粗く推定する。
+      const x = +node.x || 0, y = +node.y || 0;
+      const fs = +node['font-size'] || 16;
+      const str = Array.isArray(node.ctx) && typeof node.ctx[0] === 'string' ? node.ctx[0] : '';
+      const w = Math.max(8, str.length * fs * 0.6);
+      const h = fs * 1.2;
+      // text の (x, y) はベースライン基準。ざっくり y - fs を top に。
+      const top = y - fs;
+      // text-anchor で x 起点が変わる: start(左)/middle(中央)/end(右)
+      const anchor = node['text-anchor'];
+      const left = anchor === 'middle' ? x - w / 2
+                 : anchor === 'end'    ? x - w
+                 : x;
+      return { x: left, y: top, width: w, height: h };
+    }
+    case 'g': {
+      // 子ノードの bbox を union
+      const children = Array.isArray(node.ctx) ? node.ctx : [];
+      let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+      for (const c of children) {
+        if (!c || typeof c !== 'object') continue;
+        const bb = calc_bbox(c);
+        if (!bb) continue;
+        xmin = Math.min(xmin, bb.x);
+        ymin = Math.min(ymin, bb.y);
+        xmax = Math.max(xmax, bb.x + bb.width);
+        ymax = Math.max(ymax, bb.y + bb.height);
+      }
+      if (!Number.isFinite(xmin)) return null;
+      return { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
+    }
+    case 'svg': {
+      // svg ルート選択時は viewBox をそのまま使う
+      const vb = String(node.viewBox || '').trim().split(/[\s,]+/).map(parseFloat);
+      if (vb.length === 4 && vb.every(Number.isFinite)) {
+        return { x: vb[0], y: vb[1], width: vb[2], height: vb[3] };
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
+};
+
 // ── state ──
 const handle = create_RicDOM('#mount-demo', {
   ui: {
@@ -276,6 +357,25 @@ handle.render = (s) => {
     ].filter(Boolean),
   };
 
+  // 選択ノードのバウンディングボックスを計算 → preview 用 tree の末尾にマーカー rect を追加。
+  // マーカーは stroke のみの dashed rect で、pointer-events を殺してクリックを奪わない。
+  // s.tree 自体には足さない（左のツリー一覧に <rect> が紛れ込まないように）。
+  const bbox = calc_bbox(selected);
+  const PAD = 3;
+  const preview_tree = bbox ? {
+    ...s.tree,
+    ctx: [...(s.tree.ctx || []), {
+      tag: 'rect',
+      x: bbox.x - PAD, y: bbox.y - PAD,
+      width:  Math.max(0, bbox.width)  + PAD * 2,
+      height: Math.max(0, bbox.height) + PAD * 2,
+      fill: 'none',
+      rx: 2,
+      style: 'stroke:#f59e0b;stroke-width:1.5;'
+           + 'stroke-dasharray:4 2;pointer-events:none',
+    }],
+  } : s.tree;
+
   // 右ペイン: SVG プレビュー
   const preview_panel = {
     tag: 'div',
@@ -288,7 +388,7 @@ handle.render = (s) => {
              + 'border:1px solid var(--ric-color-border);'
              + 'box-shadow:var(--ric-shadow);'
              + 'display:flex;align-items:center;justify-content:center',
-        ctx: [s.tree],
+        ctx: [preview_tree],
       },
     ],
   };
