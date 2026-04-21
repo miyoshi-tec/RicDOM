@@ -347,7 +347,7 @@ return {
 | `bind_input(s, key, options)` | `s[key]` と双方向バインド |
 | `ui_textarea({ value, oninput, rows, auto_resize })` | 複数行入力。`auto_resize: { min_rows, max_rows }` で高さ自動調整 |
 | `bind_textarea(s, key, options)` | `s[key]` と双方向バインド |
-| `focus_when(el, cond)` | 条件の立ち上がりエッジで `el.focus()`（`el` は `s.refs.get('name')` 等） |
+| `focus_when(el, cond)` | 条件の立ち上がりエッジで `el.focus()`。`el` は `handle.refs.get('name')` 等（`render(s)` の `s` は state Proxy で `refs` を持たないため、`create_RicDOM` の戻り値 `handle` を closure 経由で参照する） |
 | `ui_checkbox({ checked, onchange, ctx, disabled })` | checked は 0/1（数値） |
 | `bind_checkbox(s, key, options)` | `s[key]` と双方向バインド |
 | `ui_radiobutton({ name, value, options, onchange })` | options: string[] or {value,label}[] |

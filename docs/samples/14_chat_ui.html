@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chat UI — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
   <style>
     body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
     .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
@@ -17,16 +19,25 @@
 <body>
 <div id="nav_bar" data-sample="14"></div>
 <p class="page-intro">
-  v0.4.0 の新コンポーネントを組み合わせた**チャット UI**デモ。
+  v0.4.0 の新コンポーネントを組み合わせた<strong>チャット UI</strong> デモ。
   <code>ui_textarea</code> + <code>auto_resize</code> で入力欄が内容に応じて伸び、
   <code>create_ui_scroll_pane</code> がメッセージ履歴を最下部追従で表示し、
   <code>focus_when</code> が応答完了後に入力欄にフォーカスを戻します。
   すべて state 駆動・宣言的に書かれています。
+  下ペインに実際のコードを表示しています（下部 splitter で高さ調整可）。
 </p>
-<div id="mount-rui" style="flex:1;min-height:0;overflow:hidden"></div>
-<script src="_nav_bar.js"></script>
-<script>
-'use strict';
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<!--
+  デモ本体のコード。`<script type="text/plain">` に置くことで
+  ブラウザには実行されず、text として取得できる。
+  末尾の "実行スクリプト" で textContent を取り出し、
+  (1) デモとして実行 (2) ui_code_pre で表示 の両方に使う。
+-->
+<script type="text/plain" id="src-demo">
+// ── チャット UI デモ ──
+// ui_textarea (auto_resize) + create_ui_scroll_pane + focus_when を組み合わせ。
+// すべて state 駆動・宣言的。
 
 const { create_RicDOM } = RicDOM;
 const {
@@ -35,7 +46,7 @@ const {
   ui_textarea, focus_when,
 } = RicUI;
 
-// ダミーの「応答」生成（タイプライター風に 1 文字ずつ state を更新）
+// ダミー応答
 const FAKE_REPLIES = [
   'なるほど、その方向で進めるのが良さそうですね。',
   'それは重要な観察です。もう少し詳しく聞かせてください。',
@@ -47,114 +58,151 @@ const _fake_reply = () => FAKE_REPLIES[Math.floor(Math.random() * FAKE_REPLIES.l
 // 初期 state とファクトリを渡して handle を取得する。
 // render は後付けすることで、closure から handle.refs にアクセスできる
 // （render(s) の s は state Proxy のため、refs は持たない）。
-const handle = create_RicDOM('#mount-rui', {
+const handle = create_RicDOM('#mount-demo', {
   // 全 UI 状態を s.ui に集約
-  ui: {
-    input: '',
-    busy:  false,
-  },
+  ui: { input: '', busy: false },
   // メッセージ履歴は s.ignore に置くことで mutation 検知を避け、
-  // 履歴更新時は `s.ui = { ...s.ui }` で明示的に再描画を起こす（後述の send()）。
+  // 履歴更新時は `s.ui = { ... }` で明示的に再描画を起こす（後述の send()）。
   ignore: { messages: [] },
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   pane: create_ui_scroll_pane({ follow: 'bottom', threshold: 40 }),
 });
 
 handle.render = (s) => {
-    // 応答完了後に入力欄へフォーカスを戻す（busy: true → false のエッジで発火）
-    focus_when(handle.refs.get('chat_input'), !s.ui.busy);
+  // 応答完了後に入力欄へフォーカスを戻す（busy: true → false のエッジで発火）
+  focus_when(handle.refs.get('chat_input'), !s.ui.busy);
 
-    return s.page({
-      style: { height: '100%', padding: 0, borderRadius: 0,
-               display: 'flex', flexDirection: 'column' },
-      ctx: [
+  return s.page({
+    style: { height: '100%', padding: 0, borderRadius: 0,
+             display: 'flex', flexDirection: 'column' },
+    ctx: [
 
-        // ── メッセージ履歴（scroll pane） ──
-        s.pane({
-          style: 'flex:1;padding:16px',
-          ctx: [
-            ui_col({ style: { gap: '12px' }, ctx: [
-              // 初回説明
-              s.ignore.messages.length === 0
-                ? ui_text({ variant: 'muted',
-                    ctx: ['↓ 下の入力欄にメッセージを入れて送信すると、ダミー応答が追加されます。'] })
-                : null,
-              // 各メッセージ
-              ...s.ignore.messages.map((m) => ui_panel({
-                style: {
-                  margin: 0,
-                  maxWidth: '80%',
-                  alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                  background: m.role === 'user'
-                    ? 'var(--ric-color-accent)'
-                    : 'var(--ric-color-control)',
-                  color: m.role === 'user'
-                    ? 'var(--ric-color-accent-fg, #fff)'
-                    : 'var(--ric-color-fg)',
+      // ── メッセージ履歴（scroll pane） ──
+      s.pane({
+        style: 'flex:1;padding:16px',
+        ctx: [
+          ui_col({ style: { gap: '12px' }, ctx: [
+            // 初回説明
+            s.ignore.messages.length === 0
+              ? ui_text({ variant: 'muted',
+                  ctx: ['↓ 下の入力欄にメッセージを入れて送信すると、ダミー応答が追加されます。'] })
+              : null,
+            // 各メッセージ
+            ...s.ignore.messages.map((m) => ui_panel({
+              style: {
+                margin: 0,
+                maxWidth: '80%',
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                background: m.role === 'user'
+                  ? 'var(--ric-color-accent)'
+                  : 'var(--ric-color-control)',
+                color: m.role === 'user'
+                  ? 'var(--ric-color-accent-fg, #fff)'
+                  : 'var(--ric-color-fg)',
+              },
+              ctx: [ui_text({ ctx: [m.text] })],
+            })),
+          ].filter(Boolean)}),
+        ],
+      }),
+
+      // ── 入力エリア ──
+      ui_panel({
+        style: { margin: 0, borderRadius: 0,
+                 borderLeft: 0, borderRight: 0, borderBottom: 0 },
+        ctx: [
+          ui_row({ style: { gap: '8px', alignItems: 'flex-end' }, ctx: [
+            { tag: 'div', style: 'flex:1', ctx: [
+              ui_textarea({
+                ref:         'chat_input',     // focus_when 用
+                value:       s.ui.input,
+                placeholder: s.ui.busy ? '応答中…' : 'メッセージを入力（Shift+Enter で改行）',
+                disabled:    s.ui.busy,
+                auto_resize: { min_rows: 1, max_rows: 5 },
+                oninput:     (e) => { s.ui.input = e.target.value; },
+                onkeydown:   (e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !s.ui.busy) {
+                    e.preventDefault();
+                    send(s);
+                  }
                 },
-                ctx: [
-                  ui_text({ ctx: [m.text] }),
-                ],
-              })),
-            ].filter(Boolean)}),
-          ],
-        }),
-
-        // ── 入力エリア ──
-        ui_panel({
-          style: { margin: 0, borderRadius: 0,
-                   borderLeft: 0, borderRight: 0, borderBottom: 0 },
-          ctx: [
-            ui_row({ style: { gap: '8px', alignItems: 'flex-end' }, ctx: [
-              { tag: 'div', style: 'flex:1', ctx: [
-                ui_textarea({
-                  ref:         'chat_input',     // focus_when 用
-                  value:       s.ui.input,
-                  placeholder: s.ui.busy ? '応答中…' : 'メッセージを入力（Shift+Enter で改行）',
-                  disabled:    s.ui.busy,
-                  auto_resize: { min_rows: 1, max_rows: 5 },
-                  oninput:     (e) => { s.ui.input = e.target.value; },
-                  onkeydown:   (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !s.ui.busy) {
-                      e.preventDefault();
-                      send(s);
-                    }
-                  },
-                }),
-              ]},
-              ui_button({
-                variant: 'primary',
-                disabled: s.ui.busy || !s.ui.input.trim(),
-                ctx: ['送信'],
-                onclick: () => send(s),
               }),
-            ]}),
-          ],
-        }),
+            ]},
+            ui_button({
+              variant: 'primary',
+              disabled: s.ui.busy || !s.ui.input.trim(),
+              ctx: ['送信'],
+              onclick: () => send(s),
+            }),
+          ]}),
+        ],
+      }),
 
-      ],
-    });
+    ],
+  });
 };
 
-// 送信処理: ユーザー発言を追加 → busy=true → 500ms 後にダミー応答を追加 → busy=false
+// 送信: ユーザー発言を追加 → busy=true → 500〜1000ms 後にダミー応答 → busy=false
 function send(s) {
   const text = s.ui.input.trim();
   if (!text || s.ui.busy) return;
 
-  // ユーザー発言を追加
   s.ignore.messages = [...s.ignore.messages, { role: 'user', text }];
-  // 入力クリア + busy へ（scroll_pane は自動で最下部追従）
   s.ui = { input: '', busy: true };
-  // 強制的に最下部へ（ユーザーは間違いなく見たい）
   s.pane.scroll_to_bottom();
 
-  // 疑似応答
   setTimeout(() => {
     s.ignore.messages = [...s.ignore.messages, { role: 'assistant', text: _fake_reply() }];
     s.ui = { input: '', busy: false };
     s.pane.scroll_to_bottom();
   }, 500 + Math.random() * 500);
 }
+</script>
+
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+
+  // デモ本体のコード（id="src-demo" の textContent）
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  // ── 外側 splitter: 上「デモ」 / 下「コード」 ──
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 340, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            // main: デモ本体のマウント先。ctx 省略で child の DOM が親 re-render でも保持される。
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            // side: ソースコード表示
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  // 外側 frame の DOM が用意されたあとでデモを実行する
+  requestAnimationFrame(() => {
+    new Function(demo_src)();
+  });
+})();
 </script>
 </body>
 </html>
