@@ -584,14 +584,14 @@ const create_RicDOM = (target, raw_state = {}) => {
   //   render 後付け: handle.render = fn（per-instance）
   //
   // 第 1 引数が object だった過去の 3 引数 form（create_RicDOM(state, target, render)）
-  // は v0.4.0 で削除した。複数 instance + 共有 state + 独立 render は、
+  // は v0.3.3 で削除した。複数 instance + 共有 state + 独立 render は、
   // 2 引数 form + handle.render = fn で同じことが書ける。
   if (typeof target !== 'string'
       && !(typeof HTMLElement !== 'undefined' && target instanceof HTMLElement)) {
     console.error(
       'RicDOM: 第 1 引数は CSS セレクタ文字列または DOM 要素です。\n' +
       '✅ 正しい例: create_RicDOM(\'#app\', { count: 0, render: s => ({ tag: \'div\', ctx: [s.count] }) })\n' +
-      '⚠️ 旧 3 引数形式 create_RicDOM(state, target, render) は v0.4.0 で削除されました。',
+      '⚠️ 旧 3 引数形式 create_RicDOM(state, target, render) は v0.3.3 で削除されました。',
     );
     return NOOP_PROXY;
   }
