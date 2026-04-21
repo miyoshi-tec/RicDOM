@@ -106,6 +106,10 @@ const SAMPLES = [
   { no: '10', file: '10_theme_studio.html',       title: 'テーマ編集',         desc: 'CSS 変数エディタ + UI プレビュー + JSON 保存/読込' },
   { no: '11', file: '11_theme_override.html',     title: 'ローカルテーマ',     desc: 'create_ui_panel のテーマ / 密度 / disabled' },
   { no: '12', file: '12_md_viewer.html',          title: 'Markdown ビューア',  desc: 'ui_md_pre で Markdown → VDOM 変換' },
+  { no: '13', file: '13_controlled_dialog_splitter.html', title: 'Controlled Mode',   desc: 'state 駆動の dialog / splitter + SVG グラフ + コード表示' },
+  // 14 は欠番（旧 "Chat UI" は 15 "AI Chat" に包含されたため）
+  { no: '15', file: '15_ai_chat.html',             title: 'AI Chat (live)',    desc: '4 プロバイダ対応、SSE ストリーミング、API キーは state のみ保持' },
+  { no: '16', file: '16_svg_editor.html',          title: 'SVG ツリーエディタ', desc: 'SVG ノードを選択・編集・追加、ドラッグで直感的に配置' },
 ];
 
 // ── メインレンダー ──
@@ -224,19 +228,39 @@ create_RicDOM('#index_page', {
 
         { tag: 'div', class: 'section-gap' },
 
-        // ── フッター ──
-        ui_row({ style: { justifyContent: 'center', gap: '16px' }, ctx: [
-          { tag: 'a', href: 'https://github.com/miyoshi-tec/RicDOM',
-            style: 'color: var(--ric-color-accent); text-decoration: none',
-            ctx: ['GitHub'] },
-          { tag: 'a', href: 'spec.html',
-            style: 'color: var(--ric-color-accent); text-decoration: none',
-            ctx: ['API リファレンス'] },
-          { tag: 'a', href: 'tutorial.html',
-            style: 'color: var(--ric-color-accent); text-decoration: none',
-            ctx: ['チュートリアル'] },
-          ui_text({ variant: 'muted', ctx: ['個人利用・学習・研究・OSS 開発は自由。商用利用は要相談'] }),
+        // ── ドキュメント（サンプルと同じカード風リンク）──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['ドキュメント'], style: { fontSize: '1.3rem' } }),
+          ui_text({ variant: 'muted', ctx: ['サンプルだけでは拾いきれない細部や全体像はこちらから'] }),
+          ui_col({ style: { gap: '0' }, ctx: [
+            { tag: 'a', class: 'sample-link', href: 'tutorial.html', ctx: [
+              { tag: 'span', class: 'sample-no', ctx: ['📘'] },
+              { tag: 'span', class: 'sample-title', ctx: ['チュートリアル'] },
+              { tag: 'span', class: 'sample-desc',
+                ctx: [' — 準備 → Hello World → state → RicUI まで順に学ぶ入門ガイド'] },
+            ]},
+            { tag: 'a', class: 'sample-link', href: 'spec.html', ctx: [
+              { tag: 'span', class: 'sample-no', ctx: ['📗'] },
+              { tag: 'span', class: 'sample-title', ctx: ['API リファレンス (SPEC)'] },
+              { tag: 'span', class: 'sample-desc',
+                ctx: [' — 全コンポーネント / CSS 変数 / Performance & Scale / Proxy 仕様'] },
+            ]},
+            { tag: 'a', class: 'sample-link', href: 'https://github.com/miyoshi-tec/RicDOM', ctx: [
+              { tag: 'span', class: 'sample-no', ctx: ['📦'] },
+              { tag: 'span', class: 'sample-title', ctx: ['GitHub リポジトリ'] },
+              { tag: 'span', class: 'sample-desc',
+                ctx: [' — ソースコード / Issue / Pull Request'] },
+            ]},
+          ]}),
         ]}),
+
+        { tag: 'div', class: 'section-gap' },
+
+        // ── フッター（ライセンス注記のみ）──
+        ui_text({ variant: 'muted',
+          ctx: ['個人利用・学習・研究・OSS 開発は自由。商用利用は要相談'],
+          style: { textAlign: 'center', fontSize: '0.85rem' },
+        }),
       ]}),
     ]});
   },
