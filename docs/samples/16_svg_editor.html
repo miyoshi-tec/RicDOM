@@ -37,7 +37,7 @@ const { create_RicDOM } = RicDOM;
 const {
   create_ui_page, create_ui_splitter,
   ui_panel, ui_row, ui_col, ui_text, ui_button,
-  ui_input, ui_select, bind_radiobutton,
+  ui_input, bind_radiobutton,
 } = RicUI;
 
 // ── ツリー操作ヘルパ ──
@@ -65,6 +65,29 @@ const remove_at = (root, path) => {
     ...parent,
     ctx: parent.ctx.filter((_, i) => i !== idx),
   }));
+};
+
+// 選択中ノードの「直後」に新ノードを挿入して、挿入後の path を返す。
+// root (path=[]) のときは root の末尾に追加する（root の "後ろ" は子として末尾）。
+const insert_after = (root, path, new_node) => {
+  if (path.length === 0) {
+    const children = root.ctx || [];
+    return {
+      tree: { ...root, ctx: [...children, new_node] },
+      new_path: [children.length],
+    };
+  }
+  const parent_path = path.slice(0, -1);
+  const idx         = path[path.length - 1];
+  const tree = update_at(root, parent_path, parent => ({
+    ...parent,
+    ctx: [
+      ...parent.ctx.slice(0, idx + 1),
+      new_node,
+      ...parent.ctx.slice(idx + 1),
+    ],
+  }));
+  return { tree, new_path: [...parent_path, idx + 1] };
 };
 
 // タグ追加時のデフォルト属性
@@ -235,8 +258,7 @@ const calc_bbox = (node) => {
 // ── state ──
 const handle = create_RicDOM('#mount-demo', {
   ui: {
-    selected_path: [0],  // 初期選択: 最初の子
-    mode:          'edit',
+    selected_path: [0],    // 初期選択: 最初の子
     add_tag:       'circle',
   },
   tree: {
@@ -302,25 +324,13 @@ handle.render = (s) => {
   const is_text      = selected.tag === 'text';
   const text_content = is_text && typeof selected.ctx?.[0] === 'string'
     ? selected.ctx[0] : '';
-  const can_contain  = ['svg', 'g'].includes(selected.tag);
 
-  // 左ペイン: ツリー + 編集 / 追加
+  // 左ペイン: ツリー + 属性編集 + 末尾に常時「次を追加」エリア
   const editor_panel = {
     tag: 'div',
     style: 'height:100%;overflow:auto;padding:12px;'
          + 'display:flex;flex-direction:column;gap:10px',
     ctx: [
-      // モード切替
-      ui_row({ style: { alignItems: 'center', gap: '10px' }, ctx: [
-        ui_text({ variant: 'label', ctx: ['モード:'] }),
-        bind_radiobutton(s.ui, 'mode', {
-          options: [
-            { value: 'edit', label: '編集' },
-            { value: 'add',  label: '追加' },
-          ],
-        }),
-      ]}),
-
       // ツリー表示
       ui_text({ variant: 'label', ctx: ['ツリー（クリックで選択）:'] }),
       { tag: 'div',
@@ -330,102 +340,89 @@ handle.render = (s) => {
         ctx: render_tree(s),
       },
 
-      // 編集モード: 属性リスト
-      s.ui.mode === 'edit' ? ui_col({ style: { gap: '6px' }, ctx: [
-        ui_text({ variant: 'label',
-          ctx: ['選択中: <' + selected.tag + '> の属性'] }),
+      // 属性リスト
+      ui_text({ variant: 'label',
+        ctx: ['選択中: <' + selected.tag + '> の属性'] }),
 
-        ...attr_entries.map(([k, v]) => ui_row({
-          style: { alignItems: 'center', gap: '6px' },
-          ctx: [
-            { tag: 'div', style: 'flex:0 0 110px', ctx: [
-              ui_text({ variant: 'muted', ctx: [k] }),
-            ]},
-            { tag: 'div', style: 'flex:1', ctx: [
-              ui_input({
-                value: String(v),
-                oninput: (e) => {
-                  s.tree = update_at(s.tree, s.ui.selected_path,
-                    node => ({ ...node, [k]: e.target.value }));
-                },
-              }),
-            ]},
-            ui_button({
-              variant: 'ghost', ctx: ['×'],
-              onclick: () => {
-                s.tree = update_at(s.tree, s.ui.selected_path, node => {
-                  const copy = { ...node };
-                  delete copy[k];
-                  return copy;
-                });
+      ...attr_entries.map(([k, v]) => ui_row({
+        style: { alignItems: 'center', gap: '6px' },
+        ctx: [
+          { tag: 'div', style: 'flex:0 0 110px', ctx: [
+            ui_text({ variant: 'muted', ctx: [k] }),
+          ]},
+          { tag: 'div', style: 'flex:1', ctx: [
+            ui_input({
+              value: String(v),
+              oninput: (e) => {
+                s.tree = update_at(s.tree, s.ui.selected_path,
+                  node => ({ ...node, [k]: e.target.value }));
               },
             }),
-          ],
-        })),
-
-        // text タグだけテキスト本体を別枠で編集
-        is_text ? ui_row({
-          style: { alignItems: 'center', gap: '6px' },
-          ctx: [
-            { tag: 'div', style: 'flex:0 0 110px', ctx: [
-              ui_text({ variant: 'muted', ctx: ['(text 本体)'] }),
-            ]},
-            { tag: 'div', style: 'flex:1', ctx: [
-              ui_input({
-                value: text_content,
-                oninput: (e) => {
-                  s.tree = update_at(s.tree, s.ui.selected_path,
-                    node => ({ ...node, ctx: [e.target.value] }));
-                },
-              }),
-            ]},
-          ],
-        }) : null,
-
-        // ルート以外は削除ボタン
-        s.ui.selected_path.length > 0 ? ui_button({
-          variant: 'ghost', ctx: ['🗑 このノードを削除'],
-          onclick: () => {
-            s.tree = remove_at(s.tree, s.ui.selected_path);
-            s.ui = { ...s.ui, selected_path: [] };
-          },
-        }) : null,
-      ].filter(Boolean)}) : null,
-
-      // 追加モード: タグ選択 + 追加
-      s.ui.mode === 'add' ? ui_col({ style: { gap: '6px' }, ctx: [
-        ui_text({ variant: 'label', ctx: [
-          can_contain
-            ? ('<' + selected.tag + '> の子として追加:')
-            : ('<' + selected.tag + '> の隣（親の子）として追加:'),
-        ]}),
-        ui_row({ style: { alignItems: 'center', gap: '6px' }, ctx: [
-          ui_select({
-            value:    s.ui.add_tag,
-            options:  ADD_TAGS,
-            onchange: (e) => { s.ui.add_tag = e.target.value; },
-            style:    { flex: 1 },
-          }),
+          ]},
           ui_button({
-            variant: 'primary', ctx: ['追加'],
+            variant: 'ghost', ctx: ['×'],
             onclick: () => {
-              // container でなければ親に追加（末尾に挿入）
-              const insert_path = can_contain
-                ? s.ui.selected_path
-                : s.ui.selected_path.slice(0, -1);
-              const new_node = { tag: s.ui.add_tag, ...DEFAULT_ATTRS[s.ui.add_tag] };
-              s.tree = update_at(s.tree, insert_path, node => ({
-                ...node,
-                ctx: [...(node.ctx || []), new_node],
-              }));
-              // 追加したノードを新たに選択
-              const parent = get_at(s.tree, insert_path);
-              const new_idx = (parent.ctx?.length ?? 1) - 1;
-              s.ui = { ...s.ui, selected_path: [...insert_path, new_idx] };
+              s.tree = update_at(s.tree, s.ui.selected_path, node => {
+                const copy = { ...node };
+                delete copy[k];
+                return copy;
+              });
             },
           }),
-        ]}),
-      ]}) : null,
+        ],
+      })),
+
+      // text タグだけテキスト本体を別枠で編集
+      is_text ? ui_row({
+        style: { alignItems: 'center', gap: '6px' },
+        ctx: [
+          { tag: 'div', style: 'flex:0 0 110px', ctx: [
+            ui_text({ variant: 'muted', ctx: ['(text 本体)'] }),
+          ]},
+          { tag: 'div', style: 'flex:1', ctx: [
+            ui_input({
+              value: text_content,
+              oninput: (e) => {
+                s.tree = update_at(s.tree, s.ui.selected_path,
+                  node => ({ ...node, ctx: [e.target.value] }));
+              },
+            }),
+          ]},
+        ],
+      }) : null,
+
+      // ルート以外は削除ボタン
+      s.ui.selected_path.length > 0 ? ui_button({
+        variant: 'ghost', ctx: ['🗑 このノードを削除'],
+        onclick: () => {
+          s.tree = remove_at(s.tree, s.ui.selected_path);
+          s.ui = { ...s.ui, selected_path: [] };
+        },
+      }) : null,
+
+      // 区切り
+      { tag: 'hr',
+        style: 'margin:8px 0;border:none;border-top:1px dashed var(--ric-color-border)' },
+
+      // ── 末尾に常時表示: 次のノードを追加 ──
+      ui_text({ variant: 'label',
+        ctx: [s.ui.selected_path.length === 0
+          ? 'このルートの子として追加:'
+          : ('<' + selected.tag + '> の直後に追加:')],
+      }),
+      // タグ選択（ラジオボタン、bind_radiobutton で state と双方向）
+      bind_radiobutton(s.ui, 'add_tag', {
+        options: ADD_TAGS,
+      }),
+      ui_button({
+        variant: 'primary', ctx: ['➕ 追加'],
+        onclick: () => {
+          const new_node = { tag: s.ui.add_tag, ...DEFAULT_ATTRS[s.ui.add_tag] };
+          const { tree, new_path } = insert_after(s.tree, s.ui.selected_path, new_node);
+          s.tree = tree;
+          s.ui = { ...s.ui, selected_path: new_path };
+        },
+      }),
     ].filter(Boolean),
   };
 
