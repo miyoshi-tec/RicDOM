@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Controlled Mode — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
   <style>
     body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
     .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
@@ -22,27 +24,95 @@
   他の UI との同期が宣言的に書けます。
   このサンプルでは、2 つのチェックボックスと bottom スプリッターの<strong>双方向同期</strong>、
   およびボタンから state 経由で開くダイアログを示します。
+  下ペインに実際のコードを表示しています（下部 splitter で高さ調整可）。
 </p>
-<div id="mount-rui" style="flex:1;min-height:0;overflow:hidden"></div>
-<script src="_nav_bar.js"></script>
-<script>
-'use strict';
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<!--
+  デモ本体のコード。`<script type="text/plain">` に置くことで
+  ブラウザには実行されず、text として取得できる。
+  末尾の "実行スクリプト" で textContent を取り出し、
+  (1) デモとして実行 (2) ui_code_pre で表示 の両方に使う。
+-->
+<script type="text/plain" id="src-demo">
+// ── controlled mode デモ ──
+// 2 checkbox ⇄ splitter（双方向同期）+ ボタン→state→dialog
+// すべての UI 状態を s.ui に集約して state 駆動で動かす。
 
 const { create_RicDOM } = RicDOM;
 const {
   create_ui_page, create_ui_splitter, create_ui_dialog,
-  ui_panel, ui_row, ui_text, ui_button,
-  ui_checkbox,
+  ui_panel, ui_row, ui_text, ui_button, ui_checkbox,
 } = RicUI;
 
-create_RicDOM('#mount-rui', {
+// ── 軽量 SVG 描画（declarative、外部ライブラリ不要）──
+// RicDOM は tag:'svg' を検出すると自動で SVG namespace に切り替え、
+// 子要素（polyline / rect / circle など）もすべて SVG 要素として生成する。
+// 属性は attrs: {} ではなく VDOM ノードのトップレベルに直接書く。
+
+// 乱数データ生成ヘルパ（「更新」ボタンで state を丸ごと差し替える）
+const gen_graph = () => {
+  const phase = Math.random() * 6;
+  return Array.from({ length: 40 },
+    (_, i) => 50 + 30 * Math.sin(i / 3.2 + phase) + 10 * (Math.random() - 0.5));
+};
+const gen_stats = () => Array.from({ length: 12 },
+  () => Math.floor(Math.random() * 80 + 15));
+
+// 折れ線スパークライン（polyline 1 本）
+const sparkline = (values, css_stroke) => {
+  const W = 280, H = 80, PAD = 4;
+  const max = Math.max(...values), min = Math.min(...values);
+  const span = max - min || 1;
+  const dx = (W - PAD * 2) / (values.length - 1);
+  const points = values.map((v, i) => {
+    const x = PAD + i * dx;
+    const y = PAD + (H - PAD * 2) * (1 - (v - min) / span);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return {
+    tag: 'svg', viewBox: `0 0 ${W} ${H}`,
+    style: 'display:block;width:100%;height:auto',
+    ctx: [
+      { tag: 'polyline', fill: 'none', points,
+        style: `stroke:${css_stroke};stroke-width:2;stroke-linejoin:round;stroke-linecap:round` },
+    ],
+  };
+};
+
+// 棒グラフ（rect の配列）
+const bars = (values, css_fill) => {
+  const W = 280, H = 80, PAD = 4, GAP = 2;
+  const max = Math.max(...values) || 1;
+  const bar_w = (W - PAD * 2) / values.length - GAP;
+  return {
+    tag: 'svg', viewBox: `0 0 ${W} ${H}`,
+    style: 'display:block;width:100%;height:auto',
+    ctx: values.map((v, i) => {
+      const h = (H - PAD * 2) * (v / max);
+      return {
+        tag: 'rect',
+        x: (PAD + i * (bar_w + GAP)).toFixed(1),
+        y: (H - PAD - h).toFixed(1),
+        width:  bar_w.toFixed(1),
+        height: h.toFixed(1),
+        rx: 2,
+        style: `fill:${css_fill}`,
+      };
+    }),
+  };
+};
+
+create_RicDOM('#mount-demo', {
 
   // 全ての UI 状態を s.ui に集約する（1 階層目の代入で自動再描画）。
   ui: {
-    show_graph: true,
-    show_stats: false,
-    error_dlg:  null,    // null = 閉じている、文字列 = その内容を表示
+    show_graph:   true,
+    show_stats:   true,
+    confirm_dlg:  false,   // 「更新」ダイアログの開閉
   },
+  // グラフ・統計のデータは差し替え駆動。初回は乱数、更新ボタンで再生成。
+  data: { graph: gen_graph(), stats: gen_stats() },
 
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   sp:   create_ui_splitter({ side: 'bottom', size: 180, min: 80, collapsible: true }),
@@ -74,8 +144,8 @@ create_RicDOM('#mount-rui', {
               }),
               ui_button({
                 variant: 'primary',
-                ctx: ['⚠️ エラーを表示'],
-                onclick: () => { s.ui.error_dlg = 'ディスク容量が不足しています。'; },
+                ctx: ['🔄 データを更新…'],
+                onclick: () => { s.ui.confirm_dlg = true; },
               }),
             ]}),
             ui_text({ variant: 'label', ctx: ['現在の state.ui（値の変化がそのまま UI に反映されます）:'] }),
@@ -128,14 +198,14 @@ create_RicDOM('#mount-rui', {
                     style: { flex: 1, margin: 0 },
                     ctx: [
                       ui_text({ variant: 'label', ctx: ['📈 グラフパネル'] }),
-                      ui_text({ ctx: ['(ここにグラフが描画される想定)'] }),
+                      sparkline(s.data.graph, 'var(--ric-color-accent)'),
                     ],
                   }) : null,
                   s.ui.show_stats ? ui_panel({
                     style: { flex: 1, margin: 0 },
                     ctx: [
                       ui_text({ variant: 'label', ctx: ['📊 統計パネル'] }),
-                      ui_text({ ctx: ['(ここに統計が表示される想定)'] }),
+                      bars(s.data.stats, 'var(--ric-color-accent)'),
                     ],
                   }) : null,
                 ]}),
@@ -145,18 +215,31 @@ create_RicDOM('#mount-rui', {
         ]},
 
         // ── Dialog（controlled open + on_close）──
-        // open は state から算出、on_close / OK ボタン / ESC キーはすべて
-        // state をリセットする。これにより開閉の論理は state 側に完全に集約される。
+        // open は state から算出、on_close（overlay / ✕ / ESC / キャンセル）と
+        // 「更新」ボタンのどちらも、最終的には state を false に戻す。
+        // 「更新」側は閉じる前に s.data を差し替える → グラフが新データで再描画。
         s.dlg({
-          open:     s.ui.error_dlg !== null,
-          on_close: () => { s.ui.error_dlg = null; },
-          title:    'エラー',
-          ctx: [ ui_text({ ctx: [s.ui.error_dlg ?? ''] }) ],
+          open:     s.ui.confirm_dlg,
+          on_close: () => { s.ui.confirm_dlg = false; },
+          title:    'データ更新の確認',
+          ctx: [
+            ui_text({ ctx: [
+              'グラフと統計を新しい乱数データで更新します。よろしいですか？',
+            ]}),
+          ],
           actions: [
             ui_button({
+              ctx: ['キャンセル'],
+              onclick: () => { s.ui.confirm_dlg = false; },
+            }),
+            ui_button({
               variant: 'primary',
-              ctx: ['OK'],
-              onclick: () => { s.ui.error_dlg = null; },
+              ctx: ['更新'],
+              onclick: () => {
+                // データをまるごと差し替える（1 階層目の代入 → 自動再描画）
+                s.data = { graph: gen_graph(), stats: gen_stats() };
+                s.ui.confirm_dlg = false;
+              },
             }),
           ],
         }),
@@ -165,6 +248,52 @@ create_RicDOM('#mount-rui', {
     });
   },
 });
+</script>
+
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+
+  // デモ本体のコード（id="src-demo" の textContent）
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  // ── 外側 splitter: 上「デモ」 / 下「コード」 ──
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 340, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            // main: デモ本体のマウント先。ctx 省略で child の DOM が親 re-render でも保持される。
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            // side: ソースコード表示
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  // 外側 frame の DOM が用意されたあとでデモを実行する
+  requestAnimationFrame(() => {
+    new Function(demo_src)();
+  });
+})();
 </script>
 </body>
 </html>
