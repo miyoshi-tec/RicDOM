@@ -289,6 +289,8 @@ ui_panel({ id: 'main', onmouseenter: hover, ctx: [...] }),
 | `ui_button({ ctx, variant, onclick })` | ボタン（variant: `default` / `primary` / `ghost`） |
 | `ui_input({ value, oninput, placeholder })` | テキスト入力 |
 | `bind_input(s, key, options)` | state と双方向バインドされた input |
+| `ui_textarea({ value, oninput, auto_resize })` | 複数行入力。`auto_resize: { min_rows, max_rows }` で高さ自動調整 |
+| `bind_textarea(s, key, options)` | state と双方向バインドされた textarea |
 | `ui_checkbox({ checked, onchange })` | チェックボックス |
 | `bind_checkbox(s, key, options)` | state と双方向バインドされた checkbox |
 | `ui_radiobutton({ name, value, options })` | ラジオボタングループ |
@@ -300,6 +302,7 @@ ui_panel({ id: 'main', onmouseenter: hover, ctx: [...] }),
 | `ui_color({ value, oninput })` | カラーピッカー（hex/rgba 自動判定） |
 | `bind_color(s, key, options)` | state と双方向バインドされた color |
 | `ui_separator()` | 水平区切り線 |
+| `focus_when(el, cond)` | `cond` の立ち上がりエッジで `el.focus()`。`el` は `handle.refs.get('name')` |
 
 #### Text
 
@@ -368,6 +371,7 @@ s.toast.show('保存しました', { type: 'success', duration: 3000 });
 | `ui_tabs({ items, active, onchange })` | タブナビゲーション | — |
 | `bind_tabs(s, key, options)` | state とバインドされた tabs | — |
 | `create_ui_splitter(options)` | ドラッグ可能なペイン分割 | `toggle()` / `collapsed()` / `get_size()` / `set_size(px)` |
+| `create_ui_scroll_pane(options)` | 追従型スクロール領域（チャット UI 等） | `scroll_to_bottom()` / `scroll_to_top()` |
 
 ### 3 種類のコンポーネントパターン
 

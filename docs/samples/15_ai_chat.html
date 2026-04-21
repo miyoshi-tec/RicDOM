@@ -266,7 +266,9 @@ handle.render = (s) => {
                 color: m.role === 'user'
                   ? 'var(--ric-color-accent-fg, #fff)'
                   : 'var(--ric-color-fg)',
-                whiteSpace: m.role === 'user' ? 'pre-wrap' : null,
+                // user だけ改行保持（textarea で改行して送信した場合のため）。
+                // assistant 側は ui_md_pre が各ブロック要素で改行を扱う。
+                ...(m.role === 'user' ? { whiteSpace: 'pre-wrap' } : {}),
               },
               ctx: [
                 // user: plain text（入力したまま表示）

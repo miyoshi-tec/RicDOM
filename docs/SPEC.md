@@ -1007,7 +1007,7 @@ create_RicDOM('#parent', {
 npm run build        # 全バンドル
 npm run build:core   # RicDOM.min.js
 npm run build:ui     # RicUI.min.js（調整パネル含む）
-npm test             # 533 テスト
+npm test             # 575 テスト
 ```
 
 esbuild でバンドル + minify。`--platform=browser`。

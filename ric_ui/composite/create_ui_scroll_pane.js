@@ -27,6 +27,14 @@
 // 複数インスタンス識別用のモジュールレベルカウンタ
 let _sp_count = 0;
 
+// style オブジェクトを CSS 文字列に変換する小ヘルパ。
+// render 関数の中で毎回定義すると呼び出し回数分だけクロージャが作られるため、
+// モジュールレベルで 1 つだけ持つ。
+const _style_to_str = (s) => typeof s === 'object' && !Array.isArray(s)
+  ? Object.entries(s).map(([k, v]) =>
+      `${k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}: ${v}`).join(';')
+  : String(s || '');
+
 const create_ui_scroll_pane = ({
   follow    = 'bottom',   // 'bottom' | 'top' | 'none'
   threshold = 50,
@@ -81,10 +89,6 @@ const create_ui_scroll_pane = ({
 
     // rest.style は string / object を想定。object のときは string 化して連結する
     // （SPEC の rest スプレッド契約に沿って計算値で最終上書きする）。
-    const _style_to_str = (s) => typeof s === 'object' && !Array.isArray(s)
-      ? Object.entries(s).map(([k, v]) =>
-          `${k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}: ${v}`).join(';')
-      : String(s || '');
     const extra_style = rest.style ? _style_to_str(rest.style) + ';' : '';
 
     return {

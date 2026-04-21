@@ -28,10 +28,11 @@
 // scrollHeight と min/max 行数でクランプする。
 const _do_resize = (el, auto_resize) => {
   if (!el || !auto_resize) return;
+  // SSR / Node 単体環境では getComputedStyle も el.style も使えないので即 return。
+  if (typeof window === 'undefined') return;
   const { min_rows = 1, max_rows = null } = auto_resize;
   // 現在の高さをリセットして scrollHeight を正しく測る
   el.style.height = 'auto';
-  if (typeof window === 'undefined') return; // SSR / Node 環境では何もしない
   const cs = window.getComputedStyle(el);
   const line_h = parseFloat(cs.lineHeight) || 22;
   const pad    = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);

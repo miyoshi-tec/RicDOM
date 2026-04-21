@@ -7,13 +7,18 @@
 // 前回値との差分で副作用を最小化する。
 //
 // 使い方:
-//   render(s) {
-//     focus_when(s.refs.get('input'), !s.busy);
+//   const handle = create_RicDOM('#app', { ... });
+//   handle.render = (s) => {
+//     focus_when(handle.refs.get('input'), !s.busy);
 //     return { ... };
-//   }
+//   };
+//
+// 注意: render(s) の `s` は state Proxy で、`refs` は持っていない。
+//   refs は create_RicDOM の戻り値 `handle` にしかないため、
+//   handle を closure で参照する必要がある（上記のパターン）。
 //
 // 動作:
-//   - el が null なら何もしない（ref が未解決）
+//   - el が null / undefined なら何もしない（ref が未解決）
 //   - cond が前回 false → 今回 true の**立ち上がりエッジ**のときだけ
 //     rAF 2 回後に el.focus() を呼ぶ（DOM 更新完了を待つ保険）
 //   - disabled な要素はフォーカスしない
