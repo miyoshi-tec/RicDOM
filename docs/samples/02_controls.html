@@ -141,7 +141,14 @@ create_RicDOM('#mount-raw', {
   <!-- 右：RicUI 版 -->
   <script type="text/plain" id="src-rui">
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, ui_panel, ui_text, bind_radiobutton, bind_select, create_ui_popup, ui_button, ui_col, ui_code_pre } = RicUI;
+const {
+  // このサンプルの主役: ボタン・ポップアップメニュー
+  ui_button, create_ui_popup,
+  // state バインド系コントロール
+  bind_radiobutton, bind_select,
+  // レイアウト・テキスト
+  create_ui_page, ui_panel, ui_col, ui_text, ui_code_pre,
+} = RicUI;
 // ── データ定義 ────────────────────────────────────────────────────────
 const ROLES = [
   { value: 'viewer', label: '閲覧者' },

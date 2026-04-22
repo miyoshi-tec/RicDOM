@@ -3,6 +3,37 @@
 AI（Claude Code 等）がコーディングする際の詳細仕様書。
 人間向けの概要は README.md を参照。
 
+## 公開 API 早見表
+
+すぐに API だけ確認したい場合の一覧。詳細は各節を参照。
+
+### RicDOM コア
+
+| API | 用途 |
+|---|---|
+| `create_RicDOM(target, state_with_render)` | インスタンス生成・マウント |
+| `handle.refs: Map<string, Element>` | `ref: 'name'` 付き要素の DOM 参照 |
+| `handle.render = fn` | render 関数の per-instance 差し替え |
+| `RicDOM.version` | バージョン文字列 |
+
+### RicUI（`window.RicUI` / `require('../ric_ui')`）
+
+| カテゴリ | API |
+|---|---|
+| **layout** | `create_ui_page` / `ui_col` / `ui_row` |
+| **surface** | `ui_panel` / `create_ui_panel` |
+| **control (純関数)** | `ui_button` / `ui_input` / `ui_textarea` / `ui_checkbox` / `ui_radiobutton` / `ui_range` / `ui_color` / `ui_select` / `ui_separator` |
+| **control (state バインド)** | `bind_input` / `bind_textarea` / `bind_checkbox` / `bind_radiobutton` / `bind_range` / `bind_color` / `bind_select` |
+| **control (ヘルパ)** | `focus_when(el, cond)` |
+| **text** | `ui_text` / `ui_code_pre` / `ui_md_pre` |
+| **popup（ファクトリ）** | `create_ui_popup` / `create_ui_tooltip` / `create_ui_dialog` / `create_ui_toast` |
+| **composite（ファクトリ）** | `create_ui_accordion` / `create_ui_splitter` / `create_ui_scroll_pane` / `create_ui_tweak_panel` |
+| **composite (純関数)** | `ui_tabs` / `bind_tabs` / `ui_tweak_panel` / `ui_tweak_folder` / `ui_tweak_row` / `tweak_infer_type` |
+| **theme util** | `create_theme` / `create_density` / `create_font_size` / `export_theme` / `export_settings` |
+| **meta** | `version` |
+
+全 `ui_*` は rest スプレッド契約（任意 DOM 属性透過）、`create_ui_*` は `s` のトップレベル格納＋`__notify` 自動注入、という共通ルール。詳細は [rest スプレッド契約](#任意属性の透過rest-スプレッド契約) と [Controlled / Uncontrolled パターン](#controlled--uncontrolled-パターン) を参照。
+
 ---
 
 ## 1. アーキテクチャ概要
