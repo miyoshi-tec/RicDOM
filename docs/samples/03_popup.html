@@ -268,7 +268,7 @@ create_RicDOM('#mount-rui', {
       ui_button({ ctx: ['新規作成'],     variant: 'ghost', onclick: () => { s.last_action = '新規作成'; } }),
       ui_button({ ctx: ['保存'],         variant: 'ghost', onclick: () => { s.last_action = '保存'; } }),
       ui_button({ ctx: ['エクスポート'], variant: 'ghost', onclick: () => { s.last_action = 'エクスポート'; } }),
-      { tag: 'div', class: 'ric-menu__sep' },
+      { tag: 'div', class: 'ric-popup__sep' },
       ui_button({ ctx: ['設定'],         variant: 'ghost', onclick: () => { s.last_action = '設定を開く'; } }),
     ];
     const LANG_CTX = [
@@ -348,7 +348,7 @@ create_RicDOM('#mount-rui', {
           ui_button({ ctx: ['新規作成'],     variant: 'ghost', onclick: () => { fs.last_action = '新規作成'; } }),
           ui_button({ ctx: ['保存'],         variant: 'ghost', onclick: () => { fs.last_action = '保存'; } }),
           ui_button({ ctx: ['エクスポート'], variant: 'ghost', onclick: () => { fs.last_action = 'エクスポート'; } }),
-          { tag: 'div', class: 'ric-menu__sep' },
+          { tag: 'div', class: 'ric-popup__sep' },
           ui_button({ ctx: ['設定'],         variant: 'ghost', onclick: () => { fs.last_action = '設定を開く'; } }),
         ];
         return fs.page({ ctx: [

@@ -47,8 +47,11 @@ const infer_type = (value) => {
   if (typeof value === 'boolean') return 'checkbox';
   if (typeof value === 'number')  return 'number';
   if (typeof value === 'string') {
+    // hex と rgb/rgba のみ color 判定する。ui_color は hex と rgb/rgba のみ
+    // パース対応のため、hsl(...) を color 判定すると黒 picker にフォールバックして
+    // 元値を失う。将来 ui_color が hsl に対応したら ここにも追加する。
     if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value))  return 'color';
-    if (/^(rgb|rgba|hsl|hsla)\s*\(/.test(value))      return 'color';
+    if (/^rgba?\s*\(/.test(value))                    return 'color';
     return 'text';
   }
   if (_is_plain_object(value)) return 'folder';
