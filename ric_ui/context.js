@@ -1,6 +1,6 @@
 // RicUI — Context ユーティリティ
 // theme / density / font_size の 3 キーを CSS variables 文字列に変換する。
-// surface / tone は予約語として存在するが、実装は v0.3 以降。
+// make_css_vars() が create_ui_page / create_ui_panel から呼ばれる中心関数。
 
 'use strict';
 

@@ -4,18 +4,22 @@
 // src/ricui_globals.js は require('../ric_ui') をそのまま window.RicUI に割り当てる。
 //
 // 公開カテゴリ：
+//   meta      : version
 //   layout    : create_ui_page / ui_col / ui_row
 //   surface   : ui_panel / create_ui_panel
 //   control   : ui_button / ui_input / bind_input
+//               ui_textarea / bind_textarea
 //               ui_checkbox / bind_checkbox
 //               ui_radiobutton / bind_radiobutton
 //               ui_range / bind_range
 //               ui_color / bind_color
 //               ui_select / bind_select
 //               ui_separator
+//               focus_when
 //   text      : ui_text / ui_code_pre / ui_md_pre
 //   popup     : create_ui_popup / create_ui_tooltip / create_ui_dialog / create_ui_toast
-//   composite : create_ui_accordion / create_ui_splitter / ui_tabs / bind_tabs
+//   composite : create_ui_accordion / create_ui_splitter / create_ui_scroll_pane
+//               ui_tabs / bind_tabs
 //               create_ui_tweak_panel / ui_tweak_panel / ui_tweak_folder / ui_tweak_row
 //               tweak_infer_type
 //   theme util: create_theme / create_density / create_font_size

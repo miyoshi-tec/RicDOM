@@ -12,7 +12,7 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 | バンドル | 内容 |
 |---------|------|
 | `RicDOM.min.js` | コア（必須）— Proxy リアクティビティ + JSON→DOM 差分更新 |
-| `RicUI.min.js` | UI コンポーネント集（40 公開関数、5 テーマ）+ パラメータ調整パネル |
+| `RicUI.min.js` | UI コンポーネント集（5 テーマ）+ パラメータ調整パネル |
 
 バンドルサイズは README.md を参照。
 
@@ -766,7 +766,7 @@ ui_tweak_folder({ label: 'Advanced', open: true, ctx: [...] })
 | `boolean` | checkbox |
 | `number` | number |
 | `'#e11d48'`（hex） | color |
-| `'rgb(255,0,0)'`（rgb/rgba/hsl/hsla） | color |
+| `'rgb(255,0,0)'` / `'rgba(...)'` | color |
 | `'Hello'`（その他文字列） | text |
 | `[...]`（配列） | json_preview |
 | `{ ... }`（plain object） | folder |

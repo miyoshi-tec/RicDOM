@@ -639,9 +639,6 @@ const create_RicDOM = (target, raw_state = {}) => {
   // DOM への ref 参照マップ（インスタンス固有。shared state には載せない）
   const refs_map = new Map();
 
-  // ref に紐付いた Observer のリスト（destroy() 時に解除する）
-  const ref_observers = new Set();
-
   // マウント先の DOM 要素（解決後にセットする）
   let target_el = null;
 
@@ -761,7 +758,8 @@ const create_RicDOM = (target, raw_state = {}) => {
   // ref の処理（描画後に DOM ノードへの参照を登録する）
   // ---------------------------------------------------------------
 
-  // 描画後に ref が付いたノードを refs_map に登録し、Observer を設定する
+  // 描画後に ref が付いたノードを refs_map に再登録する。
+  // render ごとに全走査するのはコスト的に許容範囲（典型的には ref 数十個以下）。
   const register_refs_from_element = (target_element) => {
     refs_map.clear();
 
@@ -874,12 +872,6 @@ const create_RicDOM = (target, raw_state = {}) => {
 
     // 以降の再描画をすべて無視するフラグを立てる（残留rAFをスキップするため）
     is_destroyed = true;
-
-    // ref_observers（将来の ref ベース Observer 用）を解除する
-    for (const observer of ref_observers) {
-      observer.disconnect();
-    }
-    ref_observers.clear();
 
     // ref の参照をクリアする
     refs_map.clear();
