@@ -180,14 +180,14 @@ create_RicDOM('#index_page', {
 
           // 💝 心（楽しい、感動、美しさ）
           ui_text({ variant: 'label', ctx: ['💝 心（楽しい、感動、美しさ）'] }),
-          ui_col({ ctx: [
+          ui_col({ style: { paddingLeft: '1.5em' }, ctx: [
             ui_text({ ctx: ['Proxy 自動追跡 — s.count = 5 で動く魔法のような直感性'] }),
             ui_text({ ctx: ['JSON で UI — { tag: \'div\', ctx: [...] } が data のまま UI になる宣言的な美しさ'] }),
           ]}),
 
           // 🔧 技（できる）
           ui_text({ variant: 'label', ctx: ['🔧 技（できる）'] }),
-          ui_col({ ctx: [
+          ui_col({ style: { paddingLeft: '1.5em' }, ctx: [
             ui_text({ ctx: ['実 DOM を直接操作 — ブラウザ機能（focus, hover, :invalid, カスタム要素）が素直に効く'] }),
             ui_text({ ctx: ['テーマ × 密度のカスタマイズ — 5 テーマ × 3 密度で業務 UI に馴染む'] }),
             ui_text({ ctx: ['Electron / ブラウザ両対応 — 社内ツール、プロトタイプ、調整 UI が作れる'] }),
@@ -195,7 +195,7 @@ create_RicDOM('#index_page', {
 
           // 💪 体（快適・軽やか）
           ui_text({ variant: 'label', ctx: ['💪 体（快適・軽やか）'] }),
-          ui_col({ ctx: [
+          ui_col({ style: { paddingLeft: '1.5em' }, ctx: [
             ui_text({ ctx: ['軽量 8KB — ロードが速い、ページが軽い'] }),
             ui_text({ ctx: ['学習コスト低 — 覚えるのは create_RicDOM だけ'] }),
             ui_text({ ctx: ['ビルド不要 — webpack / Vite の設定地獄なし'] }),
@@ -204,7 +204,11 @@ create_RicDOM('#index_page', {
           ]}),
 
           ui_text({ variant: 'muted',
-            ctx: ['🎯 得意: Electron アプリ、社内ツール、プロトタイプ、データ可視化、パラメータ調整 UI。  ❌ 苦手: 大規模 SPA、SEO 必須のマーケサイト。'],
+            ctx: ['🎯 得意: Electron アプリ、社内ツール、プロトタイプ、データ可視化、パラメータ調整 UI。'],
+            style: { fontSize: '0.85rem' },
+          }),
+          ui_text({ variant: 'muted',
+            ctx: ['❌ 苦手: 大規模 SPA、SEO 必須のマーケサイト。'],
             style: { fontSize: '0.85rem' },
           }),
         ]}),
