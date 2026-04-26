@@ -31,6 +31,13 @@
 
   <!-- 左：RicDOM のみ版 -->
   <script type="text/plain" id="src-raw">
+// ── 比較用: RicDOM のみでスプリッターを手組みした低レベル実装 ──
+// 通常は右側の RicUI 版（create_ui_splitter）を使う。
+// 直接 DOM 操作・mousemove 登録・_render_tick による手動再描画は
+// 「RicUI がドラッグ処理を裏で代行している」ことを見せるための比較。
+// _render_tick は state を一段増やすトリックで、reactive 外から再描画を
+// 起こすときの常套句（普段は state を直接更新するだけで自動再描画される）。
+
 const { create_RicDOM } = RicDOM;
 const SP_MIN = 60, SP_MAX = 480;
 const NAV_ITEMS = ['📁 プロジェクト','📄 ファイル','🔍 検索','⚙ 設定','📦 パッケージ'];

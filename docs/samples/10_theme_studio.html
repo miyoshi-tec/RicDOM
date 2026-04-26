@@ -19,7 +19,19 @@
 
 <script type="text/plain" id="src-demo">
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, create_ui_accordion, create_ui_dialog, create_ui_popup, create_ui_splitter, bind_tabs, create_ui_toast, create_ui_tooltip, create_theme, ui_tweak_panel, ui_tweak_folder, ui_tweak_row, ui_button, ui_col, ui_input, ui_panel, ui_radiobutton, ui_row, ui_select, ui_text, bind_checkbox, ui_code_pre } = RicUI;
+const {
+  // layout / surface / text
+  create_ui_page, ui_col, ui_row, ui_panel, ui_text, ui_code_pre,
+  // controls
+  ui_button, ui_input, ui_select, ui_radiobutton, bind_checkbox,
+  // popups
+  create_ui_popup, create_ui_dialog, create_ui_toast, create_ui_tooltip,
+  // composite
+  create_ui_splitter, create_ui_accordion, bind_tabs,
+  ui_tweak_panel, ui_tweak_folder, ui_tweak_row,
+  // theme
+  create_theme,
+} = RicUI;
 
 // ═══════════════════════════════════════════════════════════
 // Theme Studio — CSS 変数エディタ + UI プレビュー
@@ -56,8 +68,11 @@ const SEC_VARS = {
 // ── テーマオブジェクト直接操作 ──
 // s.page.theme を常にオブジェクトとして扱い、ui_tweak_row はそれを直接読み書きする。
 // nav_bar でプリセットが選ばれたら、create_theme(name) でオブジェクトに展開して代入。
-
-// 現在のテーマを確実にオブジェクトにする
+//
+// ⚠ 注意: _ensure_theme_obj は state を書き換えるが、これは render 中ではなく
+//   ユーザーの編集イベント（tweak row の get/set コールバック・保存ボタン）から
+//   呼ばれる **「プリセット文字列 → 編集可能オブジェクトへの遅延変換」** 専用。
+//   通常の RicDOM アプリでは render 中に state を書き換えてはいけない。
 const _ensure_theme_obj = (s) => {
   if (typeof s.page.theme === 'string') {
     s.page.theme = create_theme(s.page.theme);
@@ -344,6 +359,12 @@ const s = create_RicDOM('#mount-demo', {
 });
 </script>
 
+<!-- ════════════════════════════════════════════════════════════════
+     ここから下は docs サイト用のラッパー（デモ本体ではない）。
+     上の <script type="text/plain" id="src-demo"> を取り出して eval し、
+     #mount-demo にデモを流し込み、その下にコードペインを並べる
+     だけの薄い装置。RicDOM の学習対象ではないので読み飛ばして OK。
+     ════════════════════════════════════════════════════════════════ -->
 <script src="_nav_bar.js"></script>
 <script>
 (() => {

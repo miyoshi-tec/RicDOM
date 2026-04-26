@@ -29,9 +29,17 @@
 
 <script type="text/plain" id="src-demo">
 // ── SVG ツリーエディタ ──
-// state.tree が VDOM としてそのまま SVG に描画される。
-// ツリー操作は「不変更新」パターン: update_at(root, path, fn) で
-// path の位置のノードを fn で置き換えた新 tree を返す（top-level 代入で再描画）。
+//
+// 🎯 RicDOM の主役: state.tree と handle.render の関係。
+//   - state.tree は VDOM オブジェクトで、`{ tag: 'circle', cx: 80, ... }` 形式。
+//     これがそのまま RicDOM の差分更新エンジンを通って SVG として描画される。
+//   - 編集は **不変更新** で行う: update_at(root, path, fn) が path の位置の
+//     ノードを fn で置き換えた新 tree を返し、`s.tree = new_tree` のトップレベル
+//     代入で再描画が起きる。直接書き換えは Proxy が拾わないので NG。
+//
+// 残り（calc_bbox / ドラッグ座標計算 / SVG 属性編集 UI）は SVG 固有のロジック
+// で、RicDOM の学びからは独立。「state を不変更新して再描画」だけ追えば、
+// SVG 描画ロジックの中身は飛ばしても OK。
 
 const { create_RicDOM } = RicDOM;
 const {
@@ -529,6 +537,12 @@ handle.render = (s) => {
 };
 </script>
 
+<!-- ════════════════════════════════════════════════════════════════
+     ここから下は docs サイト用のラッパー（デモ本体ではない）。
+     上の <script type="text/plain" id="src-demo"> を取り出して eval し、
+     #mount-demo にデモを流し込み、その下にコードペインを並べる
+     だけの薄い装置。RicDOM の学習対象ではないので読み飛ばして OK。
+     ════════════════════════════════════════════════════════════════ -->
 <script src="_nav_bar.js"></script>
 <script>
 (() => {
