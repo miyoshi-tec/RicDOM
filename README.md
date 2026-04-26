@@ -450,7 +450,7 @@ return s.page({ ctx: [ s.tw() ] });
 | `number` | number input |
 | `'Hello'` | text input |
 | `'#e11d48'` | color picker（hex 検出） |
-| `'rgb(255,0,0)'` | color picker（rgb/rgba/hsl/hsla 検出） |
+| `'rgb(255,0,0)'` | color picker（rgb / rgba 検出） |
 | `{ ... }` (plain object) | folder（再帰展開） |
 | `[...]` / その他 | JSON preview |
 
@@ -555,7 +555,8 @@ const s = create_RicDOM('#app', {
   render: s => ({ tag: 'div', ctx: [`${s.count}`] }),
 });
 
-// 内部の購読解除・style タグ削除を実行
+// 購読を解除し、再描画タイマーと target 探索タイマーを停止し、refs をクリアする
+// （描画した DOM や CSS は残るため、必要なら呼び出し側で削除する）
 s._internal.destroy();
 ```
 

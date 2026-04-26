@@ -104,7 +104,7 @@ state.counter = 7;   // 両 instance が再描画される
 **戻り値** `instance_handle`:
 - state プロパティへのアクセス: `handle.count`, `handle.theme` 等
 - `handle.refs`: `Map<string, Element>` — ref で登録した DOM 要素
-- `handle._internal.destroy()`: 購読解除・style タグ削除
+- `handle._internal.destroy()`: 購読解除、再描画タイマー / target 探索タイマー停止、refs クリア（描画済み DOM や CSS は残す）
 - `handle._internal.force_render()`: 同期再描画（非推奨）
 
 **エラー時**: `NOOP_PROXY` を返す（全操作が無害に成功する Proxy）

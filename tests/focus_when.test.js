@@ -17,7 +17,13 @@ const setup_jsdom = () => {
   global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
   return dom;
 };
-const flush = () => new Promise((r) => setTimeout(r, 20)); // rAF 2 回分余裕
+// focus_when 内の 2 段ネスト rAF と同じ深さで待ち、CPU 負荷下でも確実に
+// focus コールバックが完了するようにする（固定タイムアウトだと flaky になる）。
+const flush = () => new Promise((r) =>
+  global.requestAnimationFrame(() =>
+    global.requestAnimationFrame(r)
+  )
+);
 
 describe('focus_when', () => {
 

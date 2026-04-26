@@ -228,7 +228,7 @@ const create_theme = (base = 'light', overrides = {}) => {
 //   create_ui_page({ density: my_density })
 //
 // 引数：
-//   base     : 'comfortable' | 'compact' | オブジェクト
+//   base     : 'comfortable' | 'compact' | 'tight' | オブジェクト
 //   overrides: 上書きする CSS 変数のオブジェクト（省略可）
 // ──────────────────────────────────────────────
 const create_density = (base = 'comfortable', overrides = {}) => {

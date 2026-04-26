@@ -181,7 +181,7 @@ try {
   };
 
   // ── ナビバー描画 ──
-  const nav_handle = create_RicDOM('#nav_bar', {
+  create_RicDOM('#nav_bar', {
     render(s) {
       // create_ui_page で包む（RicUI CSS が自動適用される）
       s.page ??= create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' });
