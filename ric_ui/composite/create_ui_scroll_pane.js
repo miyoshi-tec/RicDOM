@@ -20,27 +20,22 @@
 // 仕組み:
 //   - render 呼び出し時に DOM の scroll 位置を読んで「端にいるか」を判定
 //   - rAF で描画後に scrollTop を更新
-//   - data-ric-sp 属性でインスタンスを特定（クラス名は短縮の対象になるため）
+//   - data-ric-sp 属性でインスタンスを特定（ric-* クラスはビルド時に
+//     scripts/shorten_css_classes.js で短縮されるため、識別子には使えない）
 
 'use strict';
 
-// 複数インスタンス識別用のモジュールレベルカウンタ
-let _sp_count = 0;
+const { style_to_css_string } = require('../style_utils');
 
-// style オブジェクトを CSS 文字列に変換する小ヘルパ。
-// render 関数の中で毎回定義すると呼び出し回数分だけクロージャが作られるため、
-// モジュールレベルで 1 つだけ持つ。
-const _style_to_str = (s) => typeof s === 'object' && !Array.isArray(s)
-  ? Object.entries(s).map(([k, v]) =>
-      `${k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}: ${v}`).join(';')
-  : String(s || '');
+// 複数インスタンス識別用のモジュールレベルカウンタ
+let _pane_count = 0;
 
 const create_ui_scroll_pane = ({
   follow    = 'bottom',   // 'bottom' | 'top' | 'none'
   threshold = 50,
 } = {}) => {
 
-  const _id = ++_sp_count;
+  const _id = ++_pane_count;
 
   const _find_el = () =>
     (typeof document !== 'undefined')
@@ -89,7 +84,7 @@ const create_ui_scroll_pane = ({
 
     // rest.style は string / object を想定。object のときは string 化して連結する
     // （SPEC の rest スプレッド契約に沿って計算値で最終上書きする）。
-    const extra_style = rest.style ? _style_to_str(rest.style) + ';' : '';
+    const extra_style = rest.style ? style_to_css_string(rest.style) + ';' : '';
 
     return {
       ...rest,

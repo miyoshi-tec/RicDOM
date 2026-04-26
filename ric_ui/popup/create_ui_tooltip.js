@@ -16,12 +16,11 @@
 
 'use strict';
 
-const _portal = require('./_page_portal_queue');
+const _portal                        = require('./_page_portal_queue');
+const { apply_theme_to_portal }      = require('./_wrap_portal');
 const { _pos_style, _get_portal_cb } = require('./_popup_utils');
 
 const create_ui_tooltip = () => {
-  const { apply_theme_to_portal } = require('./_wrap_portal');
-
   const inst = ({ content, ctx, dir = 'auto', theme, density, font_size }) => {
     if (inst._o) {
       const portal_items = [{
@@ -37,6 +36,9 @@ const create_ui_tooltip = () => {
       onmouseenter: (e) => {
         const rect  = e.currentTarget.getBoundingClientRect();
         const cb    = _get_portal_cb(e.currentTarget);
+        // ポップアップサイズの近似値（実寸ではなく "向き決定" 用の参考寸法）。
+        // CSS の .ric-tooltip__popup と完全一致させる必要はなく、
+        // 上下左右どこに開くと収まるかの優先順位を判定できれば十分。
         const POP_H = 34, POP_W = 120, GAP = 8;
         const chosen = dir !== 'auto' ? dir
           : (rect.top    - cb.top)      >= POP_H + GAP ? 'top'

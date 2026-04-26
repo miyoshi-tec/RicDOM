@@ -7,7 +7,8 @@
 
 'use strict';
 
-const { make_css_vars } = require('../context');
+const { make_css_vars }       = require('../context');
+const { style_to_css_string } = require('../style_utils');
 
 // items: ポータルに push する VDOM 要素の配列
 // opts:  { theme, density, font_size }
@@ -24,15 +25,10 @@ const apply_theme_to_portal = (items, opts = {}) => {
     font_size: opts.font_size,
   });
 
-  // style をオブジェクト→文字列に変換するヘルパー
-  const _to_str = (s) => typeof s === 'object' && !Array.isArray(s)
-    ? Object.entries(s).map(([k, v]) => `${k.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}: ${v}`).join(';')
-    : String(s || '');
-
   // 各要素の style 先頭に CSS 変数を追加
   return items.map(item => {
     if (!item) return item;
-    const existing = item.style ? _to_str(item.style) : '';
+    const existing = item.style ? style_to_css_string(item.style) : '';
     const sep = existing ? '; ' : '';
     return { ...item, style: vars + sep + existing };
   });

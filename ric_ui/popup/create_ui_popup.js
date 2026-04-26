@@ -29,7 +29,8 @@
 
 'use strict';
 
-const _portal = require('./_page_portal_queue');
+const _portal                   = require('./_page_portal_queue');
+const { apply_theme_to_portal } = require('./_wrap_portal');
 const {
   make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others,
 } = require('./_popup_utils');
@@ -51,7 +52,6 @@ const create_ui_popup = () => {
     inst.__notify?.();
   };
 
-  const { apply_theme_to_portal } = require('./_wrap_portal');
 
   // inst(props) → VDOM
   const inst = ({ label, icon, ghost = false, ctx = [], theme, density, font_size } = {}) => {

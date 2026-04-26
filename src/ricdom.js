@@ -170,6 +170,11 @@ const DOM_PROPERTY_KEYS = new Set([
 // イベントハンドラのプレフィックス
 const is_event_handler_key = (key) => /^on[a-z]/.test(key);
 
+// VDOM ノードの「構造を表すキー」集合。
+// これらは normalize 処理が個別に処理するため、属性・プロパティ・イベントの
+// 一般ループでは無視する（apply / patch 両方のパスで共通利用）。
+const STRUCTURAL_NODE_KEYS = new Set(['node_type','tag','id','class','style','ctx','ref']);
+
 // ノードに属性・プロパティ・イベントハンドラを適用する
 const apply_attributes_to_element = (el, normalized_node) => {
   // id
@@ -196,8 +201,8 @@ const apply_attributes_to_element = (el, normalized_node) => {
 
   // その他の属性（イベント・プロパティ・HTML属性）
   for (const [key, val] of Object.entries(normalized_node)) {
-    // normalize 済みの既知キーはスキップ
-    if (['node_type','tag','id','class','style','ctx','ref'].includes(key)) continue;
+    // normalize 済みの構造キーはスキップ
+    if (STRUCTURAL_NODE_KEYS.has(key)) continue;
 
     if (is_event_handler_key(key)) {
       // イベントハンドラ：null は未設定として扱う
@@ -364,17 +369,16 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
   }
 
   // その他の属性・プロパティ・イベントハンドラの差分
-  const skip_keys = new Set(['node_type','tag','id','class','style','ctx','ref']);
-  const prev_extra = Object.fromEntries(Object.entries(prev_normalized).filter(([k]) => !skip_keys.has(k)));
-  const next_extra = Object.fromEntries(Object.entries(next_normalized).filter(([k]) => !skip_keys.has(k)));
+  const prev_extra = Object.fromEntries(Object.entries(prev_normalized).filter(([k]) => !STRUCTURAL_NODE_KEYS.has(k)));
+  const next_extra = Object.fromEntries(Object.entries(next_normalized).filter(([k]) => !STRUCTURAL_NODE_KEYS.has(k)));
 
   // 次の値を適用する
   for (const [key, val] of Object.entries(next_extra)) {
     if (is_event_handler_key(key)) {
       // イベントハンドラは差分チェックを通さず常に最新ハンドラで上書きする。
-      // is_json_equal が参照比較になったことで論理的には不要だが、
-      // 万が一同一参照が渡っても最新クロージャに差し替えが行われることを
-      // 明示的に保証するためにここで上書きする。
+      // render 関数の中で毎回 () => {...} を作るのが普通の使い方なので、
+      // 参照は毎回新しい。同一参照が渡ってきた場合でも、最新クロージャに
+      // 差し替わることを保証するため一律上書きする（性能影響は無視できる小ささ）。
       el[key] = (typeof val === 'function') ? val : null;
     } else if (!is_json_equal(prev_extra[key], val)) {
       if (DOM_PROPERTY_KEYS.has(key)) {
@@ -389,18 +393,13 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
     }
   }
 
-  // 前にあったが次にない属性を削除する
+  // 前にあったが次にない属性を削除する。
+  // DOM プロパティはデフォルト値に戻す術が型ごとに違うため、HTML 属性と同じく
+  // removeAttribute で代用する（属性 → 対応プロパティの初期化はブラウザに任せる）。
   for (const key of Object.keys(prev_extra)) {
     if (!(key in next_extra)) {
-      if (is_event_handler_key(key)) {
-        el[key] = null;
-      } else if (DOM_PROPERTY_KEYS.has(key)) {
-        // プロパティは削除ではなくデフォルト値に戻す
-        // （型に応じてデフォルト値が異なるため、removeAttribute で代用する）
-        el.removeAttribute(key);
-      } else {
-        el.removeAttribute(key);
-      }
+      if (is_event_handler_key(key)) el[key] = null;
+      else                            el.removeAttribute(key);
     }
   }
 };
@@ -702,6 +701,9 @@ const create_RicDOM = (target, raw_state = {}) => {
         if (key === 'render') return _render_fn ?? undefined;
         const val = obj[key];
         // ignore / null / プリミティブ / 配列はそのまま返す
+        // 配列を Proxy ラップしない結果、 `s.list.push(x)` のような mutation では
+        // 再描画はトリガされない。配列は置き換え（`s.list = [...s.list, x]`）で扱うこと。
+        // この制限は SPEC.md「Proxy 監視深度」にも明記されている。
         if (key === 'ignore' || val == null
             || (typeof val !== 'object' && typeof val !== 'function')
             || Array.isArray(val)) {

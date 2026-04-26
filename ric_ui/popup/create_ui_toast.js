@@ -17,7 +17,8 @@
 
 'use strict';
 
-const _portal = require('./_page_portal_queue');
+const _portal                   = require('./_page_portal_queue');
+const { apply_theme_to_portal } = require('./_wrap_portal');
 
 const create_ui_toast = () => {
 
@@ -34,8 +35,6 @@ const create_ui_toast = () => {
     item._c = true;
     inst.__notify?.();
   };
-
-  const { apply_theme_to_portal } = require('./_wrap_portal');
 
   // inst({ theme, density, font_size }) → null（ポータル登録のみ）
   // render 関数内で毎回呼ぶ: toast(); return s.page({ ... });

@@ -27,12 +27,8 @@
 
 const { make_css_vars }              = require('../context');
 const { collect_classes, build_css } = require('../css_registry');
+const { style_to_css_string }        = require('../style_utils');
 const _portal                         = require('../popup/_page_portal_queue');
-
-// style がオブジェクトなら CSS 文字列に変換する小ヘルパー
-const _style_to_str = (s) => typeof s === 'object' && !Array.isArray(s)
-  ? Object.entries(s).map(([k, v]) => `${k.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}: ${v}`).join(';')
-  : String(s || '');
 
 const create_ui_page = (initial = {}) => {
   // rest: onclick / id / data-* / aria-* 等の任意属性を透過する
@@ -64,7 +60,7 @@ const create_ui_page = (initial = {}) => {
       density:   inst.density,
       font_size: inst.font_size,
     });
-    const page_style = extra_style ? base_style + ';' + _style_to_str(extra_style) : base_style;
+    const page_style = extra_style ? base_style + ';' + style_to_css_string(extra_style) : base_style;
 
     // rest を先に展開してから、計算済みの tag/class/style/ctx で上書きする。
     // これにより onclick / id / data-* 等が DOM に透過される。
