@@ -334,7 +334,7 @@ ui_panel({ id: 'main', onmouseenter: hover, ctx: [...] }),
 | `ui_color({ value, oninput })` | カラーピッカー（hex/rgba 自動判定） |
 | `bind_color(s, key, options)` | state と双方向バインドされた color |
 | `ui_separator()` | 水平区切り線 |
-| `focus_when(el, cond)` | `cond` の立ち上がりエッジで `el.focus()`。`el` は `handle.refs.get('name')` |
+| `focus_when(el, cond)` | `cond` の立ち上がりエッジで `el.focus()`。`render(s)` の `s` には `refs` が無いため、`el` は `handle.refs.get('name')` を closure で渡す（TUTORIAL FAQ 参照） |
 
 #### Text
 
@@ -517,6 +517,10 @@ ui_tweak_panel({
 | `09_json_editor.html` | JSON エディタ |
 | `10_theme_studio.html` | テーマエディタ（CSS 変数見える化 + JSON 保存/読込） |
 | `11_theme_override.html` | テーマ上書き・全コンポーネント比較 |
+| `12_md_viewer.html` | Markdown ビューア（`ui_md_pre`） |
+| `13_controlled_dialog_splitter.html` | controlled mode（外部 state で開閉管理）|
+| `15_ai_chat.html` | AI チャット UI（自動スクロール + textarea + ストリーミング）|
+| `16_svg_editor.html` | SVG ツリーエディタ（rect / circle / path のドラッグ編集）|
 
 ローカルで確認するには、お好みの静的サーバーで `docs/` を配信してください。例:
 
