@@ -91,8 +91,8 @@ const insert_after = (root, path, new_node) => {
 };
 
 // タグ追加時のデフォルト属性。
-// g はネストで bbox / ドラッグ / 削除の扱いが一気に複雑化するため追加対象から除外する
-// （既存の tree に g が含まれていれば bbox 計算だけはサポート）。
+// g はネストで bbox / ドラッグ / 削除の扱いが一気に複雑化するため、
+// このサンプルでは扱わない（追加もできず、初期 tree にも入っていない）。
 const DEFAULT_ATTRS = {
   circle:  { cx: 60,  cy: 60,  r: 30,                 fill: '#3b82f6' },
   rect:    { x: 20,   y: 20,   width: 80, height: 50, fill: '#10b981' },
@@ -226,22 +226,6 @@ const calc_bbox = (node) => {
                  : anchor === 'end'    ? x - w
                  : x;
       return { x: left, y: top, width: w, height: h };
-    }
-    case 'g': {
-      // 子ノードの bbox を union
-      const children = Array.isArray(node.ctx) ? node.ctx : [];
-      let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
-      for (const c of children) {
-        if (!c || typeof c !== 'object') continue;
-        const bb = calc_bbox(c);
-        if (!bb) continue;
-        xmin = Math.min(xmin, bb.x);
-        ymin = Math.min(ymin, bb.y);
-        xmax = Math.max(xmax, bb.x + bb.width);
-        ymax = Math.max(ymax, bb.y + bb.height);
-      }
-      if (!Number.isFinite(xmin)) return null;
-      return { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
     }
     case 'svg': {
       // svg ルート選択時は viewBox をそのまま使う
