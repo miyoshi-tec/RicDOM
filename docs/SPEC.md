@@ -51,21 +51,23 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 
 ```
 src/
-  ricdom.js              # RicDOM コア実装（938行）
+  ricdom.js              # RicDOM コア実装
   ricdom_globals.js      # ブラウザ window 公開エントリ
   ricui_globals.js       # RicUI window 公開エントリ
+  version.js             # バージョン文字列（package.json から自動生成）
 
 ric_ui/
   index.js               # RicUI 公開 API 入口
   context.js             # テーマ CSS 変数（5テーマ × density × font_size）
   css_registry.js        # CSS クラス収集・ビルドキャッシュ
   css_templates.js       # CSS テンプレート（コンポーネント別）
+  style_utils.js         # style プロパティ → cssText 文字列変換ヘルパ
   layout/                # ui_page, ui_col, ui_row
   surface/               # ui_panel, create_ui_panel
-  control/               # ui_button, ui_input, bind_input, ui_range, bind_range, ui_color, bind_color, ui_separator, etc.
+  control/               # ui_button, ui_input, bind_input, ui_textarea, bind_textarea, ui_range, bind_range, ui_color, bind_color, ui_separator, focus_when, etc.
   text/                  # ui_text, ui_code_pre, ui_md_pre
   popup/                 # create_ui_popup, create_ui_tooltip, create_ui_dialog, create_ui_toast
-  composite/             # create_ui_accordion, create_ui_splitter, ui_tabs, bind_tabs, create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row
+  composite/             # create_ui_accordion, create_ui_splitter, create_ui_scroll_pane, ui_tabs, bind_tabs, create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row
 ```
 
 

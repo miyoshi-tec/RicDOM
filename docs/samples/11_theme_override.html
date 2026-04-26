@@ -28,7 +28,7 @@ create_RicDOM('#app', {
   teal:  create_ui_panel({ theme: 'teal',    font_size: 'lg' }),
   cyber: create_ui_panel({ theme: 'cyber',   density: 'compact' }),
   aqua:  create_ui_panel({ theme: 'aqua', disabled: true }),
-  pgCfg: create_ui_popup(),
+  pg_cfg: create_ui_popup(),
   // ポップアップ類の一部は render 内で動的に s['dd_'+id] 等として生成される
   render(s) {
     const panels = [s.light, s.dark, s.teal, s.cyber, s.aqua];
@@ -136,7 +136,7 @@ create_RicDOM('#app', {
       : ui_row({ style: { flexWrap: 'wrap', alignItems: 'flex-start' }, ctx: panels.map(theme_block) });
 
     // ── page 設定メニュー ──
-    const pgNote = `${s.page.theme} — ${s.page.density} / ${s.page.font_size}`;
+    const pg_note = `${s.page.theme} — ${s.page.density} / ${s.page.font_size}`;
 
     return s.page({ style: 'min-height:100vh; padding: 20px', ctx: [
       ui_col({ ctx: [
@@ -154,8 +154,8 @@ create_RicDOM('#app', {
             ],
             onchange: (e) => { s.wrap = e.target.value; },
           }),
-          ui_text({ variant: 'label', ctx: [`page: ${pgNote}`] }),
-          s.pgCfg({ ctx: [
+          ui_text({ variant: 'label', ctx: [`page: ${pg_note}`] }),
+          s.pg_cfg({ ctx: [
             // stopPropagation: 操作してもメニューが閉じないようにする
             { tag: 'div', onclick: (e) => e.stopPropagation(), ctx: [
               ui_col({ style: { padding: '8px', minWidth: '200px' }, ctx: [
