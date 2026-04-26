@@ -8,20 +8,40 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
   <style>
     body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
+                  border-bottom: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); }
+    .page-intro code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+                       font-family: ui-monospace, monospace; font-size: 12.5px; }
   </style>
   <script src="../RicDOM.min.js"></script>
   <script src="../RicUI.min.js"></script>
 </head>
 <body>
-
 <div id="nav_bar" data-sample="12"></div>
-<div id="mount-rui" style="flex:1;min-height:0;overflow:hidden"></div>
+<p class="page-intro">
+  <code>ui_md_pre</code> で Markdown を VDOM に変換します。外部ライブラリ不要で、
+  ヘルプ画面やチュートリアル表示に使えます。「分割方向」ラジオで、ソース／プレビューの
+  並びを <strong>左右割り</strong> ↔ <strong>上下割り</strong> に切り替えられます。
+  下ペインに実際のコードを表示しています（下部 splitter で高さ調整可）。
+</p>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
 
-<script src="_nav_bar.js"></script>
+<!--
+  デモ本体のコード。<script type="text/plain"> に置くことで
+  ブラウザには実行されず、text として取得できる。
+  末尾の "実行スクリプト" で textContent を取り出し、
+  (1) デモとして実行  (2) ui_code_pre で表示  の両方に使う。
+-->
+<script type="text/plain" id="src-demo">
+// ── ui_md_pre + 分割方向トグル デモ ──
+// orientation を radio で切り替え、左右割り / 上下割り 用の splitter を
+// それぞれ別インスタンスとして持っておく。各サイズは個別に保持される。
 
-<script>
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, create_ui_splitter, ui_md_pre, ui_panel, ui_text } = RicUI;
+const {
+  create_ui_page, create_ui_splitter,
+  ui_md_pre, ui_panel, ui_text, ui_row, bind_radiobutton,
+} = RicUI;
 
 const SAMPLE_MD = `# ui_md_pre デモ
 
@@ -62,7 +82,7 @@ create_RicDOM('#app', {
 | バンドル | サイズ | 説明 |
 |----------|:------:|------|
 | \`RicDOM.min.js\` | 8KB | コア（必須） |
-| \`RicUI.min.js\` | 54KB | UI コンポーネント集 |
+| \`RicUI.min.js\` | — | UI コンポーネント集 |
 
 ### リスト
 
@@ -75,49 +95,118 @@ create_RicDOM('#app', {
 
 *以上が ui_md_pre の対応構文です。*`;
 
-create_RicDOM('#mount-rui', {
-  md_src: SAMPLE_MD,
-  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
-  sp: create_ui_splitter({ side: 'left', size: 400, min: 250 }),
+create_RicDOM('#mount-demo', {
+  md_src:      SAMPLE_MD,
+  orientation: 'horizontal',  // 'horizontal' = 左右割り / 'vertical' = 上下割り
+  page:        create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  // 縦割り・横割りで splitter を別インスタンスとして持つことで、それぞれの
+  // 直近のサイズが個別に保持される（横は 400px、縦は 300px が初期値）
+  sp_h:        create_ui_splitter({ side: 'left', size: 400, min: 250 }),
+  sp_v:        create_ui_splitter({ side: 'top',  size: 300, min: 150 }),
 
   render(s) {
+    // ── side / main の中身は orientation 共通 ──
+    const side_pane = {
+      style: { padding: '16px', overflow: 'auto' },
+      ctx: [
+        ui_text({ variant: 'title', ctx: ['Markdown ソース'] }),
+        { tag: 'textarea', value: s.md_src,
+          style: {
+            width: '100%', height: 'calc(100% - 40px)', resize: 'none',
+            fontFamily: 'Consolas, "Source Code Pro", monospace',
+            fontSize: '13px', lineHeight: '1.5',
+            padding: '12px', border: '1px solid var(--ric-color-border)',
+            borderRadius: 'var(--ric-radius)', background: 'var(--ric-color-control)',
+            color: 'var(--ric-color-fg)', outline: 'none',
+          },
+          oninput: (e) => { s.md_src = e.target.value; },
+        },
+      ],
+    };
+    const main_pane = {
+      style: { padding: '20px', overflow: 'auto' },
+      ctx: [
+        ui_text({ variant: 'title', ctx: ['プレビュー'] }),
+        ui_panel({ ctx: [
+          ui_md_pre({ ctx: [s.md_src] }),
+        ]}),
+      ],
+    };
+
+    // ── orientation に応じて splitter インスタンスを切り替える ──
+    const splitter = s.orientation === 'vertical'
+      ? s.sp_v({ side: side_pane, main: main_pane })
+      : s.sp_h({ side: side_pane, main: main_pane });
+
     return s.page({
       style: { height: '100%', borderRadius: 0, padding: 0,
                display: 'flex', flexDirection: 'column' },
       ctx: [
-        s.sp({
-          side: {
-            style: { padding: '16px', overflowY: 'auto' },
-            ctx: [
-              ui_text({ variant: 'title', ctx: ['Markdown ソース'] }),
-              { tag: 'textarea', value: s.md_src,
-                style: {
-                  width: '100%', height: 'calc(100% - 40px)', resize: 'none',
-                  fontFamily: 'Consolas, "Source Code Pro", monospace',
-                  fontSize: '13px', lineHeight: '1.5',
-                  padding: '12px', border: '1px solid var(--ric-color-border)',
-                  borderRadius: 'var(--ric-radius)', background: 'var(--ric-color-control)',
-                  color: 'var(--ric-color-fg)', outline: 'none',
-                },
-                oninput: (e) => { s.md_src = e.target.value; },
-              },
-            ],
-          },
-          main: {
-            style: { padding: '20px', overflowY: 'auto' },
-            ctx: [
-              ui_text({ variant: 'title', ctx: ['プレビュー'] }),
-              ui_panel({ ctx: [
-                ui_md_pre({ ctx: [s.md_src] }),
-              ]}),
-            ],
-          },
+        // ── ツールバー: 縦割り / 横割り 切替 ──
+        ui_row({
+          style: { padding: '8px 16px', borderBottom: '1px solid var(--ric-color-border)',
+                   alignItems: 'center', gap: '12px' },
+          ctx: [
+            ui_text({ variant: 'label', ctx: ['分割方向'] }),
+            bind_radiobutton(s, 'orientation', {
+              options: [
+                { value: 'horizontal', label: '左右割り' },
+                { value: 'vertical',   label: '上下割り' },
+              ],
+            }),
+          ],
         }),
+        splitter,
       ],
     });
   },
 });
 </script>
 
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+
+  // デモ本体のコード（id="src-demo" の textContent）
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  // ── 外側 splitter: 上「デモ」 / 下「コード」 ──
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 280, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            // main: デモ本体のマウント先。ctx 省略で child の DOM が親 re-render でも保持される。
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            // side: ソースコード表示
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  // 外側 frame の DOM が用意されたあとでデモを実行する
+  requestAnimationFrame(() => {
+    new Function(demo_src)();
+  });
+})();
+</script>
 </body>
 </html>

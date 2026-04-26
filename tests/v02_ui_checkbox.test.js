@@ -175,9 +175,9 @@ describe('bind_checkbox: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ agreed: true }, target, s =>
-      bind_checkbox(s, 'agreed'),
-    );
+    create_RicDOM(target, { agreed: true,
+      render: s => bind_checkbox(s, 'agreed'),
+    });
 
     assert.equal(target.querySelector('input[type="checkbox"]').checked, true);
   });
@@ -187,9 +187,9 @@ describe('bind_checkbox: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ agreed: false }, target, s =>
-      bind_checkbox(s, 'agreed'),
-    );
+    create_RicDOM(target, { agreed: false,
+      render: s => bind_checkbox(s, 'agreed'),
+    });
 
     assert.equal(target.querySelector('input[type="checkbox"]').checked, false);
   });
@@ -199,9 +199,9 @@ describe('bind_checkbox: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ ok: false }, target, s =>
-      bind_checkbox(s, 'ok', { ctx: ['利用規約に同意する'] }),
-    );
+    create_RicDOM(target, { ok: false,
+      render: s => bind_checkbox(s, 'ok', { ctx: ['利用規約に同意する'] }),
+    });
 
     const span = target.querySelector('span');
     assert.ok(span, 'span が存在する');
@@ -213,9 +213,9 @@ describe('bind_checkbox: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ flag: false }, target, s =>
-      bind_checkbox(s, 'flag'),
-    );
+    create_RicDOM(target, { flag: false,
+      render: s => bind_checkbox(s, 'flag'),
+    });
 
     assert.equal(target.querySelector('span'), null);
   });
@@ -228,9 +228,9 @@ describe('bind_checkbox: 双方向バインド', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM({ agreed: false }, target, s =>
-      bind_checkbox(s, 'agreed'),
-    );
+    const panel = create_RicDOM(target, { agreed: false,
+      render: s => bind_checkbox(s, 'agreed'),
+    });
 
     const el = target.querySelector('input[type="checkbox"]');
     el.checked = true;
@@ -246,9 +246,9 @@ describe('bind_checkbox: 双方向バインド', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM({ agreed: true }, target, s =>
-      bind_checkbox(s, 'agreed'),
-    );
+    const panel = create_RicDOM(target, { agreed: true,
+      render: s => bind_checkbox(s, 'agreed'),
+    });
 
     const el = target.querySelector('input[type="checkbox"]');
     el.checked = false;
@@ -264,9 +264,9 @@ describe('bind_checkbox: 双方向バインド', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM({ agreed: false }, target, s =>
-      bind_checkbox(s, 'agreed'),
-    );
+    const panel = create_RicDOM(target, { agreed: false,
+      render: s => bind_checkbox(s, 'agreed'),
+    });
 
     panel.agreed = true;
     await flush_raf();
@@ -282,9 +282,9 @@ describe('bind_checkbox: truthy/falsy 変換', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ count: 1 }, target, s =>
-      bind_checkbox(s, 'count'),
-    );
+    create_RicDOM(target, { count: 1,
+      render: s => bind_checkbox(s, 'count'),
+    });
 
     assert.equal(target.querySelector('input[type="checkbox"]').checked, true);
   });
@@ -294,9 +294,9 @@ describe('bind_checkbox: truthy/falsy 変換', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ val: null }, target, s =>
-      bind_checkbox(s, 'val'),
-    );
+    create_RicDOM(target, { val: null,
+      render: s => bind_checkbox(s, 'val'),
+    });
 
     assert.equal(target.querySelector('input[type="checkbox"]').checked, false);
   });

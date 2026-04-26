@@ -3,23 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <title>ui_panel テーマ上書きデモ</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
 </head>
 <body>
 <div id="nav_bar" data-sample="11"></div>
-<div id="app"></div>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
 
-<script src="../RicDOM.min.js"></script>
-<script src="../RicUI.min.js"></script>
-<script src="_nav_bar.js"></script>
-<script>
+<script type="text/plain" id="src-demo">
 const { create_RicDOM } = RicDOM;
 const { create_ui_page, create_ui_popup, create_ui_tooltip, create_ui_panel, create_ui_dialog, ui_button, ui_col, ui_input, ui_panel, ui_radiobutton, ui_row, ui_select, ui_text, ui_checkbox } = RicUI;
 
-create_RicDOM('#app', {
+create_RicDOM('#mount-demo', {
   wrap: 'row',
   // ── page / panel ファクトリ（設定を自身で持つ、s 不要） ──
   page:  create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
@@ -28,7 +30,7 @@ create_RicDOM('#app', {
   teal:  create_ui_panel({ theme: 'teal',    font_size: 'lg' }),
   cyber: create_ui_panel({ theme: 'cyber',   density: 'compact' }),
   aqua:  create_ui_panel({ theme: 'aqua', disabled: true }),
-  pgCfg: create_ui_popup(),
+  pg_cfg: create_ui_popup(),
   // ポップアップ類の一部は render 内で動的に s['dd_'+id] 等として生成される
   render(s) {
     const panels = [s.light, s.dark, s.teal, s.cyber, s.aqua];
@@ -136,7 +138,7 @@ create_RicDOM('#app', {
       : ui_row({ style: { flexWrap: 'wrap', alignItems: 'flex-start' }, ctx: panels.map(theme_block) });
 
     // ── page 設定メニュー ──
-    const pgNote = `${s.page.theme} — ${s.page.density} / ${s.page.font_size}`;
+    const pg_note = `${s.page.theme} — ${s.page.density} / ${s.page.font_size}`;
 
     return s.page({ style: 'min-height:100vh; padding: 20px', ctx: [
       ui_col({ ctx: [
@@ -154,8 +156,8 @@ create_RicDOM('#app', {
             ],
             onchange: (e) => { s.wrap = e.target.value; },
           }),
-          ui_text({ variant: 'label', ctx: [`page: ${pgNote}`] }),
-          s.pgCfg({ ctx: [
+          ui_text({ variant: 'label', ctx: [`page: ${pg_note}`] }),
+          s.pg_cfg({ ctx: [
             // stopPropagation: 操作してもメニューが閉じないようにする
             { tag: 'div', onclick: (e) => e.stopPropagation(), ctx: [
               ui_col({ style: { padding: '8px', minWidth: '200px' }, ctx: [
@@ -186,6 +188,48 @@ create_RicDOM('#app', {
     ]});
   },
 });
+</script>
+
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  // ── 外側 splitter: 上「デモ」 / 下「コード」 ──
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 280, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%;overflow:auto' }] },
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => {
+    new Function(demo_src)();
+  });
+})();
 </script>
 </body>
 </html>

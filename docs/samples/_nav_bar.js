@@ -37,12 +37,16 @@ try {
     { no: '04', file: '04_accordion_dialog.html', title: 'ダイアログ & トースト' },
     { no: '05', file: '05_toast_accordion.html',  title: 'アコーディオン' },
     { no: '06', file: '06_splitter.html',         title: 'スプリッター' },
-    { no: '07', file: '07_tweak_splitter.html',   title: 'Tweak Panel + Splitter' },
-    { no: '08', file: '08_tweak_menu.html',       title: 'Tweak Panel + Menu' },
+    { no: '07', file: '07_tweak_splitter.html',   title: 'Tweak Panel + スプリッター' },
+    { no: '08', file: '08_tweak_menu.html',       title: 'Tweak Panel + メニュー' },
     { no: '09', file: '09_json_editor.html',      title: 'JSON エディタ' },
     { no: '10', file: '10_theme_studio.html',     title: 'Theme Studio' },
     { no: '11', file: '11_theme_override.html',   title: 'テーマ上書き' },
     { no: '12', file: '12_md_viewer.html',        title: 'Markdown ビューア' },
+    { no: '13', file: '13_controlled_dialog_splitter.html', title: 'Controlled Mode' },
+    // 14 は欠番（旧 "Chat UI" は 15 "AI Chat" に完全に包含されたため削除）
+    { no: '15', file: '15_ai_chat.html',           title: 'AI Chat (live)' },
+    { no: '16', file: '16_svg_editor.html',        title: 'SVG ツリーエディタ' },
   ];
 
   // ── 現在のページ検出 ──

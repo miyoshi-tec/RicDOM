@@ -170,6 +170,11 @@ const DOM_PROPERTY_KEYS = new Set([
 // イベントハンドラのプレフィックス
 const is_event_handler_key = (key) => /^on[a-z]/.test(key);
 
+// VDOM ノードの「構造を表すキー」集合。
+// これらは normalize 処理が個別に処理するため、属性・プロパティ・イベントの
+// 一般ループでは無視する（apply / patch 両方のパスで共通利用）。
+const STRUCTURAL_NODE_KEYS = new Set(['node_type','tag','id','class','style','ctx','ref']);
+
 // ノードに属性・プロパティ・イベントハンドラを適用する
 const apply_attributes_to_element = (el, normalized_node) => {
   // id
@@ -196,8 +201,8 @@ const apply_attributes_to_element = (el, normalized_node) => {
 
   // その他の属性（イベント・プロパティ・HTML属性）
   for (const [key, val] of Object.entries(normalized_node)) {
-    // normalize 済みの既知キーはスキップ
-    if (['node_type','tag','id','class','style','ctx','ref'].includes(key)) continue;
+    // normalize 済みの構造キーはスキップ
+    if (STRUCTURAL_NODE_KEYS.has(key)) continue;
 
     if (is_event_handler_key(key)) {
       // イベントハンドラ：null は未設定として扱う
@@ -364,17 +369,16 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
   }
 
   // その他の属性・プロパティ・イベントハンドラの差分
-  const skip_keys = new Set(['node_type','tag','id','class','style','ctx','ref']);
-  const prev_extra = Object.fromEntries(Object.entries(prev_normalized).filter(([k]) => !skip_keys.has(k)));
-  const next_extra = Object.fromEntries(Object.entries(next_normalized).filter(([k]) => !skip_keys.has(k)));
+  const prev_extra = Object.fromEntries(Object.entries(prev_normalized).filter(([k]) => !STRUCTURAL_NODE_KEYS.has(k)));
+  const next_extra = Object.fromEntries(Object.entries(next_normalized).filter(([k]) => !STRUCTURAL_NODE_KEYS.has(k)));
 
   // 次の値を適用する
   for (const [key, val] of Object.entries(next_extra)) {
     if (is_event_handler_key(key)) {
       // イベントハンドラは差分チェックを通さず常に最新ハンドラで上書きする。
-      // is_json_equal が参照比較になったことで論理的には不要だが、
-      // 万が一同一参照が渡っても最新クロージャに差し替えが行われることを
-      // 明示的に保証するためにここで上書きする。
+      // render 関数の中で毎回 () => {...} を作るのが普通の使い方なので、
+      // 参照は毎回新しい。同一参照が渡ってきた場合でも、最新クロージャに
+      // 差し替わることを保証するため一律上書きする（性能影響は無視できる小ささ）。
       el[key] = (typeof val === 'function') ? val : null;
     } else if (!is_json_equal(prev_extra[key], val)) {
       if (DOM_PROPERTY_KEYS.has(key)) {
@@ -389,18 +393,13 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
     }
   }
 
-  // 前にあったが次にない属性を削除する
+  // 前にあったが次にない属性を削除する。
+  // DOM プロパティはデフォルト値に戻す術が型ごとに違うため、HTML 属性と同じく
+  // removeAttribute で代用する（属性 → 対応プロパティの初期化はブラウザに任せる）。
   for (const key of Object.keys(prev_extra)) {
     if (!(key in next_extra)) {
-      if (is_event_handler_key(key)) {
-        el[key] = null;
-      } else if (DOM_PROPERTY_KEYS.has(key)) {
-        // プロパティは削除ではなくデフォルト値に戻す
-        // （型に応じてデフォルト値が異なるため、removeAttribute で代用する）
-        el.removeAttribute(key);
-      } else {
-        el.removeAttribute(key);
-      }
+      if (is_event_handler_key(key)) el[key] = null;
+      else                            el.removeAttribute(key);
     }
   }
 };
@@ -575,42 +574,42 @@ const resolve_target_element = (target) => {
 // create_RicDOM：メインのファクトリ関数
 // =====================================================================
 
-const create_RicDOM = (...args) => {
+const create_RicDOM = (target, raw_state = {}) => {
 
   // ── 引数の正規化 ─────────────────────────────────────────
-  // 新 API: create_RicDOM(target, state)
-  //   target が string or DOM → 新 API
-  //   state.render があれば描画関数として使用
+  // API: create_RicDOM(target, state_with_render)
+  //   target: CSS セレクタ文字列 or DOM 要素
+  //   state_with_render: 初期 state。render: (s) => VDOM を含めると描画関数として使われる
+  //   render 後付け: handle.render = fn（per-instance）
   //
-  // 旧 API（後方互換）: create_RicDOM(state, target, render_fn?)
-  //   第1引数が object → 旧 API
-  let raw_state, target, render_fn;
-
-  if (typeof args[0] === 'string' || (typeof HTMLElement !== 'undefined' && args[0] instanceof HTMLElement)) {
-    // 新 API: create_RicDOM(target, state)
-    target    = args[0];
-    raw_state = args[1] ?? {};
-    render_fn = raw_state.render;
-    // render は state のプロパティだが、raw_state からは削除しない
-    // （s.render の get/set trap で管理するため）
-  } else {
-    // 旧 API: create_RicDOM(state, target, render_fn?)
-    raw_state = args[0];
-    target    = args[1];
-    render_fn = args[2];
+  // 第 1 引数が object だった過去の 3 引数 form（create_RicDOM(state, target, render)）
+  // は v0.3.3 で削除した。複数 instance + 共有 state + 独立 render は、
+  // 2 引数 form + handle.render = fn で同じことが書ける。
+  if (typeof target !== 'string'
+      && !(typeof HTMLElement !== 'undefined' && target instanceof HTMLElement)) {
+    console.error(
+      'RicDOM: 第 1 引数は CSS セレクタ文字列または DOM 要素です。\n' +
+      '✅ 正しい例: create_RicDOM(\'#app\', { count: 0, render: s => ({ tag: \'div\', ctx: [s.count] }) })\n' +
+      '⚠️ 旧 3 引数形式 create_RicDOM(state, target, render) は v0.3.3 で削除されました。',
+    );
+    return NOOP_PROXY;
   }
+
+  const render_fn = raw_state.render;
+  // render は state のプロパティだが、raw_state からは削除しない
+  // （s.render の get/set trap で管理するため）
 
   // render_fn のバリデーション
   if (render_fn !== undefined && render_fn !== null && typeof render_fn !== 'function') {
     console.error(
       'RicDOM: render が関数ではありません。\n' +
       '✅ 正しい例: create_RicDOM(\'#app\', { count: 0, render: s => ({ tag: \'div\', ctx: [s.count] }) })\n' +
-      '✅ 省略も可: create_RicDOM(\'#app\', { count: 0 }) → s.render = fn で後設定',
+      '✅ 省略も可: create_RicDOM(\'#app\', { count: 0 }) → handle.render = fn で後設定',
     );
     return NOOP_PROXY;
   }
 
-  // render_fn 省略時は null。s.render = fn で設定するまで描画しない。
+  // render_fn 省略時は null。handle.render = fn で設定するまで描画しない。
   let _render_fn = typeof render_fn === 'function' ? render_fn : null;
   const _render_fn_provided = _render_fn !== null;
 
@@ -638,9 +637,6 @@ const create_RicDOM = (...args) => {
 
   // DOM への ref 参照マップ（インスタンス固有。shared state には載せない）
   const refs_map = new Map();
-
-  // ref に紐付いた Observer のリスト（destroy() 時に解除する）
-  const ref_observers = new Set();
 
   // マウント先の DOM 要素（解決後にセットする）
   let target_el = null;
@@ -705,6 +701,9 @@ const create_RicDOM = (...args) => {
         if (key === 'render') return _render_fn ?? undefined;
         const val = obj[key];
         // ignore / null / プリミティブ / 配列はそのまま返す
+        // 配列を Proxy ラップしない結果、 `s.list.push(x)` のような mutation では
+        // 再描画はトリガされない。配列は置き換え（`s.list = [...s.list, x]`）で扱うこと。
+        // この制限は SPEC.md「Proxy 監視深度」にも明記されている。
         if (key === 'ignore' || val == null
             || (typeof val !== 'object' && typeof val !== 'function')
             || Array.isArray(val)) {
@@ -714,10 +713,16 @@ const create_RicDOM = (...args) => {
         return _wrap_child(val);
       },
       set(obj, key, value) {
-        // s.render = fn で描画関数を差し替え → 再描画トリガー
+        // s.render = fn（render 関数内から shared_proxy 経由）で描画関数を差し替え。
         // s.page = ... 等の代入で既に rAF がスケジュール済みの場合、
         // rAF コールバックは同期コード完了後に走るため、
         // この時点で _render_fn を設定しておけば rAF 内の do_render で使われる。
+        //
+        // 注意: shared_proxy はキャッシュ（state_proxy_map）で複数 instance 間で共有されるが、
+        // この `_render_fn` は **最初の create_RicDOM 呼び出しのクロージャ変数**。
+        // そのため shared_proxy.render = fn は「最初の instance の render のみ」を変更する。
+        // 複数 instance で異なる render を使いたい場合は `handle.render = fn` を使うこと
+        // （instance_handle 側の set トラップで per-instance に処理される）。
         if (key === 'render' && typeof value === 'function') {
           _render_fn = value;
           // target 解決済みなら同期で初回描画（FOUC 防止）
@@ -755,7 +760,8 @@ const create_RicDOM = (...args) => {
   // ref の処理（描画後に DOM ノードへの参照を登録する）
   // ---------------------------------------------------------------
 
-  // 描画後に ref が付いたノードを refs_map に登録し、Observer を設定する
+  // 描画後に ref が付いたノードを refs_map に再登録する。
+  // render ごとに全走査するのはコスト的に許容範囲（典型的には ref 数十個以下）。
   const register_refs_from_element = (target_element) => {
     refs_map.clear();
 
@@ -869,12 +875,6 @@ const create_RicDOM = (...args) => {
     // 以降の再描画をすべて無視するフラグを立てる（残留rAFをスキップするため）
     is_destroyed = true;
 
-    // ref_observers（将来の ref ベース Observer 用）を解除する
-    for (const observer of ref_observers) {
-      observer.disconnect();
-    }
-    ref_observers.clear();
-
     // ref の参照をクリアする
     refs_map.clear();
   };
@@ -900,7 +900,18 @@ const create_RicDOM = (...args) => {
       return shared_proxy[key]; // それ以外は共有Proxy に委譲
     },
     set(_, key, value) {
-      shared_proxy[key] = value; // 共有Proxy の set トラップを経由 → 全員再描画
+      // render の代入は per-instance で処理する。
+      // shared_proxy.render = fn は最初の create_RicDOM のクロージャの _render_fn を
+      // 書き換えるため、複数 instance が同じ raw_state を共有するときに
+      // handle.render = fn_B が handle.render = fn_A を上書きしてしまう問題があった。
+      // instance_handle で受け止めれば、自分の _render_fn クロージャに書ける。
+      if (key === 'render' && typeof value === 'function') {
+        _render_fn = value;
+        if (target_el) do_render();   // 同期描画（shared_proxy.render = fn と同じ挙動）
+        else schedule_render();       // target 解決前なら rAF に任せる
+        return true;
+      }
+      shared_proxy[key] = value; // それ以外は共有Proxy 経由 → 全 instance 再描画
       return true;
     },
     deleteProperty(_, key) {
@@ -916,9 +927,11 @@ const create_RicDOM = (...args) => {
 // エクスポート
 // =====================================================================
 
+const version = require('./version');
+
 // CommonJS 形式でエクスポートする（Node.js / Electron 対象）
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { create_RicDOM, NOOP_PROXY };
+  module.exports = { create_RicDOM, NOOP_PROXY, version };
 
   // テスト環境でのみ純粋関数を公開する（NODE_ENV=test のときだけ使える）
   // プロダクションコードからは直接参照しないこと

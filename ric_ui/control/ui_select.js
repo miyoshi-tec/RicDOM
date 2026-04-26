@@ -47,12 +47,14 @@ const ui_select = ({
     }),
   ].filter(Boolean);
 
+  // rest スプレッド契約: ...rest を先頭に置き、算出値（tag/class/onchange/
+  // disabled/ctx）で上書きする。rest.class は基底クラスに連結する。
   return {
+    ...rest,
     tag:   'select',
     class: rest.class ? 'ric-select ' + rest.class : 'ric-select',
     ...(onchange ? { onchange }       : {}),
     ...(disabled ? { disabled: true } : {}),
-    ...rest,
     ctx: option_nodes,
   };
 };

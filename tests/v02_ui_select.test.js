@@ -159,9 +159,9 @@ describe('bind_select: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ role: 'editor' }, target, s =>
-      bind_select(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
-    );
+    create_RicDOM(target, { role: 'editor',
+      render: s => bind_select(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
+    });
 
     const sel = target.querySelector('select');
     assert.ok(sel, 'select 要素が存在する');
@@ -176,9 +176,9 @@ describe('bind_select: 双方向バインド', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM({ role: 'viewer' }, target, s =>
-      bind_select(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
-    );
+    const panel = create_RicDOM(target, { role: 'viewer',
+      render: s => bind_select(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
+    });
 
     const sel = target.querySelector('select');
     sel.value = 'admin';
@@ -193,9 +193,9 @@ describe('bind_select: 双方向バインド', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM({ role: 'viewer' }, target, s =>
-      bind_select(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
-    );
+    const panel = create_RicDOM(target, { role: 'viewer',
+      render: s => bind_select(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
+    });
 
     panel.role = 'admin';
     await flush_raf();

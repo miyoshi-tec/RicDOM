@@ -33,9 +33,6 @@
 
 'use strict';
 
-// インスタンスごとにユニークな ref 名を生成するためのモジュールレベルカウンタ
-let _sp_count = 0;
-
 const create_ui_splitter = ({
   side        = 'left',  // 'left' | 'right' | 'top' | 'bottom'
   size        = 240,
@@ -43,10 +40,6 @@ const create_ui_splitter = ({
   max         = null,
   collapsible = true,
 } = {}) => {
-
-  const _id       = ++_sp_count;
-  const _ref_side = 'sp_side_' + _id; // サイドパネルの ref 名
-  const _ref_div  = 'sp_div_'  + _id; // 仕切り線の ref 名
 
   // 水平分割 (left/right) か垂直分割 (top/bottom) か
   const _is_h = (side === 'left' || side === 'right');
@@ -152,7 +145,6 @@ const create_ui_splitter = ({
     // 意図しない flex-basis 変化でアニメーションが走るのを防ぐため）。
     const side_panel = {
       tag:   'div',
-      ref:   _ref_side,
       class: 'ric-splitter__side'
            + (inst._cl ? ' ric-splitter__side--collapsed' : ''),
       style: 'flex-shrink:0;flex-basis:' + (inst._cl ? 0 : inst._sz) + 'px'
@@ -166,7 +158,6 @@ const create_ui_splitter = ({
     // onclick: 折り畳み中のみ展開（ドラッグ操作と競合しないよう mousedown とは分離）
     const divider = {
       tag:         'div',
-      ref:         _ref_div,
       class:       'ric-splitter__divider',
       onmousedown: _on_mouse_down,
       // 折り畳み中のみ有効。折り畳みボタン由来のバブルはスキップ（二重トグル防止）

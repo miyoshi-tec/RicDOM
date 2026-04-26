@@ -7,17 +7,8 @@
 
 'use strict';
 
-const { make_css_vars } = require('../context');
-
-// style オブジェクトを cssText 文字列に変換するヘルパー
-// camelCase キーを kebab-case に変換する
-const _style_to_string = (obj) => {
-  if (typeof obj === 'string') return obj;
-  if (!obj || typeof obj !== 'object') return '';
-  return Object.entries(obj)
-    .map(([k, v]) => `${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}: ${v}`)
-    .join('; ');
-};
+const { make_css_vars }       = require('../context');
+const { style_to_css_string } = require('../style_utils');
 
 const ui_panel = ({ ctx = [], layout = 'col', style = {},
                     theme, density, font_size, disabled = false,
@@ -38,7 +29,7 @@ const ui_panel = ({ ctx = [], layout = 'col', style = {},
   // スタイルを組み立て（テーマ上書き + ユーザー style + disabled）
   const parts = [
     has_override ? make_css_vars({ theme, density, font_size }) : '',
-    has_style    ? _style_to_string(style) : '',
+    has_style    ? style_to_css_string(style) : '',
     disabled_css,
   ].filter(Boolean);
 

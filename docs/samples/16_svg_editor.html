@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVG Tree Editor — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
+                  border-bottom: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); }
+    .page-intro code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+                       font-family: ui-monospace, monospace; font-size: 12.5px; }
+  </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+<div id="nav_bar" data-sample="16"></div>
+<p class="page-intro">
+  <strong>SVG ツリーエディタ</strong>。左のツリーでノードを選び、下の属性パネルで
+  値を編集するとリアルタイムで右の SVG が更新されます。「追加」モードで
+  新しいノードを挿入することもできます。state の VDOM オブジェクトがそのまま
+  SVG として描画される流れを確かめられます。
+  下ペインに実際のコードを表示しています。
+</p>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<script type="text/plain" id="src-demo">
+// ── SVG ツリーエディタ ──
+// state.tree が VDOM としてそのまま SVG に描画される。
+// ツリー操作は「不変更新」パターン: update_at(root, path, fn) で
+// path の位置のノードを fn で置き換えた新 tree を返す（top-level 代入で再描画）。
+
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_splitter,
+  ui_panel, ui_row, ui_col, ui_text, ui_button,
+  ui_input, bind_radiobutton,
+} = RicUI;
+
+// ── ツリー操作ヘルパ ──
+// path = [i1, i2, ...] は root.ctx[i1].ctx[i2]... の位置。[] は root 自身。
+
+const get_at = (root, path) =>
+  path.reduce((node, i) => node.ctx[i], root);
+
+const update_at = (root, path, fn) => {
+  if (path.length === 0) return fn(root);
+  return {
+    ...root,
+    ctx: root.ctx.map((c, i) =>
+      i === path[0] && c && typeof c === 'object'
+        ? update_at(c, path.slice(1), fn)
+        : c),
+  };
+};
+
+const remove_at = (root, path) => {
+  if (path.length === 0) return root; // ルートは削除不可
+  const parent_path = path.slice(0, -1);
+  const idx         = path[path.length - 1];
+  return update_at(root, parent_path, parent => ({
+    ...parent,
+    ctx: parent.ctx.filter((_, i) => i !== idx),
+  }));
+};
+
+// 選択中ノードの「直後」に新ノードを挿入して、挿入後の path を返す。
+// root (path=[]) のときは root の末尾に追加する（root の "後ろ" は子として末尾）。
+const insert_after = (root, path, new_node) => {
+  if (path.length === 0) {
+    const children = root.ctx || [];
+    return {
+      tree: { ...root, ctx: [...children, new_node] },
+      new_path: [children.length],
+    };
+  }
+  const parent_path = path.slice(0, -1);
+  const idx         = path[path.length - 1];
+  const tree = update_at(root, parent_path, parent => ({
+    ...parent,
+    ctx: [
+      ...parent.ctx.slice(0, idx + 1),
+      new_node,
+      ...parent.ctx.slice(idx + 1),
+    ],
+  }));
+  return { tree, new_path: [...parent_path, idx + 1] };
+};
+
+// タグ追加時のデフォルト属性。
+// g はネストで bbox / ドラッグ / 削除の扱いが一気に複雑化するため、
+// このサンプルでは扱わない（追加もできず、初期 tree にも入っていない）。
+const DEFAULT_ATTRS = {
+  circle:  { cx: 60,  cy: 60,  r: 30,                 fill: '#3b82f6' },
+  rect:    { x: 20,   y: 20,   width: 80, height: 50, fill: '#10b981' },
+  line:    { x1: 10,  y1: 10,  x2: 120, y2: 80,       stroke: '#111', 'stroke-width': 2 },
+  ellipse: { cx: 70,  cy: 50,  rx: 50, ry: 25,        fill: '#f59e0b' },
+  polygon: { points: '50,10 90,80 10,80',             fill: '#8b5cf6' },
+  text:    { x: 50,   y: 50,   fill: '#111', 'font-size': 16, ctx: ['Text'] },
+};
+const ADD_TAGS = Object.keys(DEFAULT_ATTRS);
+
+// ── ドラッグ確定時に位置属性を整数に丸める ──
+// ドラッグ中は round2 で滑らかに動かし、mouseup で Math.round に切り替える。
+// 属性パネルの数字が 94.78 のような小数で残らないため、読みやすさが上がる。
+const round_positions = (node) => {
+  const POS_ATTRS = {
+    circle:  ['cx', 'cy'],
+    ellipse: ['cx', 'cy'],
+    rect:    ['x', 'y'],
+    text:    ['x', 'y'],
+    line:    ['x1', 'y1', 'x2', 'y2'],
+  };
+  const keys = POS_ATTRS[node.tag];
+  if (keys) {
+    const patch = {};
+    for (const k of keys) {
+      if (k in node) patch[k] = Math.round(+node[k] || 0);
+    }
+    return { ...node, ...patch };
+  }
+  if (node.tag === 'polygon') {
+    const nums = String(node.points || '').trim().split(/[\s,]+/).map(parseFloat);
+    const rounded = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      rounded.push(Math.round(nums[i]) + ',' + Math.round(nums[i + 1]));
+    }
+    return { ...node, points: rounded.join(' ') };
+  }
+  return node;
+};
+
+// ── ドラッグで位置属性を dx / dy シフト ──
+// start_node = ドラッグ開始時点のノードのスナップショット（累積誤差を防ぐ）。
+// 現在のノード (current) は他の属性が編集されているかもしれないので、
+// 位置属性だけ start からの delta で書き換えて current の他属性は維持。
+// 数値は小数 2 桁に丸めて無限小数の散らかりを防ぐ。
+const round2 = (v) => Math.round(v * 100) / 100;
+
+const apply_move = (current, start, dx, dy) => {
+  switch (start.tag) {
+    case 'circle':
+    case 'ellipse':
+      return { ...current,
+        cx: round2((+start.cx || 0) + dx),
+        cy: round2((+start.cy || 0) + dy),
+      };
+    case 'rect':
+    case 'text':
+      return { ...current,
+        x: round2((+start.x || 0) + dx),
+        y: round2((+start.y || 0) + dy),
+      };
+    case 'line':
+      return { ...current,
+        x1: round2((+start.x1 || 0) + dx),
+        y1: round2((+start.y1 || 0) + dy),
+        x2: round2((+start.x2 || 0) + dx),
+        y2: round2((+start.y2 || 0) + dy),
+      };
+    case 'polygon': {
+      const nums = String(start.points || '').trim().split(/[\s,]+/).map(parseFloat);
+      const moved = [];
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        moved.push(round2(nums[i] + dx) + ',' + round2(nums[i + 1] + dy));
+      }
+      return { ...current, points: moved.join(' ') };
+    }
+    default:
+      // g / svg などは移動非対応
+      return current;
+  }
+};
+
+// ── 選択中ノードのバウンディングボックスを属性から計算 ──
+// returns { x, y, width, height } または null（計測不能）
+// transform 属性は今回スコープ外（シンプルなサンプル用の近似）。
+const calc_bbox = (node) => {
+  if (!node) return null;
+  switch (node.tag) {
+    case 'circle': {
+      const cx = +node.cx || 0, cy = +node.cy || 0, r = +node.r || 0;
+      return { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r };
+    }
+    case 'rect':
+      return { x: +node.x || 0, y: +node.y || 0,
+               width: +node.width || 0, height: +node.height || 0 };
+    case 'ellipse': {
+      const cx = +node.cx || 0, cy = +node.cy || 0,
+            rx = +node.rx || 0, ry = +node.ry || 0;
+      return { x: cx - rx, y: cy - ry, width: 2 * rx, height: 2 * ry };
+    }
+    case 'line': {
+      const x1 = +node.x1 || 0, y1 = +node.y1 || 0,
+            x2 = +node.x2 || 0, y2 = +node.y2 || 0;
+      return { x: Math.min(x1, x2), y: Math.min(y1, y2),
+               width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+    }
+    case 'polygon': {
+      const nums = String(node.points || '').trim().split(/[\s,]+/).map(parseFloat);
+      if (nums.length < 2) return null;
+      let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        const x = nums[i], y = nums[i + 1];
+        if (Number.isFinite(x)) { xmin = Math.min(xmin, x); xmax = Math.max(xmax, x); }
+        if (Number.isFinite(y)) { ymin = Math.min(ymin, y); ymax = Math.max(ymax, y); }
+      }
+      if (!Number.isFinite(xmin)) return null;
+      return { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
+    }
+    case 'text': {
+      // text の正確な幅は DOM 計測が必要。ここでは font-size と文字数から粗く推定する。
+      const x = +node.x || 0, y = +node.y || 0;
+      const fs = +node['font-size'] || 16;
+      const str = Array.isArray(node.ctx) && typeof node.ctx[0] === 'string' ? node.ctx[0] : '';
+      const w = Math.max(8, str.length * fs * 0.6);
+      const h = fs * 1.2;
+      // text の (x, y) はベースライン基準。ざっくり y - fs を top に。
+      const top = y - fs;
+      // text-anchor で x 起点が変わる: start(左)/middle(中央)/end(右)
+      const anchor = node['text-anchor'];
+      const left = anchor === 'middle' ? x - w / 2
+                 : anchor === 'end'    ? x - w
+                 : x;
+      return { x: left, y: top, width: w, height: h };
+    }
+    case 'svg': {
+      // svg ルート選択時は viewBox をそのまま使う
+      const vb = String(node.viewBox || '').trim().split(/[\s,]+/).map(parseFloat);
+      if (vb.length === 4 && vb.every(Number.isFinite)) {
+        return { x: vb[0], y: vb[1], width: vb[2], height: vb[3] };
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
+};
+
+// ── state ──
+const handle = create_RicDOM('#mount-demo', {
+  ui: {
+    selected_path: [0],    // 初期選択: 最初の子
+    add_tag:       'circle',
+  },
+  tree: {
+    tag: 'svg', viewBox: '0 0 300 200',
+    width: '100%', height: '100%',
+    style: 'display:block;max-width:100%;max-height:100%',
+    ctx: [
+      { tag: 'circle', cx: 80,  cy: 100, r: 40, fill: '#3b82f6' },
+      { tag: 'rect',   x: 160,  y: 50, width: 100, height: 100,
+                       fill: '#10b981', rx: 8 },
+      { tag: 'text',   x: 150,  y: 30,
+                       'text-anchor': 'middle', fill: '#111',
+                       'font-size': 16, ctx: ['Hello SVG'] },
+    ],
+  },
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  sp:   create_ui_splitter({ side: 'left', size: 380, min: 260, collapsible: true }),
+});
+
+// ── ツリー 1 行分（インデント + クリック選択）──
+const tree_line = (node, path, is_selected, onclick) => {
+  const attrs = Object.entries(node)
+    .filter(([k]) => k !== 'tag' && k !== 'ctx' && k !== 'style')
+    .map(([k, v]) => `${k}="${v}"`).join(' ');
+  const inner = (node.tag === 'text' && typeof node.ctx?.[0] === 'string')
+    ? node.ctx[0] + '</text>' : (node.tag === 'text' ? '</text>' : '');
+  const label = '<' + node.tag + (attrs ? ' ' + attrs : '') + '>' + inner;
+  return {
+    tag: 'div',
+    style: 'padding:2px 6px;border-radius:3px;cursor:pointer;'
+         + 'margin-left:' + (path.length * 14) + 'px;'
+         + 'font-family:ui-monospace,monospace;font-size:12px;'
+         + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+         + (is_selected
+             ? 'background:var(--ric-color-accent);color:var(--ric-color-accent-fg,#fff)'
+             : ''),
+    onclick,
+    ctx: [label],
+  };
+};
+
+const render_tree = (s) => {
+  const lines = [];
+  const walk = (node, path) => {
+    const is_selected = JSON.stringify(path) === JSON.stringify(s.ui.selected_path);
+    lines.push(tree_line(node, path, is_selected,
+      () => { s.ui = { ...s.ui, selected_path: path }; }));
+    if (Array.isArray(node.ctx)) {
+      node.ctx.forEach((c, i) => {
+        if (c && typeof c === 'object') walk(c, [...path, i]);
+      });
+    }
+  };
+  walk(s.tree, []);
+  return lines;
+};
+
+// ── render ──
+handle.render = (s) => {
+  const selected    = get_at(s.tree, s.ui.selected_path);
+  const attr_entries = Object.entries(selected)
+    .filter(([k]) => k !== 'tag' && k !== 'ctx');
+  const is_text      = selected.tag === 'text';
+  const text_content = is_text && typeof selected.ctx?.[0] === 'string'
+    ? selected.ctx[0] : '';
+
+  // 左ペイン: ツリー + 属性編集 + 末尾に常時「次を追加」エリア
+  const editor_panel = {
+    tag: 'div',
+    style: 'height:100%;overflow:auto;padding:12px;'
+         + 'display:flex;flex-direction:column;gap:10px',
+    ctx: [
+      // ツリー表示
+      ui_text({ variant: 'label', ctx: ['ツリー（クリックで選択）:'] }),
+      { tag: 'div',
+        style: 'border:1px solid var(--ric-color-border);border-radius:4px;'
+             + 'padding:6px;background:var(--ric-color-control);'
+             + 'max-height:220px;overflow:auto',
+        ctx: render_tree(s),
+      },
+
+      // 属性リスト
+      ui_text({ variant: 'label',
+        ctx: ['選択中: <' + selected.tag + '> の属性'] }),
+
+      ...attr_entries.map(([k, v]) => ui_row({
+        style: { alignItems: 'center', gap: '6px' },
+        ctx: [
+          { tag: 'div', style: 'flex:0 0 110px', ctx: [
+            ui_text({ variant: 'muted', ctx: [k] }),
+          ]},
+          { tag: 'div', style: 'flex:1', ctx: [
+            ui_input({
+              value: String(v),
+              oninput: (e) => {
+                s.tree = update_at(s.tree, s.ui.selected_path,
+                  node => ({ ...node, [k]: e.target.value }));
+              },
+            }),
+          ]},
+          ui_button({
+            variant: 'ghost', ctx: ['×'],
+            onclick: () => {
+              s.tree = update_at(s.tree, s.ui.selected_path, node => {
+                const copy = { ...node };
+                delete copy[k];
+                return copy;
+              });
+            },
+          }),
+        ],
+      })),
+
+      // text タグだけテキスト本体を別枠で編集
+      is_text ? ui_row({
+        style: { alignItems: 'center', gap: '6px' },
+        ctx: [
+          { tag: 'div', style: 'flex:0 0 110px', ctx: [
+            ui_text({ variant: 'muted', ctx: ['(text 本体)'] }),
+          ]},
+          { tag: 'div', style: 'flex:1', ctx: [
+            ui_input({
+              value: text_content,
+              oninput: (e) => {
+                s.tree = update_at(s.tree, s.ui.selected_path,
+                  node => ({ ...node, ctx: [e.target.value] }));
+              },
+            }),
+          ]},
+        ],
+      }) : null,
+
+      // ルート以外は削除ボタン
+      s.ui.selected_path.length > 0 ? ui_button({
+        variant: 'ghost', ctx: ['🗑 このノードを削除'],
+        onclick: () => {
+          s.tree = remove_at(s.tree, s.ui.selected_path);
+          s.ui = { ...s.ui, selected_path: [] };
+        },
+      }) : null,
+
+      // 区切り
+      { tag: 'hr',
+        style: 'margin:8px 0;border:none;border-top:1px dashed var(--ric-color-border)' },
+
+      // ── 末尾に常時表示: 次のノードを追加 ──
+      ui_text({ variant: 'label',
+        ctx: [s.ui.selected_path.length === 0
+          ? 'このルートの子として追加:'
+          : ('<' + selected.tag + '> の直後に追加:')],
+      }),
+      // タグ選択（ラジオボタン、bind_radiobutton で state と双方向）
+      bind_radiobutton(s.ui, 'add_tag', {
+        options: ADD_TAGS,
+      }),
+      ui_button({
+        variant: 'primary', ctx: ['➕ 追加'],
+        onclick: () => {
+          const new_node = { tag: s.ui.add_tag, ...DEFAULT_ATTRS[s.ui.add_tag] };
+          const { tree, new_path } = insert_after(s.tree, s.ui.selected_path, new_node);
+          s.tree = tree;
+          s.ui = { ...s.ui, selected_path: new_path };
+        },
+      }),
+    ].filter(Boolean),
+  };
+
+  // ── 選択ノードのハイライトマーカー + ドラッグ ──
+  // 属性から計算した bbox に破線 rect を重ねる。
+  // - fill は完全透明（rgba(0,0,0,0)）で bbox 内全体がクリック / ドラッグ可能
+  // - stroke-dasharray で形状と区別、cursor:move でドラッグできることを示す
+  // - onmousedown でドラッグ開始、document の mousemove / mouseup で追従
+  // - スクリーン座標 → SVG 座標は viewBox / 実寸の比率で変換（スケール対応）
+  // - ドラッグ開始時のノード属性をスナップショットに取り、開始値からの delta を都度反映
+  //   （現在値 += delta だと描画ずれが累積する）
+  const bbox = calc_bbox(selected);
+  const PAD = 3;
+  // ドラッグで移動できるのは位置属性を持つ単体シェイプのみ。
+  // g / svg は子が多数あり delta 伝播が複雑になるので今回はスコープ外。
+  const DRAGGABLE = ['circle', 'ellipse', 'rect', 'text', 'line', 'polygon'];
+  const can_drag  = bbox && DRAGGABLE.includes(selected.tag);
+
+  // プレビュー用にツリーを再構築する。
+  // 1. 既存シェイプに onclick を注入 → 右の SVG を直接クリックしても選択できる
+  // 2. 選択ノードに bbox を重ねる overlay rect を末尾に追加（最前面、ドラッグハンドル）
+  //    overlay が最後にあるので DOM 上では最前面 = 選択中の shape 上に出現。
+  //    他のシェイプは overlay の外側なので onclick が普通に届く。
+  const attach_click = (node, path) => {
+    if (!node || typeof node !== 'object') return node;
+    const wrapped_ctx = Array.isArray(node.ctx)
+      ? node.ctx.map((c, i) =>
+          c && typeof c === 'object' ? attach_click(c, [...path, i]) : c)
+      : node.ctx;
+    // ルート (svg) はクリック対象から除外（背景クリックは未定義扱い）
+    if (path.length === 0) return { ...node, ctx: wrapped_ctx };
+    return {
+      ...node,
+      style: (node.style ? String(node.style) + ';' : '') + 'cursor:pointer',
+      onclick: (e) => {
+        e.stopPropagation();
+        s.ui = { ...s.ui, selected_path: path };
+      },
+      ctx: wrapped_ctx,
+    };
+  };
+
+  const clickable_tree = attach_click(s.tree, []);
+
+  const overlay_rect = bbox ? {
+    tag: 'rect',
+    x: bbox.x - PAD, y: bbox.y - PAD,
+    width:  Math.max(0, bbox.width)  + PAD * 2,
+    height: Math.max(0, bbox.height) + PAD * 2,
+    fill: 'rgba(0,0,0,0)',  // 透明塗りつぶし: bbox 内全体がマウスヒット対象
+    rx: 2,
+    style: 'stroke:#f59e0b;stroke-width:1.5;stroke-dasharray:4 2;'
+         + (can_drag ? 'cursor:move' : 'cursor:not-allowed;opacity:0.7'),
+    onmousedown: can_drag ? (e) => {
+      e.preventDefault();
+      const svg_el = e.target.ownerSVGElement;
+      if (!svg_el) return;
+
+      // viewBox と実寸の比率でスケール。viewBox 未指定なら 1:1。
+      const dom = svg_el.getBoundingClientRect();
+      const vb  = svg_el.viewBox && svg_el.viewBox.baseVal;
+      const sx = (vb && vb.width  > 0 && dom.width  > 0) ? vb.width  / dom.width  : 1;
+      const sy = (vb && vb.height > 0 && dom.height > 0) ? vb.height / dom.height : 1;
+
+      const start_mx = e.clientX;
+      const start_my = e.clientY;
+      const drag_path  = s.ui.selected_path;
+      const start_node = get_at(s.tree, drag_path);
+
+      const on_move = (ev) => {
+        const dx = (ev.clientX - start_mx) * sx;
+        const dy = (ev.clientY - start_my) * sy;
+        s.tree = update_at(s.tree, drag_path,
+          (cur) => apply_move(cur, start_node, dx, dy));
+      };
+      const on_up = () => {
+        document.removeEventListener('mousemove', on_move);
+        document.removeEventListener('mouseup',   on_up);
+        // 確定時に位置属性を整数へ丸める（ドラッグ中の小数蓄積を解消）
+        s.tree = update_at(s.tree, drag_path, round_positions);
+      };
+      document.addEventListener('mousemove', on_move);
+      document.addEventListener('mouseup',   on_up);
+    } : undefined,
+  } : null;
+
+  const preview_tree = overlay_rect ? {
+    ...clickable_tree,
+    ctx: [...(clickable_tree.ctx || []), overlay_rect],
+  } : clickable_tree;
+
+  // 右ペイン: SVG プレビュー
+  const preview_panel = {
+    tag: 'div',
+    style: 'height:100%;display:flex;align-items:center;justify-content:center;'
+         + 'padding:16px;background:repeating-linear-gradient(45deg,'
+         + '#f9fafb,#f9fafb 10px,#f3f4f6 10px,#f3f4f6 20px)',
+    ctx: [
+      { tag: 'div',
+        style: 'width:min(100%, 520px);aspect-ratio: 3 / 2;background:#fff;'
+             + 'border:1px solid var(--ric-color-border);'
+             + 'box-shadow:var(--ric-shadow);'
+             + 'display:flex;align-items:center;justify-content:center',
+        ctx: [preview_tree],
+      },
+    ],
+  };
+
+  return s.page({
+    style: { height: '100%', padding: 0, borderRadius: 0,
+             display: 'flex', flexDirection: 'column' },
+    ctx: [
+      s.sp({
+        side: { ctx: [editor_panel] },
+        main: { ctx: [preview_panel] },
+      }),
+    ],
+  });
+};
+</script>
+
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 340, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => { new Function(demo_src)(); });
+})();
+</script>
+</body>
+</html>

@@ -2,8 +2,10 @@
 // ui_color を state と双方向バインドする便利関数。
 //
 // 使い方：
-//   bind_color(s, 'bg_color')                    // hex モード
-//   bind_color(s, 'overlay', { alpha: true })     // 値が rgba なら自動でアルファ表示
+//   bind_color(s, 'bg_color')    // state 値が hex なら hex picker
+//   bind_color(s, 'overlay')     // state 値が rgba(...) なら自動で alpha つき picker
+// alpha モードは state 値が rgba(...) 形式か否かで ui_color が自動判定するため、
+// 呼び出し側で明示するオプションはない。
 
 'use strict';
 

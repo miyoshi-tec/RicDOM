@@ -134,12 +134,11 @@ describe('bind_input: 初期描画', () => {
   test('初期値が input.value に反映される', () => {
     const dom    = setup_jsdom();
     const { create_RicDOM } = require('../src/ricdom');
-    const state  = { name: 'Taro' };
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM(state, target, s =>
-      bind_input(s, 'name'),
-    );
+    create_RicDOM(target, { name: 'Taro',
+      render: s => bind_input(s, 'name'),
+    });
 
     const el = target.querySelector('input');
     assert.ok(el, 'input 要素が存在する');
@@ -151,9 +150,9 @@ describe('bind_input: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ name: '' }, target, s =>
-      bind_input(s, 'name', { placeholder: '名前を入力' }),
-    );
+    create_RicDOM(target, { name: '',
+      render: s => bind_input(s, 'name', { placeholder: '名前を入力' }),
+    });
 
     assert.equal(target.querySelector('input').placeholder, '名前を入力');
   });
@@ -163,9 +162,9 @@ describe('bind_input: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ val: '' }, target, s =>
-      bind_input(s, 'val', { disabled: true }),
-    );
+    create_RicDOM(target, { val: '',
+      render: s => bind_input(s, 'val', { disabled: true }),
+    });
 
     assert.equal(target.querySelector('input').disabled, true);
   });
@@ -175,9 +174,9 @@ describe('bind_input: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ email: '' }, target, s =>
-      bind_input(s, 'email', { type: 'email' }),
-    );
+    create_RicDOM(target, { email: '',
+      render: s => bind_input(s, 'email', { type: 'email' }),
+    });
 
     assert.equal(target.querySelector('input').type, 'email');
   });
@@ -188,12 +187,11 @@ describe('bind_input: 双方向バインド', () => {
   test('oninput イベントで s[key] が更新される', async () => {
     const dom    = setup_jsdom();
     const { create_RicDOM } = require('../src/ricdom');
-    const state  = { name: '' };
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM(state, target, s =>
-      bind_input(s, 'name'),
-    );
+    const panel = create_RicDOM(target, { name: '',
+      render: s => bind_input(s, 'name'),
+    });
 
     const el = target.querySelector('input');
     el.value = 'Alice';
@@ -206,12 +204,11 @@ describe('bind_input: 双方向バインド', () => {
   test('panel 経由で state を変えると input.value が追従する', async () => {
     const dom    = setup_jsdom();
     const { create_RicDOM } = require('../src/ricdom');
-    const state  = { name: 'Taro' };
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM(state, target, s =>
-      bind_input(s, 'name'),
-    );
+    const panel = create_RicDOM(target, { name: 'Taro',
+      render: s => bind_input(s, 'name'),
+    });
 
     panel.name = 'Hanako';
     await flush_raf();
@@ -229,12 +226,11 @@ describe('bind_input: リセット（value="" への変更が DOM に反映さ�
   test('文字を入力後に state を "" にすると input.value が空になる', async () => {
     const dom    = setup_jsdom();
     const { create_RicDOM } = require('../src/ricdom');
-    const state  = { name: '' };
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM(state, target, s =>
-      bind_input(s, 'name'),
-    );
+    const panel = create_RicDOM(target, { name: '',
+      render: s => bind_input(s, 'name'),
+    });
 
     // 文字を入力
     const el = target.querySelector('input');
@@ -258,11 +254,10 @@ describe('bind_input: リセット（value="" への変更が DOM に反映さ�
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM(
-      { text: 'initial' },
-      target,
-      s => bind_input(s, 'text'),
-    );
+    const panel = create_RicDOM(target, {
+      text: 'initial',
+      render: s => bind_input(s, 'text'),
+    });
 
     const el = target.querySelector('input');
     assert.equal(el.value, 'initial');
@@ -282,11 +277,10 @@ describe('bind_input: リセット（value="" への変更が DOM に反映さ�
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM(
-      { email: 'a@example.com' },
-      target,
-      s => bind_input(s, 'email', { type: 'email' }),
-    );
+    const panel = create_RicDOM(target, {
+      email: 'a@example.com',
+      render: s => bind_input(s, 'email', { type: 'email' }),
+    });
 
     const el = target.querySelector('input');
     el.value = '||||';

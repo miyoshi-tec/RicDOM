@@ -27,7 +27,8 @@
 
 'use strict';
 
-const _portal = require('./_page_portal_queue');
+const _portal                   = require('./_page_portal_queue');
+const { apply_theme_to_portal } = require('./_wrap_portal');
 
 const create_ui_dialog = () => {
 
@@ -60,8 +61,6 @@ const create_ui_dialog = () => {
   const _esc_handler = (e) => {
     if (e.key === 'Escape') _request_close();
   };
-
-  const { apply_theme_to_portal } = require('./_wrap_portal');
 
   // inst(props) → VDOM（uncontrolled: trigger ボタン / controlled: null）
   // 開いているときはバックドロップ＋ダイアログ本体をキューに積む。

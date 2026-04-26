@@ -166,9 +166,9 @@ describe('bind_radiobutton: 初期描画', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    create_RicDOM({ role: 'editor' }, target, s =>
-      bind_radiobutton(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
-    );
+    create_RicDOM(target, { role: 'editor',
+      render: s => bind_radiobutton(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
+    });
 
     const inputs = target.querySelectorAll('input[type="radio"]');
     const checked = [...inputs].filter(i => i.checked).map(i => i.value);
@@ -183,9 +183,9 @@ describe('bind_radiobutton: 双方向バインド', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM({ role: 'viewer' }, target, s =>
-      bind_radiobutton(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
-    );
+    const panel = create_RicDOM(target, { role: 'viewer',
+      render: s => bind_radiobutton(s, 'role', { options: ['viewer', 'editor', 'admin'] }),
+    });
 
     const inputs = target.querySelectorAll('input[type="radio"]');
     const admin  = [...inputs].find(i => i.value === 'admin');
@@ -201,9 +201,9 @@ describe('bind_radiobutton: 双方向バインド', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const target = dom.window.document.querySelector('#app');
 
-    const panel = create_RicDOM({ role: 'viewer' }, target, s =>
-      bind_radiobutton(s, 'role', { options: ['viewer', 'editor'] }),
-    );
+    const panel = create_RicDOM(target, { role: 'viewer',
+      render: s => bind_radiobutton(s, 'role', { options: ['viewer', 'editor'] }),
+    });
 
     panel.role = 'editor';
     await flush_raf();

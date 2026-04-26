@@ -4,17 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JSON Editor — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  </style>
   <script src="../RicDOM.min.js"></script>
   <script src="../RicUI.min.js"></script>
 </head>
 <body>
 
 <div id="nav_bar" data-sample="09"></div>
-<div id="mount"></div>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
 
-<script src="_nav_bar.js"></script>
-
-<script>
+<script type="text/plain" id="src-demo">
 'use strict';
 const { create_RicDOM } = RicDOM;
 const { create_ui_page, create_ui_dialog, create_ui_toast, ui_button, ui_input, ui_text } = RicUI;
@@ -76,7 +79,7 @@ const DEMO = {
   config:  { theme: 'dark', fontSize: 14, autosave: false },
 };
 
-create_RicDOM('#mount', {
+create_RicDOM('#mount-demo', {
   json_root: clone(DEMO),
   filename:  'demo.json',
   // expanded: パスの JSON.stringify をキー、bool を値とする展開状態マップ。
@@ -336,5 +339,46 @@ create_RicDOM('#mount', {
 });
 </script>
 
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  // ── 外側 splitter: 上「デモ」 / 下「コード」 ──
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 280, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => {
+    new Function(demo_src)();
+  });
+})();
+</script>
 </body>
 </html>
