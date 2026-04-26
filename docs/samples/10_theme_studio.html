@@ -4,23 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Theme Studio — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
   <style>
-    /* viewport 全域をフレックスで使うため body の margin をリセットし、
-       #mount が残り高さを埋めるように flex: 1 を指定する。*/
     body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-    #mount { flex: 1; min-height: 0; overflow: hidden; }
   </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
 </head>
 <body>
 
 <div id="nav_bar" data-sample="10"></div>
-<div id="mount"></div>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
 
-<script src="../RicDOM.min.js"></script>
-<script src="../RicUI.min.js"></script>
-<script src="_nav_bar.js"></script>
-
-<script id="src-rui">
+<script type="text/plain" id="src-demo">
 const { create_RicDOM } = RicDOM;
 const { create_ui_page, create_ui_accordion, create_ui_dialog, create_ui_popup, create_ui_splitter, bind_tabs, create_ui_toast, create_ui_tooltip, create_theme, ui_tweak_panel, ui_tweak_folder, ui_tweak_row, ui_button, ui_col, ui_input, ui_panel, ui_radiobutton, ui_row, ui_select, ui_text, bind_checkbox, ui_code_pre } = RicUI;
 
@@ -139,7 +136,7 @@ const section_style = (s, sec_id) => {
 // ═══════════════════════════════════════════════════════════
 // メイン: create_RicDOM
 // ═══════════════════════════════════════════════════════════
-const s = create_RicDOM('#mount', {
+const s = create_RicDOM('#mount-demo', {
   _sel_part: null,
   _chk_demo: false,
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
@@ -345,7 +342,48 @@ const s = create_RicDOM('#mount', {
     });
   },
 });
+</script>
 
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  // ── 外側 splitter: 上「デモ」 / 下「コード」 ──
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 280, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => {
+    new Function(demo_src)();
+  });
+})();
 </script>
 </body>
 </html>
