@@ -130,16 +130,6 @@ const {
   create_ui_splitter,
 } = RicUI;
 
-// ── DOM 骨格を mount-demo に流し込む ──
-// toolbar / inner-frame の 2 段。inner-frame の中身は layout_h が
-// splitter を描画して、その side / main に list / editor の mount 先を置く。
-document.getElementById('mount-demo').innerHTML = `
-  <div style="height:100%; display:flex; flex-direction:column">
-    <div id="toolbar"></div>
-    <div id="inner-frame" style="flex:1; min-height:0"></div>
-  </div>
-`;
-
 // ── 永続化 ──
 const STORAGE_KEY = 'ric-multi-memo';
 const SAMPLE_SEED = [
@@ -238,14 +228,16 @@ const delete_memo = (id) => {
 };
 
 // ════════════════════════════════════════════════════════════
-// Layout panel — List と Editor の間の splitter を管理する構造専用 instance
-// （data state を持たず、resize / collapse の VDOM を返すだけ）
+// Layout panel — 全体の骨組み（toolbar スロット + List/Editor splitter）
 // ════════════════════════════════════════════════════════════
-// layout_h を先に立ち上げて #list / #editor の mount 先を作る。
-// 親 RicDOM が再描画しても、ctx 内の `{ tag:'div', id:'list' }` は VDOM 上
-// 不変なので diff が DOM を差し替えず、内側の list_h / editor_h が
-// 描画した DOM はそのまま保持される（13_controlled_dialog_splitter と同じ手法）。
-const layout_h = create_RicDOM('#inner-frame', {
+// layout_h は data state を持たず、構造の VDOM だけを返す instance。
+// #mount-demo に mount し、toolbar / list / editor の **mount 先となる div** を
+// VDOM で出力する。toolbar_h / list_h / editor_h が後でその id に mount。
+//
+// layout_h が再描画しても、ctx 内の `{ tag:'div', id:'list' }` 等は VDOM 上
+// 不変なので diff が DOM を差し替えず、子 instance が描画した中身はそのまま
+// 保持される（13_controlled_dialog_splitter と同じ手法）。
+const layout_h = create_RicDOM('#mount-demo', {
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   sp:   create_ui_splitter({ side: 'left', size: 380, min: 240, collapsible: true }),
   render(s) {
@@ -254,10 +246,15 @@ const layout_h = create_RicDOM('#inner-frame', {
       style: { height: '100%', padding: 0, borderRadius: 0, border: 0,
                display: 'flex', flexDirection: 'column' },
       ctx: [
-        s.sp({
-          side: { ctx: [{ tag: 'div', id: 'list',   style: 'height:100%' }] },
-          main: { ctx: [{ tag: 'div', id: 'editor', style: 'height:100%' }] },
-        }),
+        // toolbar_h の mount 先
+        { tag: 'div', id: 'toolbar' },
+        // List + Editor を分ける splitter（どちらも子 instance の mount 先）
+        { tag: 'div', style: 'flex:1; min-height:0', ctx: [
+          s.sp({
+            side: { ctx: [{ tag: 'div', id: 'list',   style: 'height:100%' }] },
+            main: { ctx: [{ tag: 'div', id: 'editor', style: 'height:100%' }] },
+          }),
+        ]},
       ],
     });
   },
