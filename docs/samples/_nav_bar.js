@@ -47,6 +47,7 @@ try {
     // 14 は欠番（旧 "Chat UI" は 15 "AI Chat" に完全に包含されたため削除）
     { no: '15', file: '15_ai_chat.html',           title: 'AI Chat (live)' },
     { no: '16', file: '16_svg_editor.html',        title: 'SVG ツリーエディタ' },
+    { no: '17', file: '17_multi_ricdom.html',      title: 'Multi-instance Memo' },
   ];
 
   // ── 現在のページ検出 ──

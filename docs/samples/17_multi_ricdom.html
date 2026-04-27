@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-instance Memo App — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
+                  border-bottom: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); }
+    .page-intro code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+                       font-family: ui-monospace, monospace; font-size: 12.5px; }
+
+    /* ── 自前 CSS（partial RicUI の実例）— 付箋カードは独自の意匠で組む ── */
+    .memo-list { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+    .memo-row {
+      padding: 8px 10px; cursor: pointer; border-radius: 4px;
+      border: 1px solid transparent; transition: background 0.12s;
+    }
+    .memo-row:hover { background: rgba(0,0,0,0.05); }
+    .memo-row--selected {
+      background: var(--ric-color-accent);
+      color: var(--ric-color-accent-fg);
+    }
+    .memo-row__title { font-weight: 600; font-size: 14px; }
+    .memo-row__excerpt {
+      font-size: 12px; opacity: 0.7;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .memo-row--selected .memo-row__excerpt { opacity: 0.92; }
+
+    .memo-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 16px; padding: 16px; align-content: start;
+    }
+    .memo-card {
+      padding: 12px; cursor: pointer; border-radius: 2px;
+      box-shadow: 2px 4px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.4);
+      transform: rotate(-1.2deg);
+      transition: transform 0.15s, box-shadow 0.15s;
+      min-height: 80px; max-height: 180px; overflow: hidden;
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      color: #1f2937;
+    }
+    .memo-card:nth-child(2n) { transform: rotate(1deg); background: linear-gradient(135deg, #c7f0fe, #a8d8e8); }
+    .memo-card:nth-child(3n) { transform: rotate(-0.5deg); background: linear-gradient(135deg, #fce7f3, #fbcfe8); }
+    .memo-card:nth-child(4n) { transform: rotate(0.8deg); background: linear-gradient(135deg, #d1fae5, #a7f3d0); }
+    .memo-card:hover { transform: rotate(0) translateY(-2px); }
+    .memo-card--selected {
+      box-shadow: 0 0 0 3px var(--ric-color-accent), 2px 4px 12px rgba(0,0,0,0.22);
+      transform: rotate(0) translateY(-2px);
+    }
+    .memo-card__title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+    .memo-card__body { font-size: 12px; line-height: 1.4; }
+    .memo-card__body * { font-size: inherit !important; margin: 2px 0 !important; }
+    .memo-card__body h1, .memo-card__body h2, .memo-card__body h3 { font-weight: 700 !important; }
+    .memo-card__body code { background: rgba(0,0,0,0.08); padding: 0 3px; border-radius: 2px; }
+    .memo-card__body pre { background: rgba(0,0,0,0.08); padding: 4px; border-radius: 3px; overflow: hidden; }
+
+    /* render counter — 教育的ハイライト */
+    .render-counter {
+      font-size: 11px; opacity: 0.55; font-weight: 400; margin-left: 8px;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    .panel-empty {
+      display: flex; align-items: center; justify-content: center;
+      flex: 1; min-height: 0;
+      color: var(--ric-color-fg-muted, #888);
+      font-size: 14px; text-align: center; padding: 20px;
+    }
+
+    /* edit/preview の display:none 切替で textarea の caret を保持 */
+    .edit-pane[data-mode="preview"] .edit-pane__edit { display: none; }
+    .edit-pane[data-mode="edit"]    .edit-pane__preview { display: none; }
+  </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+<div id="nav_bar" data-sample="17"></div>
+<p class="page-intro">
+  <strong>multi-instance パターン</strong> — render 関数を分割するのではなく、
+  <code>create_RicDOM</code> をパネル単位に分けて再描画スコープを物理的に分離します。
+  各パネルのタイトル右の <code>(R: N)</code> が render 回数。
+  <strong>Editor で typing しても List のカウンタは増えません</strong>。
+  メモアプリ風 CRUD で textarea / dialog / Markdown / 付箋カード表示を実例化。
+  下ペインに実際のコードを表示しています。
+</p>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<script type="text/plain" id="src-demo">
+// ════════════════════════════════════════════════════════════════════
+// multi-instance パターン デモ — NyanKeep 風メモアプリ
+// ════════════════════════════════════════════════════════════════════
+//
+// 🎯 RicDOM の主役: 3 つの create_RicDOM
+//
+//   - toolbar_h / list_h / editor_h は完全に独立した state を持つ。
+//     subscribers リストも instance 単位で分離されている。
+//   - Editor の textarea にタイピング → editor_h.draft 更新 → editor_h
+//     だけが再描画。list_h / toolbar_h は無関係に静止。
+//   - パネル間でデータを動かす時は handle.xxx に直接書き込む。
+//     例: list の付箋クリック → editor_h.draft = { ...memo } で
+//     editor だけが新しい draft で再描画される。
+//
+// 「render を関数で切り出す」のではなく「create_RicDOM を分ける」のが
+// RicDOM の自然な scaling 戦略。React の memo 化とは発想が真逆。
+//
+// ════════════════════════════════════════════════════════════════════
+
+const { create_RicDOM } = RicDOM;
+const {
+  // layout / surface / text
+  create_ui_page, ui_panel, ui_text, ui_row, ui_md_pre,
+  // controls
+  ui_button, ui_input, ui_textarea, bind_input, ui_radiobutton,
+  // popups
+  create_ui_popup, create_ui_dialog,
+} = RicUI;
+
+// ── DOM 骨格を mount-demo に流し込む ──
+// 3 panel の入れ物を用意してから create_RicDOM × 3 で各 instance を立ち上げる。
+document.getElementById('mount-demo').innerHTML = `
+  <div style="height:100%; display:flex; flex-direction:column">
+    <div id="toolbar"></div>
+    <div style="flex:1; min-height:0; display:flex">
+      <div id="list" style="width:38%; min-width:280px; border-right:1px solid var(--ric-color-border); display:flex; flex-direction:column; overflow:hidden"></div>
+      <div id="editor" style="flex:1; min-width:0; display:flex; flex-direction:column"></div>
+    </div>
+  </div>
+`;
+
+// ── 永続化 ──
+const STORAGE_KEY = 'ric-multi-memo';
+const SAMPLE_SEED = [
+  { id: 1, title: 'ようこそ',
+    body: '# multi-instance パターン\n\nこのメモは **Markdown** で書けます。\n\n- 付箋表示に切り替えてみてください\n- typing しても List のカウンタは増えません',
+    updated_at: Date.now() },
+  { id: 2, title: '買い物リスト',
+    body: '- 牛乳\n- パン\n- `卵`',
+    updated_at: Date.now() - 100000 },
+  { id: 3, title: 'TODO',
+    body: '## 今日\n\n- メール返信\n- レポート提出',
+    updated_at: Date.now() - 200000 },
+];
+const load_memos = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return SAMPLE_SEED;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : SAMPLE_SEED;
+  } catch (e) {
+    console.warn('[memo] localStorage parse error', e);
+    return SAMPLE_SEED;
+  }
+};
+const save_memos = (memos) => {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(memos)); }
+  catch (e) { console.warn('[memo] localStorage save error', e); }
+};
+
+// ── テーマ設定（toolbar の popup から触る）──
+// 既存の 'ric-theme-change' イベントに乗って全 page が同期する仕組み。
+const get_setting = (key, fallback) =>
+  (window._ric_settings && window._ric_settings[key]) ?? fallback;
+const set_setting = (key, value) => {
+  window._ric_settings = { ...(window._ric_settings ?? {}), [key]: value };
+  try { localStorage.setItem('ric-settings', JSON.stringify(window._ric_settings)); }
+  catch {}
+  window.dispatchEvent(new CustomEvent('ric-theme-change', { detail: { key, value } }));
+};
+
+// ── 空 draft（毎回新オブジェクトを返す。共有して mutate されないように）──
+const make_empty_draft = () => ({ id: null, title: '', body: '' });
+
+// ── render counter（state ではなく closure 変数で持つ。Proxy 外なので安全） ──
+let toolbar_renders = 0, list_renders = 0, editor_renders = 0;
+
+// ════════════════════════════════════════════════════════════
+// パネル間の操作 — handle を closure で参照する
+// （関数の body は call 時に handle を読むので、handle 宣言より先に定義しても TDZ にならない。
+//   render 時に `onclick: create_new_memo` のように直接代入するため、これらは
+//   create_RicDOM より先に初期化しておく必要がある）
+// ════════════════════════════════════════════════════════════
+
+// 未保存変更がある時は確認 dialog 経由にする
+const guard_unsaved = (action) => {
+  if (editor_h.dirty) {
+    editor_h.pending_action = action;
+    editor_h.show_confirm   = true;
+  } else {
+    action();
+  }
+};
+
+const _create_new_memo = () => {
+  const new_memo = {
+    id:    Date.now() + Math.floor(Math.random() * 1000),
+    title: '',
+    body:  '',
+    updated_at: Date.now(),
+  };
+  // List を更新（list_h だけ再描画）
+  list_h.memos       = [new_memo, ...list_h.memos];
+  list_h.selected_id = new_memo.id;
+  // Editor を更新（editor_h だけ再描画）
+  editor_h.draft = { ...new_memo };
+  editor_h.mode  = 'edit';
+  editor_h.dirty = false;
+  // toolbar_h は触らないので再描画されない
+  save_memos(list_h.memos);
+};
+const create_new_memo = () => guard_unsaved(_create_new_memo);
+
+const _select_memo = (id) => {
+  const memo = list_h.memos.find(m => m.id === id);
+  list_h.selected_id = id;
+  editor_h.draft = memo ? { ...memo } : make_empty_draft();
+  editor_h.dirty = false;
+};
+const select_memo = (id) => guard_unsaved(() => _select_memo(id));
+
+const save_draft = () => {
+  if (editor_h.draft.id === null) return;
+  const updated = { ...editor_h.draft, updated_at: Date.now() };
+  list_h.memos = list_h.memos.map(m =>
+    m.id === editor_h.draft.id ? updated : m
+  );
+  editor_h.dirty = false;
+  save_memos(list_h.memos);
+};
+
+const delete_memo = (id) => {
+  list_h.memos       = list_h.memos.filter(m => m.id !== id);
+  list_h.selected_id = null;
+  editor_h.draft     = make_empty_draft();
+  editor_h.dirty     = false;
+  save_memos(list_h.memos);
+};
+
+// ════════════════════════════════════════════════════════════
+// List panel — 一覧 / 付箋 / フィルタ / 選択
+// ════════════════════════════════════════════════════════════
+const list_h = create_RicDOM('#list', {
+  memos:       load_memos(),
+  selected_id: null,
+  filter:      '',
+  view:        'list',  // 'list' | 'cards'
+  page:        create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  render(s) {
+    list_renders++;
+
+    const filtered = s.filter
+      ? s.memos.filter(m =>
+          (m.title + '\n' + m.body).toLowerCase().includes(s.filter.toLowerCase()))
+      : s.memos;
+
+    const make_row = (m) => ({
+      tag: 'div',
+      class: 'memo-row' + (m.id === s.selected_id ? ' memo-row--selected' : ''),
+      onclick: () => select_memo(m.id),
+      ctx: [
+        { tag: 'div', class: 'memo-row__title', ctx: [m.title || '(無題)'] },
+        { tag: 'div', class: 'memo-row__excerpt',
+          ctx: [m.body.split('\n')[0].replace(/[#*`>-]/g, '').trim().slice(0, 60) || '(空)'] },
+      ],
+    });
+
+    const make_card = (m) => ({
+      tag: 'div',
+      class: 'memo-card' + (m.id === s.selected_id ? ' memo-card--selected' : ''),
+      onclick: () => select_memo(m.id),
+      ctx: [
+        { tag: 'div', class: 'memo-card__title', ctx: [m.title || '(無題)'] },
+        { tag: 'div', class: 'memo-card__body', ctx: [
+          ui_md_pre({ ctx: [m.body.slice(0, 200)] }),
+        ]},
+      ],
+    });
+
+    const items = filtered.length === 0
+      ? [{ tag: 'div', class: 'panel-empty',
+           ctx: [s.filter ? '一致するメモがありません' : 'メモがまだありません'] }]
+      : (s.view === 'cards' ? filtered.map(make_card) : filtered.map(make_row));
+
+    return s.page({
+      style: { height: '100%', padding: 0, borderRadius: 0, border: 0,
+               display: 'flex', flexDirection: 'column' },
+      ctx: [
+        // header: タイトル・render counter・view 切替・フィルタ
+        ui_panel({
+          style: { margin: 0, borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0,
+                   padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' },
+          ctx: [
+            ui_row({ style: { alignItems: 'center', gap: '8px' }, ctx: [
+              ui_text({ variant: 'label', ctx: ['📋 List'] }),
+              { tag: 'span', class: 'render-counter', ctx: [`(R: ${list_renders})`] },
+              { tag: 'span', style: { flex: 1 } },
+              ui_radiobutton({
+                name: 'view-' + Math.random(),  // 他の radio と name 衝突回避
+                value: s.view,
+                options: [
+                  { value: 'list',  label: '⊞ List' },
+                  { value: 'cards', label: '🗒 付箋' },
+                ],
+                onchange: (e) => { s.view = e.target.value; },
+              }),
+            ]}),
+            bind_input(s, 'filter', { placeholder: '🔍 フィルタ…' }),
+          ],
+        }),
+        // body: スクロール領域
+        { tag: 'div', style: 'flex:1; overflow:auto; min-height:0', ctx: [
+          { tag: 'div', class: s.view === 'cards' ? 'memo-cards' : 'memo-list', ctx: items },
+        ]},
+      ],
+    });
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+// Editor panel — タイトル・body 編集 / Markdown preview / 保存・削除
+// ════════════════════════════════════════════════════════════
+const editor_h = create_RicDOM('#editor', {
+  draft:           make_empty_draft(),
+  mode:            'edit',  // 'edit' | 'preview'
+  dirty:           false,
+  // controlled 確認 dialog（未保存時の遷移ガード）
+  confirm_dlg:     create_ui_dialog(),
+  show_confirm:    false,
+  pending_action:  null,
+  // uncontrolled 削除 dialog
+  delete_dlg:      create_ui_dialog(),
+  page:            create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  render(s) {
+    editor_renders++;
+    const has_selection = s.draft.id !== null;
+
+    // タイトル変更（dirty フラグも一緒に立てるため bind_input は使わず raw ui_input）
+    const title_field = ui_input({
+      value: s.draft.title,
+      placeholder: 'タイトル',
+      style: { fontSize: '15px', fontWeight: 600 },
+      oninput: (e) => {
+        s.draft = { ...s.draft, title: e.target.value };
+        s.dirty = true;
+      },
+    });
+
+    // body は textarea（dirty フラグも立てるため bind_textarea は使わず raw ui_textarea。
+    // bind_textarea の oninput が options の oninput を上書きするため）
+    const body_field = ui_textarea({
+      value: s.draft.body,
+      placeholder: '本文（Markdown 対応）…',
+      style: { flex: 1, fontFamily: 'ui-monospace, Consolas, monospace',
+               fontSize: '13px', resize: 'none', minHeight: 0,
+               border: '1px solid var(--ric-color-border)', borderRadius: '4px',
+               padding: '8px', background: 'var(--ric-color-control)',
+               color: 'var(--ric-color-fg)' },
+      oninput: (e) => {
+        s.draft = { ...s.draft, body: e.target.value };
+        s.dirty = true;
+      },
+    });
+
+    return s.page({
+      style: { height: '100%', padding: 0, borderRadius: 0, border: 0,
+               display: 'flex', flexDirection: 'column' },
+      ctx: [
+        // header
+        ui_panel({
+          style: { margin: 0, borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0,
+                   padding: '8px 12px' },
+          ctx: [
+            ui_row({ style: { alignItems: 'center', gap: '8px' }, ctx: [
+              ui_text({ variant: 'label', ctx: ['✏️ Editor'] }),
+              { tag: 'span', class: 'render-counter', ctx: [`(R: ${editor_renders})`] },
+              s.dirty ? ui_text({ variant: 'muted', ctx: ['● 未保存'] }) : null,
+              { tag: 'span', style: { flex: 1 } },
+              has_selection ? ui_radiobutton({
+                name: 'editor-mode',
+                value: s.mode,
+                options: [
+                  { value: 'edit',    label: 'Edit' },
+                  { value: 'preview', label: 'Preview' },
+                ],
+                onchange: (e) => { s.mode = e.target.value; },
+              }) : null,
+            ].filter(Boolean) }),
+          ],
+        }),
+
+        // body
+        !has_selection
+          ? { tag: 'div', class: 'panel-empty',
+              ctx: ['メモを選択するか、+ New で新規作成してください'] }
+          : { tag: 'div',
+              class: 'edit-pane',
+              'data-mode': s.mode,
+              style: 'flex:1; min-height:0; display:flex; flex-direction:column; padding:12px; gap:8px',
+              ctx: [
+                title_field,
+                // edit / preview 両方を DOM に残し、display で切り替え（caret 保持）
+                { tag: 'div', class: 'edit-pane__edit',
+                  style: 'flex:1; min-height:0; display:flex',
+                  ctx: [body_field],
+                },
+                { tag: 'div', class: 'edit-pane__preview',
+                  style: 'flex:1; min-height:0; overflow:auto; padding:10px;'
+                       + 'border:1px solid var(--ric-color-border); border-radius:4px;'
+                       + 'background:var(--ric-color-control); color:var(--ric-color-fg)',
+                  ctx: [ ui_md_pre({ ctx: [s.draft.body || '*(空)*'] }) ],
+                },
+                // ボタン行
+                ui_row({ style: { gap: '8px' }, ctx: [
+                  ui_button({
+                    variant: 'primary', ctx: ['💾 Save'],
+                    disabled: s.dirty ? null : 'disabled',
+                    onclick: save_draft,
+                  }),
+                  s.delete_dlg({
+                    trigger_ctx: ['🗑 Delete...'],
+                    title: 'メモを削除',
+                    ctx: [ ui_text({ ctx: [`「${s.draft.title || '(無題)'}」を削除します。元には戻せません。`] }) ],
+                    actions: [
+                      ui_button({ variant: 'primary', ctx: ['削除'],
+                        onclick: () => { delete_memo(s.draft.id); s.delete_dlg.close(); }}),
+                      ui_button({ ctx: ['キャンセル'],
+                        onclick: () => { s.delete_dlg.close(); }}),
+                    ],
+                  }),
+                ]}),
+              ],
+            },
+
+        // 未保存ガード dialog（controlled mode）
+        s.confirm_dlg({
+          open: s.show_confirm,
+          on_close: () => { s.show_confirm = false; s.pending_action = null; },
+          title: '未保存の変更',
+          ctx: [ ui_text({ ctx: ['編集中の変更が未保存です。どうしますか？'] }) ],
+          actions: [
+            ui_button({ variant: 'primary', ctx: ['保存して続行'],
+              onclick: () => {
+                save_draft();
+                const fn = s.pending_action;
+                s.pending_action = null;
+                s.show_confirm   = false;
+                if (fn) fn();
+              }}),
+            ui_button({ ctx: ['破棄して続行'],
+              onclick: () => {
+                s.dirty = false;
+                const fn = s.pending_action;
+                s.pending_action = null;
+                s.show_confirm   = false;
+                if (fn) fn();
+              }}),
+            ui_button({ ctx: ['キャンセル'],
+              onclick: () => {
+                s.pending_action = null;
+                s.show_confirm   = false;
+              }}),
+          ],
+        }),
+      ].filter(Boolean),
+    });
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+// Toolbar panel — 新規作成 / テーマ設定 popup
+// ════════════════════════════════════════════════════════════
+const toolbar_h = create_RicDOM('#toolbar', {
+  page:     create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  settings: create_ui_popup(),
+  render(s) {
+    toolbar_renders++;
+    return s.page({
+      style: { padding: 0, borderRadius: 0, border: 0,
+               borderBottom: '1px solid var(--ric-color-border)' },
+      ctx: [
+        ui_panel({
+          style: { margin: 0, border: 0, borderRadius: 0, padding: '8px 16px' },
+          ctx: [ ui_row({ style: { alignItems: 'center', gap: '12px' }, ctx: [
+            ui_text({ variant: 'title', ctx: ['🗂 Memo App'] }),
+            { tag: 'span', class: 'render-counter', ctx: [`(R: ${toolbar_renders})`] },
+            { tag: 'span', style: { flex: 1 } },
+            ui_button({ variant: 'primary', ctx: ['+ New'], onclick: create_new_memo }),
+            // テーマ設定 popup（toolbar 自前。nav_bar とは独立）
+            s.settings({ label: '⚙ テーマ', ctx: [
+              { tag: 'div', onclick: (e) => e.stopPropagation(),
+                style: 'min-width:220px;padding:8px;display:flex;flex-direction:column;gap:6px',
+                ctx: [
+                  ui_text({ variant: 'label', ctx: ['テーマ'] }),
+                  ui_radiobutton({
+                    name: 'tb-theme', value: get_setting('theme', 'light'),
+                    options: ['light', 'dark', 'teal', 'cyber', 'aqua'],
+                    onchange: (e) => { set_setting('theme', e.target.value); },
+                  }),
+                  ui_text({ variant: 'label', ctx: ['密度'] }),
+                  ui_radiobutton({
+                    name: 'tb-density', value: get_setting('density', 'comfortable'),
+                    options: ['tight', 'compact', 'comfortable'],
+                    onchange: (e) => { set_setting('density', e.target.value); },
+                  }),
+                  ui_text({ variant: 'label', ctx: ['フォント'] }),
+                  ui_radiobutton({
+                    name: 'tb-font', value: get_setting('font_size', 'lg'),
+                    options: ['sm', 'md', 'lg'],
+                    onchange: (e) => { set_setting('font_size', e.target.value); },
+                  }),
+                ],
+              },
+            ]}),
+          ]}) ],
+        }),
+      ],
+    });
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+// 末尾の教訓 — このサンプルから持ち帰ってほしいこと
+// ════════════════════════════════════════════════════════════
+//
+// 1. create_RicDOM は安い: 1 ページに何個あっても問題ない。
+//    UI の関心事ごとに instance を分けると、再描画スコープが
+//    自然に小さくなり、コードも読みやすい。
+//
+// 2. 共有 state は使わない: 各 handle は独立した state を持ち、
+//    cross-panel の更新は handle.xxx への直接代入で行う。
+//    state_proxy_map による sharing は、複数 instance を完全に
+//    同期させたい時専用（このサンプルでは使っていない）。
+//
+// 3. 関数で render を分割するより instance で分割: 1 つの巨大
+//    render を抱えるより、5 つの小さい create_RicDOM のほうが
+//    読み手の認知負荷も低く、再描画も最適化される。
+//
+// 4. localStorage は 1 箇所にまとめる: save_memos / load_memos
+//    の 2 関数だけが永続化を扱う。各 mutation の最後に save を呼ぶ。
+//
+// 5. partial RicUI も自然: 付箋カード（.memo-card）は自前 CSS で
+//    意匠を作り込み、ボタン・input・dialog は RicUI に任せた。
+//    var(--ric-color-*) を参照すれば自前 CSS もテーマに追従する。
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ここから下は docs サイト用のラッパー（デモ本体ではない）。
+     上の <script type="text/plain" id="src-demo"> を取り出して eval し、
+     #mount-demo にデモを流し込み、その下にコードペインを並べる
+     だけの薄い装置。RicDOM の学習対象ではないので読み飛ばして OK。
+     ════════════════════════════════════════════════════════════════ -->
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 280, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            side: {
+              style: 'height:100%;overflow:auto;padding:0',
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => {
+    new Function(demo_src)();
+  });
+})();
+</script>
+</body>
+</html>
