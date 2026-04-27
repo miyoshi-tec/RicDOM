@@ -65,6 +65,7 @@
     .render-counter {
       font-size: 11px; opacity: 0.55; font-weight: 400; margin-left: 8px;
       font-family: ui-monospace, Consolas, monospace;
+      white-space: nowrap;
     }
 
     .panel-empty {
@@ -98,7 +99,7 @@
 // multi-instance パターン デモ — NyanKeep 風メモアプリ
 // ════════════════════════════════════════════════════════════════════
 //
-// 🎯 RicDOM の主役: 3 つの create_RicDOM
+// 🎯 RicDOM の主役: 4 つの create_RicDOM
 //
 //   - toolbar_h / list_h / editor_h は完全に独立した state を持つ。
 //     subscribers リストも instance 単位で分離されている。
@@ -107,6 +108,10 @@
 //   - パネル間でデータを動かす時は handle.xxx に直接書き込む。
 //     例: list の付箋クリック → editor_h.draft = { ...memo } で
 //     editor だけが新しい draft で再描画される。
+//   - layout_h は List と Editor の間の splitter を管理するだけの
+//     "構造専用" instance。data state は持たず、splitter の resize /
+//     collapse の VDOM を返すだけ。これも create_RicDOM が安いから
+//     できる役割分担。
 //
 // 「render を関数で切り出す」のではなく「create_RicDOM を分ける」のが
 // RicDOM の自然な scaling 戦略。React の memo 化とは発想が真逆。
@@ -121,17 +126,17 @@ const {
   ui_button, ui_input, ui_textarea, bind_input, ui_radiobutton,
   // popups
   create_ui_dialog,
+  // composite
+  create_ui_splitter,
 } = RicUI;
 
 // ── DOM 骨格を mount-demo に流し込む ──
-// 3 panel の入れ物を用意してから create_RicDOM × 3 で各 instance を立ち上げる。
+// toolbar / inner-frame の 2 段。inner-frame の中身は layout_h が
+// splitter を描画して、その side / main に list / editor の mount 先を置く。
 document.getElementById('mount-demo').innerHTML = `
   <div style="height:100%; display:flex; flex-direction:column">
     <div id="toolbar"></div>
-    <div style="flex:1; min-height:0; display:flex">
-      <div id="list" style="width:38%; min-width:280px; border-right:1px solid var(--ric-color-border); display:flex; flex-direction:column; overflow:hidden"></div>
-      <div id="editor" style="flex:1; min-width:0; display:flex; flex-direction:column"></div>
-    </div>
+    <div id="inner-frame" style="flex:1; min-height:0"></div>
   </div>
 `;
 
@@ -168,7 +173,7 @@ const save_memos = (memos) => {
 const make_empty_draft = () => ({ id: null, title: '', body: '' });
 
 // ── render counter（state ではなく closure 変数で持つ。Proxy 外なので安全） ──
-let toolbar_renders = 0, list_renders = 0, editor_renders = 0;
+let toolbar_renders = 0, list_renders = 0, editor_renders = 0, layout_renders = 0;
 
 // ════════════════════════════════════════════════════════════
 // パネル間の操作 — handle を closure で参照する
@@ -231,6 +236,32 @@ const delete_memo = (id) => {
   editor_h.dirty     = false;
   save_memos(list_h.memos);
 };
+
+// ════════════════════════════════════════════════════════════
+// Layout panel — List と Editor の間の splitter を管理する構造専用 instance
+// （data state を持たず、resize / collapse の VDOM を返すだけ）
+// ════════════════════════════════════════════════════════════
+// layout_h を先に立ち上げて #list / #editor の mount 先を作る。
+// 親 RicDOM が再描画しても、ctx 内の `{ tag:'div', id:'list' }` は VDOM 上
+// 不変なので diff が DOM を差し替えず、内側の list_h / editor_h が
+// 描画した DOM はそのまま保持される（13_controlled_dialog_splitter と同じ手法）。
+const layout_h = create_RicDOM('#inner-frame', {
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  sp:   create_ui_splitter({ side: 'left', size: 380, min: 240, collapsible: true }),
+  render(s) {
+    layout_renders++;
+    return s.page({
+      style: { height: '100%', padding: 0, borderRadius: 0, border: 0,
+               display: 'flex', flexDirection: 'column' },
+      ctx: [
+        s.sp({
+          side: { ctx: [{ tag: 'div', id: 'list',   style: 'height:100%' }] },
+          main: { ctx: [{ tag: 'div', id: 'editor', style: 'height:100%' }] },
+        }),
+      ],
+    });
+  },
+});
 
 // ════════════════════════════════════════════════════════════
 // List panel — 一覧 / 付箋 / フィルタ / 選択
@@ -493,7 +524,10 @@ const toolbar_h = create_RicDOM('#toolbar', {
 //
 // 1. create_RicDOM は安い: 1 ページに何個あっても問題ない。
 //    UI の関心事ごとに instance を分けると、再描画スコープが
-//    自然に小さくなり、コードも読みやすい。
+//    自然に小さくなり、コードも読みやすい。このサンプルでは 4 個:
+//      toolbar_h (操作)・list_h (一覧)・editor_h (編集)・layout_h (構造)。
+//    layout_h のように "data state を持たず構造だけを担う" instance も
+//    自然なパターン。役割が明確なら何個でも分けて良い。
 //
 // 2. 共有 state は使わない: 各 handle は独立した state を持ち、
 //    cross-panel の更新は handle.xxx への直接代入で行う。
