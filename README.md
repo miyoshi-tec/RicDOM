@@ -234,6 +234,25 @@ s.user.address.city = 'Tokyo';
 s.ignore.cache = someData;
 ```
 
+> ⚠️ **よく踏むハマりどころ — フォーム draft の更新**
+>
+> 編集中の入力値を `s.draft = { ... }` のような **オブジェクト** で持つと、
+> ネスト代入は再描画されません。**スプレッドで丸ごと差し替える**のが正解です:
+>
+> ```javascript
+> // ❌ 再描画されない（draft は s の二段目以降）
+> s.draft.title = 'new title';
+>
+> // ✅ トップレベルを差し替える
+> s.draft = { ...s.draft, title: 'new title' };
+>
+> // ✅ もしくはトップレベルにフラットに持つ
+> s.draft_title = 'new title';
+> ```
+>
+> Proxy 監視は「トップレベル + その一段目」の合計 2 階層まで。深くなるほど
+> 「丸ごと差し替え」のパターンが効率も読みやすさも勝ります。
+
 ## RicUI コンポーネント
 
 RicUI は RicDOM の上に構築された CSS 変数ベースのコンポーネント集です。
@@ -342,7 +361,7 @@ ui_panel({ id: 'main', onmouseenter: hover, ctx: [...] }),
 |------|------|
 | `ui_text({ ctx, variant })` | テキスト |
 | `ui_code_pre({ ctx, obj, lang })` | コードブロック |
-| `ui_md_pre({ ctx })` | Markdown → VDOM 変換 |
+| `ui_md_pre({ ctx })` | Markdown → VDOM 変換（見出し / 太字 / 斜体 / インライン code / コードブロック / リスト / 引用 / リンク / テーブル / `---`。対応範囲・非対応・サニタイズは [SPEC.md#ui_md_pre](SPEC.md#ui_md_pre) 参照） |
 
 `ui_text` の variant：
 
