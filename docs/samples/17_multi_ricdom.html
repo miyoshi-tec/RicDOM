@@ -120,7 +120,7 @@ const {
   // controls
   ui_button, ui_input, ui_textarea, bind_input, ui_radiobutton,
   // popups
-  create_ui_popup, create_ui_dialog,
+  create_ui_dialog,
 } = RicUI;
 
 // ── DOM 骨格を mount-demo に流し込む ──
@@ -162,17 +162,6 @@ const load_memos = () => {
 const save_memos = (memos) => {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(memos)); }
   catch (e) { console.warn('[memo] localStorage save error', e); }
-};
-
-// ── テーマ設定（toolbar の popup から触る）──
-// 既存の 'ric-theme-change' イベントに乗って全 page が同期する仕組み。
-const get_setting = (key, fallback) =>
-  (window._ric_settings && window._ric_settings[key]) ?? fallback;
-const set_setting = (key, value) => {
-  window._ric_settings = { ...(window._ric_settings ?? {}), [key]: value };
-  try { localStorage.setItem('ric-settings', JSON.stringify(window._ric_settings)); }
-  catch {}
-  window.dispatchEvent(new CustomEvent('ric-theme-change', { detail: { key, value } }));
 };
 
 // ── 空 draft（毎回新オブジェクトを返す。共有して mutate されないように）──
@@ -474,11 +463,10 @@ const editor_h = create_RicDOM('#editor', {
 });
 
 // ════════════════════════════════════════════════════════════
-// Toolbar panel — 新規作成 / テーマ設定 popup
+// Toolbar panel — 新規作成のみ（テーマは nav_bar の ≡ メニュー側）
 // ════════════════════════════════════════════════════════════
 const toolbar_h = create_RicDOM('#toolbar', {
-  page:     create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
-  settings: create_ui_popup(),
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   render(s) {
     toolbar_renders++;
     return s.page({
@@ -492,32 +480,6 @@ const toolbar_h = create_RicDOM('#toolbar', {
             { tag: 'span', class: 'render-counter', ctx: [`(R: ${toolbar_renders})`] },
             { tag: 'span', style: { flex: 1 } },
             ui_button({ variant: 'primary', ctx: ['+ New'], onclick: create_new_memo }),
-            // テーマ設定 popup（toolbar 自前。nav_bar とは独立）
-            s.settings({ label: '⚙ テーマ', ctx: [
-              { tag: 'div', onclick: (e) => e.stopPropagation(),
-                style: 'min-width:220px;padding:8px;display:flex;flex-direction:column;gap:6px',
-                ctx: [
-                  ui_text({ variant: 'label', ctx: ['テーマ'] }),
-                  ui_radiobutton({
-                    name: 'tb-theme', value: get_setting('theme', 'light'),
-                    options: ['light', 'dark', 'teal', 'cyber', 'aqua'],
-                    onchange: (e) => { set_setting('theme', e.target.value); },
-                  }),
-                  ui_text({ variant: 'label', ctx: ['密度'] }),
-                  ui_radiobutton({
-                    name: 'tb-density', value: get_setting('density', 'comfortable'),
-                    options: ['tight', 'compact', 'comfortable'],
-                    onchange: (e) => { set_setting('density', e.target.value); },
-                  }),
-                  ui_text({ variant: 'label', ctx: ['フォント'] }),
-                  ui_radiobutton({
-                    name: 'tb-font', value: get_setting('font_size', 'lg'),
-                    options: ['sm', 'md', 'lg'],
-                    onchange: (e) => { set_setting('font_size', e.target.value); },
-                  }),
-                ],
-              },
-            ]}),
           ]}) ],
         }),
       ],
