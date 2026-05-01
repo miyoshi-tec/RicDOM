@@ -114,6 +114,10 @@
     <code>create_ui_tooltip()</code> でホバーツールチップ。
     <code>ctx: [ ui_button({...}), ... ]</code> で中身を自由に組み立てられます。
     画面下端の固定バーで上方向フリップを確認できます。
+    <br>
+    <strong>注：</strong>左の「RicDOM のみ」版は意図的に生 DOM + CSS で書いた <em>before</em>、
+    右の RicUI 版が <em>after</em> です。CSS 量とフリップ判定ロジックの差がそのまま
+    <code>create_ui_popup()</code> の価値になります。
   </p>
 
   <!-- ── 比較グリッド ── -->
@@ -252,10 +256,15 @@ const { create_ui_page, ui_panel, ui_text, create_ui_popup, create_ui_tooltip, u
 create_RicDOM('#mount-rui', {
   lang: 'ja', last_action: null,
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  // ── ステートフルコンポーネント ─────────────────────────────
+  // create_ui_popup() / create_ui_tooltip() は「開閉状態・配置方向・
+  // フリップ判定」を内部に持つインスタンスを返す。state スロットに
+  // 1 度だけ生成して保持し、render では関数として呼ぶ
+  // （render 内で毎回 create するとクリックごとに状態がリセットされる）。
+  // 1 インスタンス = 1 トリガーに対応する（dropdown / menu / tooltip 共通）。
   nav_l: create_ui_popup(),
   nav_r: create_ui_popup(),
   lang_dd: create_ui_popup(),
-  // ツールチップは 1 インスタンス = 1 トリガー（dropdown / menu と同じ設計）
   tip1: create_ui_tooltip(),
   tip2: create_ui_tooltip(),
   tip3: create_ui_tooltip(),

@@ -18,6 +18,10 @@
   <p class="page-intro">
     同じ「名前入力＋挨拶」アプリを <strong>RicDOM のみ</strong>（スタイルなし）と
     <strong>RicUI</strong>（CSS 主導テーマ）で実装し、コードの差を比べます。
+    右側（RicUI）の違いは 3 点：
+    (1) <code>create_ui_page</code> でテーマ／密度を統一、
+    (2) <code>ui_panel</code> / <code>ui_text</code> で意味のあるラッパに置き換え、
+    (3) <code>bind_input</code> で <code>value</code> + <code>oninput</code> を 1 行化。
   </p>
 
   <!-- ── 比較グリッド ── -->
@@ -61,6 +65,8 @@ const { create_RicDOM } = RicDOM;
 const { create_ui_page, ui_panel, ui_text, bind_input } = RicUI;
 create_RicDOM('#mount-rui', {
   name: '',
+  // create_ui_page() は「ページ枠」のインスタンスを返す。state スロットに置いて
+  // render の中で s.page({ ctx: [...] }) と関数として呼び出す（RicUI 共通イディオム）。
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   render(s) {
     return s.page({
