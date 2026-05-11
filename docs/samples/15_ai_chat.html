@@ -34,6 +34,15 @@
 
 <script type="text/plain" id="src-demo">
 // ── AI Chat デモ ──
+//
+// 🎯 RicDOM の主役: state.messages / state.input / state.streaming と render の関係。
+//   - bind_textarea(s, 'input') と focus_when(handle.refs.get('input'), !s.streaming) と
+//     create_ui_scroll_pane の自動下端追従が、宣言的なチャット UI の核心。
+//
+// 残り（PROVIDERS 定義、SSE parsing、CORS リクエスト）は AI API を叩くための
+// 周辺機材で、RicDOM の学びとは独立。ファイル後半 / 別関数として分離してある
+// ので、初読では「主役 3 state + render」だけを追えば良い。
+//
 // API キーを入力 → プロバイダ選択 → 送信でストリーミング応答。
 // キーは state に保持するだけで、どこにも永続化しない。
 
@@ -383,6 +392,12 @@ async function send(s) {
 }
 </script>
 
+<!-- ════════════════════════════════════════════════════════════════
+     ここから下は docs サイト用のラッパー（デモ本体ではない）。
+     上の <script type="text/plain" id="src-demo"> を取り出して eval し、
+     #mount-demo にデモを流し込み、その下にコードペインを並べる
+     だけの薄い装置。RicDOM の学習対象ではないので読み飛ばして OK。
+     ════════════════════════════════════════════════════════════════ -->
 <script src="_nav_bar.js"></script>
 <script>
 (() => {

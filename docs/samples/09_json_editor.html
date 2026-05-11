@@ -22,6 +22,18 @@
 const { create_RicDOM } = RicDOM;
 const { create_ui_page, create_ui_dialog, create_ui_toast, ui_button, ui_input, ui_text } = RicUI;
 
+// ── path モデル（このサンプルの中心概念）──
+// 編集対象の位置を「キー / index の配列」で表す。例えば JSON が
+//   { name: 'Alice', address: { city: '東京' }, tags: ['a','b'] }
+// なら：
+//   path = []                          → root 全体
+//   path = ['name']                    → 'Alice'
+//   path = ['address', 'city']         → '東京'
+//   path = ['tags', 0]                 → 'a'（配列は数値 index）
+// 書き込み系は元の root を変更せず、clone した新しい木を返す。
+// これは RicDOM がトップレベル代入で再描画を起こすためで、
+// ネストを直接書き換えると Proxy が拾えず再描画されない。
+//
 // ── JSON ヘルパー群（純粋関数）──
 // 書き込み系（set_at / del_at / rename_at）は immutable に clone を返す。
 // 読み取り系（get_at）と分類系（type_of / preview / unique_key）は副作用なし。
@@ -339,6 +351,12 @@ create_RicDOM('#mount-demo', {
 });
 </script>
 
+<!-- ════════════════════════════════════════════════════════════════
+     ここから下は docs サイト用のラッパー（デモ本体ではない）。
+     上の <script type="text/plain" id="src-demo"> を取り出して eval し、
+     #mount-demo にデモを流し込み、その下にコードペインを並べる
+     だけの薄い装置。RicDOM の学習対象ではないので読み飛ばして OK。
+     ════════════════════════════════════════════════════════════════ -->
 <script src="_nav_bar.js"></script>
 <script>
 (() => {

@@ -684,3 +684,101 @@ test('SVG: HTML 要素の差分更新は従来通り HTML namespace', async () =
   // parent.namespaceURI が XHTML でも、HTML 要素として正しく動作する
   assert.equal(span.namespaceURI, XHTML_NS, 'span は HTML namespace のまま');
 });
+
+// =====================================================================
+// style diff: prev/next の (string | object | 無し) 全組み合わせ
+// =====================================================================
+// 旧バグ: prev が文字列形式 (style: 'flex:1' 等) のとき、次の render で
+//        style が object（空含む）になっても cssText がクリアされず残留した。
+//        else 分岐のリセットループが typeof prev_style !== 'string' でガード
+//        されていて prev が string だと丸ごとスキップされていたのが原因。
+// 修正後: else 分岐冒頭で prev が string なら cssText='' で一括クリアする。
+
+// 共通のヘルパ — mode を切り替えて span の style 遷移を検証する。
+// 初回 render は create_RicDOM の同期描画で prev が当たる。s.mode を 'b' に
+// 切り替えて flush_raf することで次 render に進み、next が当たる。
+// next === undefined のときは VDOM の style キーごと省略する（「style プロパティ
+// 自体が無いノード」と「style:{} なノード」を呼び分けたいため）。
+const run_style_transition = async ({ prev, next }) => {
+  const dom = setup_jsdom();
+  const { create_RicDOM } = require('../src/ricdom');
+  const target = dom.window.document.querySelector('#app');
+
+  const s = create_RicDOM(target, {
+    mode: 'a',
+    render: (s) => {
+      const node = { tag: 'span', ctx: ['X'] };
+      const style = s.mode === 'a' ? prev : next;
+      if (style !== undefined) node.style = style;
+      return node;
+    },
+  });
+
+  s.mode = 'b';
+  await flush_raf();
+
+  return target.querySelector('span');
+};
+
+test('style diff: string → string で cssText が完全に上書きされる', async () => {
+  const span = await run_style_transition({
+    prev: 'color:red',
+    next: 'background:blue',
+  });
+  // prev の color は残らず、next の background のみが効いている
+  assert.equal(span.style.color, '');
+  assert.equal(span.style.background, 'blue');
+});
+
+test('style diff: string → object で旧 cssText がクリアされる', async () => {
+  const span = await run_style_transition({
+    prev: 'color:red',
+    next: { background: 'blue' },
+  });
+  assert.equal(span.style.color, '', 'prev の color が残ってはいけない');
+  assert.equal(span.style.background, 'blue', 'next の background は適用される');
+});
+
+test('style diff: string → style キー無しで inline style が消える', async () => {
+  const span = await run_style_transition({
+    prev: 'color:red',
+    next: undefined,  // VDOM から style プロパティ自体を省略
+  });
+  assert.equal(span.getAttribute('style') || '', '', 'inline style が空になっている');
+});
+
+test('style diff: string → 空 object で inline style が消える', async () => {
+  // Rancha の path bar で踏んだ症状（spacer span の style:'flex:1' が、
+  // style を持たない sibling span に差し替えたとき残留する）と同質のケース。
+  const span = await run_style_transition({
+    prev: 'flex:1',
+    next: {},
+  });
+  assert.equal(span.getAttribute('style') || '', '', 'flex:1 が残ってはいけない');
+});
+
+test('style diff: object → string で cssText が完全に上書きされる', async () => {
+  const span = await run_style_transition({
+    prev: { color: 'red' },
+    next: 'background:blue',
+  });
+  assert.equal(span.style.color, '');
+  assert.equal(span.style.background, 'blue');
+});
+
+test('style diff: object → object で消えたキーがリセットされる', async () => {
+  const span = await run_style_transition({
+    prev: { color: 'red', background: 'yellow' },
+    next: { background: 'blue' },
+  });
+  assert.equal(span.style.color, '', '消えた color はクリアされる');
+  assert.equal(span.style.background, 'blue', '残った background は更新される');
+});
+
+test('style diff: object → style キー無しで inline style が消える', async () => {
+  const span = await run_style_transition({
+    prev: { color: 'red' },
+    next: undefined,
+  });
+  assert.equal(span.getAttribute('style') || '', '');
+});

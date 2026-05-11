@@ -31,6 +31,10 @@
 
   <!-- 左：RicDOM のみ版 -->
   <script type="text/plain" id="src-raw">
+// ── 比較用: RicDOM のみで dialog / toast を組み立てた低レベル実装 ──
+// 通常は右側の RicUI 版（create_ui_dialog / create_ui_toast）を使う。
+// この raw 版は「RicUI が裏で何をしているか」を覗くための比較サンプル。
+
 const { create_RicDOM } = RicDOM;
 const TOAST_ANIM_MS = 200;
 

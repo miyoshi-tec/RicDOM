@@ -33,8 +33,6 @@ const { ui_range       } = require('../control/ui_range');
 const { ui_select      } = require('../control/ui_select');
 const { ui_radiobutton } = require('../control/ui_radiobutton');
 const { ui_color       } = require('../control/ui_color');
-const { ui_button      } = require('../control/ui_button');
-const { ui_separator   } = require('../control/ui_separator');
 
 // ─────────────────────────────────────────────────────────────
 // 型推論

@@ -47,6 +47,7 @@ try {
     // 14 は欠番（旧 "Chat UI" は 15 "AI Chat" に完全に包含されたため削除）
     { no: '15', file: '15_ai_chat.html',           title: 'AI Chat (live)' },
     { no: '16', file: '16_svg_editor.html',        title: 'SVG ツリーエディタ' },
+    { no: '17', file: '17_multi_ricdom.html',      title: 'Multi-instance Memo' },
   ];
 
   // ── 現在のページ検出 ──
@@ -181,7 +182,7 @@ try {
   };
 
   // ── ナビバー描画 ──
-  const nav_handle = create_RicDOM('#nav_bar', {
+  create_RicDOM('#nav_bar', {
     render(s) {
       // create_ui_page で包む（RicUI CSS が自動適用される）
       s.page ??= create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' });

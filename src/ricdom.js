@@ -352,13 +352,23 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
       el.style.cssText = next_style;
     }
   } else {
+    // 旧 style が文字列形式（cssText 一括指定）だった場合は、object を当てる前に
+    // cssText をクリアする。これを忘れると旧の inline style が DOM に残留する。
+    // 例: prev style:'flex:1' → next style: undefined / {} のとき、下のリセット
+    // ループは prev が string だと回らないので、ここで cssText を空にしないと
+    // 'flex:1' がノード上に残ってしまう。
+    if (typeof prev_style === 'string') {
+      el.style.cssText = '';
+    }
+
     // 次のスタイルを適用する
     for (const [key, val] of Object.entries(next_style)) {
       if (el.style[key] !== val) {
         el.style[key] = val;
       }
     }
-    // 前にあったが次にないスタイルをリセットする
+    // 前にあったが次にないスタイルをリセットする（prev も object のケース）。
+    // prev が string のケースは上の cssText='' で一括クリア済み。
     if (typeof prev_style !== 'string') {
       for (const key of Object.keys(prev_style)) {
         if (!(key in next_style)) {
