@@ -28,7 +28,8 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 | **text** | `ui_text` / `ui_code_pre` / `ui_md_pre` |
 | **popup（ファクトリ）** | `create_ui_popup` / `create_ui_tooltip` / `create_ui_dialog` / `create_ui_toast` |
 | **composite（ファクトリ）** | `create_ui_accordion` / `create_ui_splitter` / `create_ui_scroll_pane` / `create_ui_tweak_panel` |
-| **composite (純関数)** | `ui_tabs` / `bind_tabs` / `ui_tweak_panel` / `ui_tweak_folder` / `ui_tweak_row` / `tweak_infer_type` |
+| **composite (純関数)** | `ui_tabs` / `bind_tabs` / `ui_inline_menu` / `ui_tweak_panel` / `ui_tweak_folder` / `ui_tweak_row` / `tweak_infer_type` |
+| **helpers** | `watch_outside_click` |
 | **theme util** | `create_theme` / `create_density` / `create_font_size` / `export_theme` / `export_settings` |
 | **meta** | `version` |
 
@@ -67,7 +68,8 @@ ric_ui/
   control/               # ui_button, ui_input, bind_input, ui_textarea, bind_textarea, ui_range, bind_range, ui_color, bind_color, ui_separator, focus_when, etc.
   text/                  # ui_text, ui_code_pre, ui_md_pre
   popup/                 # create_ui_popup, create_ui_tooltip, create_ui_dialog, create_ui_toast
-  composite/             # create_ui_accordion, create_ui_splitter, create_ui_scroll_pane, ui_tabs, bind_tabs, create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row
+  composite/             # create_ui_accordion, create_ui_splitter, create_ui_scroll_pane, ui_tabs, bind_tabs, ui_inline_menu, create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row
+  dom_helpers.js         # watch_outside_click
 ```
 
 
@@ -381,7 +383,7 @@ return {
 
 | 関数 | 説明 |
 |------|------|
-| `ui_button({ ctx, variant, onclick, disabled })` | variant: `default` / `primary` / `ghost` |
+| `ui_button({ ctx, variant, size, onclick, disabled })` | variant: `default` / `primary` / `ghost` / `link`。size: `undefined`（density 委譲、既定）/ `sm` / `md` / `lg` |
 | `ui_input({ value, oninput, placeholder, type, disabled })` | テキスト入力 |
 | `bind_input(s, key, options)` | `s[key]` と双方向バインド |
 | `ui_textarea({ value, oninput, rows, auto_resize })` | 複数行入力。`auto_resize: { min_rows, max_rows }` で高さ自動調整 |
@@ -582,6 +584,52 @@ create_RicDOM('#app', {
 ```
 
 variant: `line`（アンダーライン、デフォルト）| `pill`（背景色）
+
+#### ui_inline_menu
+
+trigger 要素の near に絶対配置する軽量ポップオーバー。`create_ui_popup` が
+重すぎる「行ごとに存在する … メニュー」のための純関数。portal を使わず、
+親要素の `position:relative` に対して `position:absolute` で配置するだけ。
+インスタンスを取らないので「行数分インスタンスが生まれる」問題が起きない。
+
+```javascript
+{
+  tag: 'div',
+  style: 'position:relative; ...',  // ← 親は position:relative にする
+  ctx: [
+    ui_button({ ctx: ['…'], onclick: () => { s.menu_for = id; } }),
+    ui_inline_menu({
+      open:   s.menu_for === id,
+      anchor: 'br',  // 'br' | 'bl' | 'tr' | 'tl' （br=親の右下）
+      ctx:    [...],
+    }),
+  ],
+}
+```
+
+含まないもの (意図的):
+- **外クリックで閉じる挙動はライブラリに持たせない**。`onclick` は内部で
+  `e.stopPropagation()` するため、`document` 級の click handler が
+  「menu の外をクリック」を検知できる。helper として
+  [`watch_outside_click`](#watch_outside_clickcallback) を使う。
+- キーボード操作 / focus trap / ARIA は含まない。これらが必要な場合は
+  `create_ui_popup` か独自実装を使うこと。
+
+#### watch_outside_click(callback)
+
+`document` に click listener を 1 つ取り付け、bubble してきたクリックで
+`callback` を呼ぶ。戻り値は unsubscribe 関数。
+
+```javascript
+const unsub = watch_outside_click(() => { s.menu_for = null; });
+// テスト / unmount で
+unsub();
+```
+
+`ui_inline_menu` の `onclick` が `e.stopPropagation()` するため、ここで
+渡した callback は **menu の外をクリックしたとき** だけ走る。複数 menu
+や popup が共存するアプリでも listener は 1 個で十分（state を 1
+callback で集約して閉じる）。
 
 #### create_ui_splitter(opts)
 

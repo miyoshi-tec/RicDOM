@@ -5,7 +5,7 @@ Electron・社内ツール・IoT デバイス UI 向け。JSON で書く 8KB の
 | レイヤー | サイズ | 役割 |
 |---------|------:|------|
 | **RicDOM** | 8KB | コア — JSON → DOM 差分更新 + Proxy リアクティビティ |
-| **RicUI** | 59KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
+| **RicUI** | 61KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
 
 Virtual DOM を持たず、JSON オブジェクトの差分から実 DOM を直接パッチします。
 Electron やブラウザで、リアルタイムなダッシュボード・パラメータ調整 UI・データ可視化ツールを素早く構築できます。
@@ -80,7 +80,7 @@ npm パッケージとしては公開していません。
 | バンドル | サイズ | 内容 |
 |---------|------:|------|
 | `RicDOM.min.js` | 8KB | コア（必須） |
-| `RicUI.min.js` | 59KB | UI コンポーネント集 + パラメータ調整パネル |
+| `RicUI.min.js` | 61KB | UI コンポーネント集 + パラメータ調整パネル |
 
 ### Hello World（RicDOM のみ）
 
@@ -337,7 +337,7 @@ ui_panel({ id: 'main', onmouseenter: hover, ctx: [...] }),
 
 | 関数 | 説明 |
 |------|------|
-| `ui_button({ ctx, variant, onclick })` | ボタン（variant: `default` / `primary` / `ghost`） |
+| `ui_button({ ctx, variant, size, onclick })` | ボタン（variant: `default` / `primary` / `ghost` / `link`、size: `sm` / `md` / `lg` 任意） |
 | `ui_input({ value, oninput, placeholder })` | テキスト入力 |
 | `bind_input(s, key, options)` | state と双方向バインドされた input |
 | `ui_textarea({ value, oninput, auto_resize })` | 複数行入力。`auto_resize: { min_rows, max_rows }` で高さ自動調整 |
@@ -421,8 +421,15 @@ s.toast.show('保存しました', { type: 'success', duration: 3000 });
 | `create_ui_accordion(options)` | アコーディオン（折りたたみ） | — |
 | `ui_tabs({ items, active, onchange })` | タブナビゲーション | — |
 | `bind_tabs(s, key, options)` | state とバインドされた tabs | — |
+| `ui_inline_menu({ open, anchor, ctx })` | 親要素 (`position:relative`) の四隅に絶対配置する軽量ポップオーバー。`watch_outside_click` と組で「外クリックで閉じる」を構成する | — |
 | `create_ui_splitter(options)` | ドラッグ可能なペイン分割 | `toggle()` / `collapsed()` / `get_size()` / `set_size(px)` |
 | `create_ui_scroll_pane(options)` | 追従型スクロール領域（チャット UI 等） | `scroll_to_bottom()` / `scroll_to_top()` |
+
+#### Helpers
+
+| 関数 | 説明 |
+|------|------|
+| `watch_outside_click(callback)` | `document` クリックで `callback` を呼ぶ。戻り値は unsubscribe 関数 |
 
 ### 3 種類のコンポーネントパターン
 

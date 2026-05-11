@@ -20,8 +20,10 @@
 //   popup     : create_ui_popup / create_ui_tooltip / create_ui_dialog / create_ui_toast
 //   composite : create_ui_accordion / create_ui_splitter / create_ui_scroll_pane
 //               ui_tabs / bind_tabs
+//               ui_inline_menu
 //               create_ui_tweak_panel / ui_tweak_panel / ui_tweak_folder / ui_tweak_row
 //               tweak_infer_type
+//   helpers   : watch_outside_click
 //   theme util: create_theme / create_density / create_font_size
 //               export_theme / export_settings
 
@@ -65,7 +67,10 @@ const { create_ui_splitter    } = require('./composite/create_ui_splitter');
 const { create_ui_scroll_pane } = require('./composite/create_ui_scroll_pane');
 const { ui_tabs             } = require('./composite/ui_tabs');
 const { bind_tabs           } = require('./composite/bind_tabs');
+const { ui_inline_menu      } = require('./composite/ui_inline_menu');
 const { create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row, infer_type: tweak_infer_type } = require('./composite/ui_tweak');
+
+const { watch_outside_click } = require('./dom_helpers');
 
 const { create_theme, create_density, create_font_size, export_theme, export_settings } = require('./context');
 
@@ -120,9 +125,12 @@ module.exports = {
   create_ui_scroll_pane,
   ui_tabs,
   bind_tabs,
+  ui_inline_menu,
   create_ui_tweak_panel,
   ui_tweak_panel,
   ui_tweak_folder,
   ui_tweak_row,
   tweak_infer_type,
+  // helpers
+  watch_outside_click,
 };
