@@ -147,9 +147,13 @@ const create_ui_splitter = ({
       tag:   'div',
       class: 'ric-splitter__side'
            + (inst._cl ? ' ric-splitter__side--collapsed' : ''),
-      style: 'flex-shrink:0;flex-basis:' + (inst._cl ? 0 : inst._sz) + 'px'
-           + ';overflow:' + (inst._cl || inst._tg ? 'hidden' : 'auto')
-           + (inst._tg ? ';transition:flex-basis var(--ric-duration, 200ms) var(--ric-easing, ease)' : ''),
+      style: {
+        flexShrink: 0,
+        flexBasis:  (inst._cl ? 0 : inst._sz) + 'px',
+        overflow:   (inst._cl || inst._tg) ? 'hidden' : 'auto',
+        // _tg (toggling) 中だけ transition を効かせる
+        ...(inst._tg ? { transition: 'flex-basis var(--ric-duration, 200ms) var(--ric-easing, ease)' } : {}),
+      },
       ontransitionend: inst._tg ? () => { inst._tg = false; inst.__notify?.(); } : undefined,
       ctx:   side_arg.ctx || [],
     };
@@ -176,7 +180,7 @@ const create_ui_splitter = ({
     const main_panel = {
       tag:   'div',
       class: 'ric-splitter__main',
-      style: 'flex:1;overflow:auto;min-width:0;min-height:0',
+      style: { flex: 1, overflow: 'auto', minWidth: 0, minHeight: 0 },
       ctx:   main_arg.ctx || [],
     };
 
@@ -189,8 +193,13 @@ const create_ui_splitter = ({
       tag:   'div',
       class: 'ric-splitter ric-splitter--' + (_is_h ? 'horizontal' : 'vertical')
            + (inst._cl ? ' ric-splitter--collapsed' : ''),
-      style: 'display:flex;flex-direction:' + (_is_h ? 'row' : 'column')
-           + ';width:100%;height:100%;overflow:hidden',
+      style: {
+        display:       'flex',
+        flexDirection: _is_h ? 'row' : 'column',
+        width:         '100%',
+        height:        '100%',
+        overflow:      'hidden',
+      },
       ctx:   children,
     };
   };

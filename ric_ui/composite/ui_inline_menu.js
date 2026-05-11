@@ -30,43 +30,58 @@
 
 'use strict';
 
-// anchor → 絶対位置スタイル文字列のマップ
+// anchor → 絶対位置スタイル (object 形式) のマップ
 // 「br = bottom-right」のように親の右下に張り付く位置（つまり親の右端の
 // すぐ下に展開する）として読む
 const _ANCHOR = {
-  br: 'top:100%;right:0;margin-top:4px',
-  bl: 'top:100%;left:0;margin-top:4px',
-  tr: 'bottom:100%;right:0;margin-bottom:4px',
-  tl: 'bottom:100%;left:0;margin-bottom:4px',
+  br: { top:    '100%', right: 0, marginTop:    '4px' },
+  bl: { top:    '100%', left:  0, marginTop:    '4px' },
+  tr: { bottom: '100%', right: 0, marginBottom: '4px' },
+  tl: { bottom: '100%', left:  0, marginBottom: '4px' },
 };
 
-const _style_to_string = (style) => {
-  if (!style) return '';
-  if (typeof style === 'string') return style;
-  // object → 'k:v;k:v' 形式に整形（既存 RicUI と同様の単純変換）
-  return Object.entries(style)
-    .map(([k, v]) => `${k}:${v}`)
-    .join(';');
+// style 引数を object に正規化する。string で渡された場合は受け入れず、
+// 'a:b;c:d' を { a: 'b', c: 'd' } に簡易変換する（後方互換のため）。
+// 公式には object 形式を推奨。
+const _to_style_object = (style) => {
+  if (!style) return {};
+  if (typeof style === 'object' && !Array.isArray(style)) return style;
+  if (typeof style === 'string') {
+    const obj = {};
+    for (const part of style.split(';')) {
+      const idx = part.indexOf(':');
+      if (idx <= 0) continue;
+      const k = part.slice(0, idx).trim();
+      const v = part.slice(idx + 1).trim();
+      if (k) obj[k] = v;
+    }
+    return obj;
+  }
+  return {};
 };
 
 const ui_inline_menu = ({
   open = false,
   anchor = 'br',
   ctx = [],
-  style = '',
+  style = null,
   class: extra_class = '',
 } = {}) => {
   if (!open) return null;
 
   const pos = _ANCHOR[anchor] || _ANCHOR.br;
-  const extra = _style_to_string(style);
-  // 単一の文字列スタイルに統一する（diff path のシンプル経路を通す）
-  const style_str = `position:absolute;z-index:10;${pos}${extra ? ';' + extra : ''}`;
+  // base + anchor の position + 呼び出し側追加の style を object でマージ
+  const merged_style = {
+    position: 'absolute',
+    zIndex:   10,
+    ...pos,
+    ..._to_style_object(style),
+  };
 
   return {
     tag: 'div',
     class: 'ric-inline-menu' + (extra_class ? ' ' + extra_class : ''),
-    style: style_str,
+    style: merged_style,
     // menu 内クリックは document に bubble させない。
     // document 側の outside-click handler が menu 自身のクリックで
     // 閉じてしまわないように。

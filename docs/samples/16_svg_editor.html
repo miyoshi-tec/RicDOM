@@ -257,7 +257,7 @@ const handle = create_RicDOM('#mount-demo', {
   tree: {
     tag: 'svg', viewBox: '0 0 300 200',
     width: '100%', height: '100%',
-    style: 'display:block;max-width:100%;max-height:100%',
+    style: { display: 'block', maxWidth: '100%', maxHeight: '100%' },
     ctx: [
       { tag: 'circle', cx: 80,  cy: 100, r: 40, fill: '#3b82f6' },
       { tag: 'rect',   x: 160,  y: 50, width: 100, height: 100,
@@ -281,13 +281,20 @@ const tree_line = (node, path, is_selected, onclick) => {
   const label = '<' + node.tag + (attrs ? ' ' + attrs : '') + '>' + inner;
   return {
     tag: 'div',
-    style: 'padding:2px 6px;border-radius:3px;cursor:pointer;'
-         + 'margin-left:' + (path.length * 14) + 'px;'
-         + 'font-family:ui-monospace,monospace;font-size:12px;'
-         + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
-         + (is_selected
-             ? 'background:var(--ric-color-accent);color:var(--ric-color-accent-fg,#fff)'
-             : ''),
+    style: {
+      padding: '2px 6px',
+      borderRadius: '3px',
+      cursor: 'pointer',
+      marginLeft: (path.length * 14) + 'px',
+      fontFamily: 'ui-monospace,monospace',
+      fontSize: '12px',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      ...(is_selected
+        ? { background: 'var(--ric-color-accent)', color: 'var(--ric-color-accent-fg,#fff)' }
+        : {}),
+    },
     onclick,
     ctx: [label],
   };
@@ -321,15 +328,12 @@ handle.render = (s) => {
   // 左ペイン: ツリー + 属性編集 + 末尾に常時「次を追加」エリア
   const editor_panel = {
     tag: 'div',
-    style: 'height:100%;overflow:auto;padding:12px;'
-         + 'display:flex;flex-direction:column;gap:10px',
+    style: { height: '100%', overflow: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' },
     ctx: [
       // ツリー表示
       ui_text({ variant: 'label', ctx: ['ツリー（クリックで選択）:'] }),
       { tag: 'div',
-        style: 'border:1px solid var(--ric-color-border);border-radius:4px;'
-             + 'padding:6px;background:var(--ric-color-control);'
-             + 'max-height:220px;overflow:auto',
+        style: { border: '1px solid var(--ric-color-border)', borderRadius: '4px', padding: '6px', background: 'var(--ric-color-control)', maxHeight: '220px', overflow: 'auto' },
         ctx: render_tree(s),
       },
 
@@ -340,10 +344,10 @@ handle.render = (s) => {
       ...attr_entries.map(([k, v]) => ui_row({
         style: { alignItems: 'center', gap: '6px' },
         ctx: [
-          { tag: 'div', style: 'flex:0 0 110px', ctx: [
+          { tag: 'div', style: { flex: '0 0 110px' }, ctx: [
             ui_text({ variant: 'muted', ctx: [k] }),
           ]},
-          { tag: 'div', style: 'flex:1', ctx: [
+          { tag: 'div', style: { flex: 1 }, ctx: [
             ui_input({
               value: String(v),
               oninput: (e) => {
@@ -369,10 +373,10 @@ handle.render = (s) => {
       is_text ? ui_row({
         style: { alignItems: 'center', gap: '6px' },
         ctx: [
-          { tag: 'div', style: 'flex:0 0 110px', ctx: [
+          { tag: 'div', style: { flex: '0 0 110px' }, ctx: [
             ui_text({ variant: 'muted', ctx: ['(text 本体)'] }),
           ]},
-          { tag: 'div', style: 'flex:1', ctx: [
+          { tag: 'div', style: { flex: 1 }, ctx: [
             ui_input({
               value: text_content,
               oninput: (e) => {
@@ -395,7 +399,7 @@ handle.render = (s) => {
 
       // 区切り
       { tag: 'hr',
-        style: 'margin:8px 0;border:none;border-top:1px dashed var(--ric-color-border)' },
+        style: { margin: '8px 0', border: 'none', borderTop: '1px dashed var(--ric-color-border)' } },
 
       // ── 末尾に常時表示: 次のノードを追加 ──
       ui_text({ variant: 'label',
@@ -467,8 +471,14 @@ handle.render = (s) => {
     height: Math.max(0, bbox.height) + PAD * 2,
     fill: 'rgba(0,0,0,0)',  // 透明塗りつぶし: bbox 内全体がマウスヒット対象
     rx: 2,
-    style: 'stroke:#f59e0b;stroke-width:1.5;stroke-dasharray:4 2;'
-         + (can_drag ? 'cursor:move' : 'cursor:not-allowed;opacity:0.7'),
+    style: {
+      stroke: '#f59e0b',
+      strokeWidth: 1.5,
+      strokeDasharray: '4 2',
+      ...(can_drag
+        ? { cursor: 'move' }
+        : { cursor: 'not-allowed', opacity: 0.7 }),
+    },
     onmousedown: can_drag ? (e) => {
       e.preventDefault();
       const svg_el = e.target.ownerSVGElement;
@@ -510,15 +520,26 @@ handle.render = (s) => {
   // 右ペイン: SVG プレビュー
   const preview_panel = {
     tag: 'div',
-    style: 'height:100%;display:flex;align-items:center;justify-content:center;'
-         + 'padding:16px;background:repeating-linear-gradient(45deg,'
-         + '#f9fafb,#f9fafb 10px,#f3f4f6 10px,#f3f4f6 20px)',
+    style: {
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px',
+      background: 'repeating-linear-gradient(45deg,#f9fafb,#f9fafb 10px,#f3f4f6 10px,#f3f4f6 20px)',
+    },
     ctx: [
       { tag: 'div',
-        style: 'width:min(100%, 520px);aspect-ratio: 3 / 2;background:#fff;'
-             + 'border:1px solid var(--ric-color-border);'
-             + 'box-shadow:var(--ric-shadow);'
-             + 'display:flex;align-items:center;justify-content:center',
+        style: {
+          width: 'min(100%, 520px)',
+          aspectRatio: '3 / 2',
+          background: '#fff',
+          border: '1px solid var(--ric-color-border)',
+          boxShadow: 'var(--ric-shadow)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
         ctx: [preview_tree],
       },
     ],
@@ -560,9 +581,9 @@ handle.render = (s) => {
                  display: 'flex', flexDirection: 'column' },
         ctx: [
           s.outer_sp({
-            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%' } }] },
             side: {
-              style: 'height:100%;overflow:auto;padding:0',
+              style: { height: '100%', overflow: 'auto', padding: 0 },
               ctx: [
                 ui_code_pre({
                   lang: 'javascript',

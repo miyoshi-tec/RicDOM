@@ -214,7 +214,7 @@ handle.render = (s) => {
       ]}),
       ui_row({ style: { alignItems: 'center', gap: '10px' }, ctx: [
         ui_text({ variant: 'label', ctx: ['API Key:'] }),
-        { tag: 'div', style: 'flex:1', ctx: [
+        { tag: 'div', style: { flex: 1 }, ctx: [
           ui_input({
             type:        'password',
             value:       s.ui.api_key,
@@ -232,7 +232,7 @@ handle.render = (s) => {
   // メッセージ履歴 + 入力エリア（splitter の main に置く）
   const chat_area = {
     tag: 'div',
-    style: 'height:100%;display:flex;flex-direction:column;min-height:0',
+    style: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 },
     ctx: [
 
       // ── エラー表示（あれば）──
@@ -244,7 +244,7 @@ handle.render = (s) => {
             ctx: [
               ui_row({ style: { alignItems: 'center', gap: '8px' }, ctx: [
                 ui_text({ ctx: ['⚠ ' + s.ui.error] }),
-                { tag: 'div', style: 'flex:1' },
+                { tag: 'div', style: { flex: 1 } },
                 ui_button({
                   variant: 'ghost',
                   ctx: ['✕'],
@@ -257,7 +257,7 @@ handle.render = (s) => {
 
       // ── メッセージ履歴 ──
       s.pane({
-        style: 'flex:1;padding:16px;min-height:0',
+        style: { flex: 1, padding: '16px', minHeight: 0 },
         ctx: [
           ui_col({ style: { gap: '12px' }, ctx: [
             s.ignore.messages.length === 0
@@ -301,7 +301,7 @@ handle.render = (s) => {
                  borderLeft: 0, borderRight: 0, borderBottom: 0 },
         ctx: [
           ui_row({ style: { gap: '8px', alignItems: 'flex-end' }, ctx: [
-            { tag: 'div', style: 'flex:1', ctx: [
+            { tag: 'div', style: { flex: 1 }, ctx: [
               ui_textarea({
                 ref:         'chat_input',
                 value:       s.ui.input,
@@ -415,9 +415,9 @@ async function send(s) {
                  display: 'flex', flexDirection: 'column' },
         ctx: [
           s.outer_sp({
-            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%' } }] },
             side: {
-              style: 'height:100%;overflow:auto;padding:0',
+              style: { height: '100%', overflow: 'auto', padding: 0 },
               ctx: [
                 ui_code_pre({
                   lang: 'javascript',

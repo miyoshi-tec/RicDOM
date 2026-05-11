@@ -36,40 +36,41 @@ describe('ui_inline_menu: 開閉', () => {
 
 describe('ui_inline_menu: anchor', () => {
 
-  test('anchor=br (default) は top:100%; right:0', () => {
-    const n = ui_inline_menu({ open: true });
-    assert.match(n.style, /top:100%/);
-    assert.match(n.style, /right:0/);
+  test('anchor=br (default) は top:100% + right:0', () => {
+    const s = ui_inline_menu({ open: true }).style;
+    assert.equal(s.top, '100%');
+    assert.equal(s.right, 0);
   });
 
-  test('anchor=bl は top:100%; left:0', () => {
-    const n = ui_inline_menu({ open: true, anchor: 'bl' });
-    assert.match(n.style, /top:100%/);
-    assert.match(n.style, /left:0/);
+  test('anchor=bl は top:100% + left:0', () => {
+    const s = ui_inline_menu({ open: true, anchor: 'bl' }).style;
+    assert.equal(s.top, '100%');
+    assert.equal(s.left, 0);
   });
 
-  test('anchor=tr は bottom:100%; right:0', () => {
-    const n = ui_inline_menu({ open: true, anchor: 'tr' });
-    assert.match(n.style, /bottom:100%/);
-    assert.match(n.style, /right:0/);
+  test('anchor=tr は bottom:100% + right:0', () => {
+    const s = ui_inline_menu({ open: true, anchor: 'tr' }).style;
+    assert.equal(s.bottom, '100%');
+    assert.equal(s.right, 0);
   });
 
-  test('anchor=tl は bottom:100%; left:0', () => {
-    const n = ui_inline_menu({ open: true, anchor: 'tl' });
-    assert.match(n.style, /bottom:100%/);
-    assert.match(n.style, /left:0/);
+  test('anchor=tl は bottom:100% + left:0', () => {
+    const s = ui_inline_menu({ open: true, anchor: 'tl' }).style;
+    assert.equal(s.bottom, '100%');
+    assert.equal(s.left, 0);
   });
 
   test('知らない anchor は default(br) に fallback', () => {
-    const n = ui_inline_menu({ open: true, anchor: 'xx' });
-    assert.match(n.style, /top:100%/);
-    assert.match(n.style, /right:0/);
+    const s = ui_inline_menu({ open: true, anchor: 'xx' }).style;
+    assert.equal(s.top, '100%');
+    assert.equal(s.right, 0);
   });
 
-  test('position:absolute が必ず含まれる', () => {
+  test('position:absolute と z-index が必ず含まれる', () => {
     for (const a of ['br', 'bl', 'tr', 'tl']) {
-      const n = ui_inline_menu({ open: true, anchor: a });
-      assert.match(n.style, /position:absolute/, `anchor=${a}`);
+      const s = ui_inline_menu({ open: true, anchor: a }).style;
+      assert.equal(s.position, 'absolute', `anchor=${a}`);
+      assert.equal(s.zIndex,   10,         `anchor=${a}`);
     }
   });
 });
@@ -104,14 +105,23 @@ describe('ui_inline_menu: 透過', () => {
     assert.equal(n.class, 'ric-inline-menu my-menu');
   });
 
-  test('style (string) が末尾に追加される', () => {
-    const n = ui_inline_menu({ open: true, style: 'min-width:120px' });
-    assert.match(n.style, /min-width:120px$/);
+  test('style (object) が base / anchor / 呼び出し側追加でマージされる', () => {
+    const n = ui_inline_menu({
+      open: true,
+      style: { minWidth: '120px', maxWidth: '300px' },
+    });
+    // base
+    assert.equal(n.style.position, 'absolute');
+    // anchor (br)
+    assert.equal(n.style.top, '100%');
+    // 呼び出し側追加
+    assert.equal(n.style.minWidth, '120px');
+    assert.equal(n.style.maxWidth, '300px');
   });
 
-  test('style (object) が k:v;k:v 形式で末尾に追加される', () => {
-    const n = ui_inline_menu({ open: true, style: { 'min-width': '120px', 'max-width': '300px' } });
-    assert.match(n.style, /min-width:120px/);
-    assert.match(n.style, /max-width:300px/);
+  test('style (string 後方互換) も object に正規化されて受け入れられる', () => {
+    // 公式は object 推奨だが、string 渡しも壊さない（後方互換）
+    const n = ui_inline_menu({ open: true, style: 'min-width:120px' });
+    assert.equal(n.style['min-width'], '120px');
   });
 });

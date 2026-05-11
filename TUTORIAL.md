@@ -145,7 +145,7 @@ create_RicDOM('#app', {
         },
         s.name
           ? { tag: 'p', ctx: [`こんにちは、${s.name}さん！`] }
-          : { tag: 'p', style: 'color:#aaa', ctx: ['（名前を入力してください）'] },
+          : { tag: 'p', style: { color: '#aaa' }, ctx: ['（名前を入力してください）'] },
       ],
     };
   },
@@ -225,7 +225,7 @@ create_RicDOM('#app', {
 // これと同じことを手書きすると…
 return {
   tag: 'div', class: 'ric-page',
-  style: '--ric-color-bg:#f9fafb; --ric-color-fg:#111318; ...',
+  style: { '--ric-color-bg': '#f9fafb', '--ric-color-fg': '#111318', /* ... */ },
   ctx: [
     { tag: 'style', ctx: ['.ric-page { ... } .ric-button { ... }'] },
     // ...子要素

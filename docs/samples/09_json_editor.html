@@ -376,9 +376,9 @@ create_RicDOM('#mount-demo', {
                  display: 'flex', flexDirection: 'column' },
         ctx: [
           s.outer_sp({
-            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%' } }] },
             side: {
-              style: 'height:100%;overflow:auto;padding:0',
+              style: { height: '100%', overflow: 'auto', padding: 0 },
               ctx: [
                 ui_code_pre({
                   lang: 'javascript',

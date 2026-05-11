@@ -234,16 +234,16 @@ const s = create_RicDOM('#mount-demo', {
       style: section_style(s, id),
       onclick: (e) => on_section_click(id, e),
       ctx: [
-        { tag: 'div', style: 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;opacity:0.5;margin-bottom:8px', ctx: [SECTION_LABELS[id]] },
+        { tag: 'div', style: { fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5, marginBottom: '8px' }, ctx: [SECTION_LABELS[id]] },
         ...ctx,
       ],
     });
 
     const right_panel = () => ({ ctx: [
-      { tag: 'div', style: 'padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto',
+      { tag: 'div', style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' },
         onclick: on_bg_click,
         ctx: [
-          { tag: 'div', style: 'font-size:11px;opacity:0.5;text-align:center', ctx: ['UI 部品をクリック → 左右パネルで関連項目をハイライト'] },
+          { tag: 'div', style: { fontSize: '11px', opacity: 0.5, textAlign: 'center' }, ctx: ['UI 部品をクリック → 左右パネルで関連項目をハイライト'] },
 
           sec('typography', [
             ui_text({ variant: 'title', ctx: ['Title テキスト'] }),
@@ -384,9 +384,9 @@ const s = create_RicDOM('#mount-demo', {
                  display: 'flex', flexDirection: 'column' },
         ctx: [
           s.outer_sp({
-            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%' } }] },
             side: {
-              style: 'height:100%;overflow:auto;padding:0',
+              style: { height: '100%', overflow: 'auto', padding: 0 },
               ctx: [
                 ui_code_pre({
                   lang: 'javascript',

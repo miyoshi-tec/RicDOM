@@ -62,7 +62,7 @@ const create_ui_popup = () => {
     if (inst._o) {
       const portal_items = [
         // 透明オーバーレイ：外クリックで閉じる
-        { tag: 'div', style: 'position:fixed;inset:0;z-index:401',
+        { tag: 'div', style: { position: 'fixed', inset: 0, zIndex: 401 },
           onclick: _do_close },
         // ポップアップ本体
         { tag: 'div',
