@@ -187,6 +187,12 @@ CSS テンプレート（`ric_ui/css_templates.js`）か、各要素の直近に
 - オブジェクト → キーを camelCase に変換
 - 配列 → 後勝ちマージ（文字列はスキップ）
 
+**スタイル差分の保証**:
+- prev / next が string / object / `undefined` のどの組み合わせでも、
+  消えたプロパティは正しく DOM からクリアされる
+- 例: prev `style: 'flex:1'` → next `style: {}`（または `style` キー省略）
+  でも旧 inline style が DOM に残らない
+
 ### DOM 差分アルゴリズム
 
 - **Serial Key マッチング**: 重複タグにインデックスを付与（`div@0`, `div@1`）
