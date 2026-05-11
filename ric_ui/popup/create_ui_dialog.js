@@ -110,12 +110,18 @@ const create_ui_dialog = () => {
         // 半透明バックドロップ（外クリックで閉じる）
         { tag: 'div',
           class: 'ric-dialog__overlay' + (inst._c ? ' ric-dialog__overlay--out' : ''),
-          style: 'position:fixed;inset:0;z-index:500',
+          style: { position: 'fixed', inset: 0, zIndex: 500 },
           onclick: _request_close },
         // ダイアログ本体（DOM 順でバックドロップの後 → 自然に前面）
         { tag: 'div',
           class: 'ric-dialog' + (inst._c ? ' ric-dialog--out' : ''),
-          style: 'position:fixed;z-index:501;top:50%;left:50%;transform:translate(-50%,-50%)',
+          style: {
+            position:  'fixed',
+            zIndex:    501,
+            top:       '50%',
+            left:      '50%',
+            transform: 'translate(-50%,-50%)',
+          },
           onanimationend: _on_anim_end,
           ctx: [
             { tag: 'div', class: 'ric-dialog__header', ctx: [

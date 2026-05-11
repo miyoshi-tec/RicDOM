@@ -43,15 +43,24 @@ const create_ui_toast = () => {
       const portal_items = [{
         tag:   'div',
         class: 'ric-toast__container',
-        style: 'position:fixed;bottom:20px;right:20px;z-index:600'
-             + ';display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none',
+        style: {
+          position:      'fixed',
+          bottom:        '20px',
+          right:         '20px',
+          zIndex:        600,
+          display:       'flex',
+          flexDirection: 'column',
+          gap:           '8px',
+          alignItems:    'flex-end',
+          pointerEvents: 'none',
+        },
         ctx: inst._it.map(item => ({
           tag:   'div',
           class: 'ric-toast__item'
                + (item._e ? ' ric-toast__item--in' : '')
                + (item.type && item.type !== 'default' ? ' ric-toast__item--' + item.type : '')
                + (item._c ? ' ric-toast__item--out' : ''),
-          style: 'pointer-events:auto',
+          style: { pointerEvents: 'auto' },
           onanimationend: item._c ? () => _remove(item.id) : item._e ? () => { item._e = false; } : undefined,
           ctx: [
             { tag: 'span', class: 'ric-toast__msg',   ctx: [item.msg] },

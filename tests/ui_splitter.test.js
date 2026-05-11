@@ -78,7 +78,7 @@ describe('create_ui_splitter: 基本構造', () => {
     const inst = create_ui_splitter({ side: 'left', size: 300 });
     const root = inst();
     const side_panel = find_by_class(root, 'ric-splitter__side')[0];
-    assert.ok(side_panel.style.includes('flex-basis:300px'));
+    assert.equal(side_panel.style.flexBasis, '300px');
   });
 
   it('collapsible:true → 折り畳みボタンあり', () => {
@@ -128,7 +128,7 @@ describe('create_ui_splitter: uncontrolled collapse', () => {
     inst.toggle();
     const root = inst();
     const side_panel = find_by_class(root, 'ric-splitter__side')[0];
-    assert.ok(side_panel.style.includes('flex-basis:0px'));
+    assert.equal(side_panel.style.flexBasis, '0px');
     assert.ok(side_panel.class.includes('ric-splitter__side--collapsed'));
     assert.ok(root.class.includes('ric-splitter--collapsed'));
   });
@@ -144,7 +144,7 @@ describe('create_ui_splitter: controlled collapse', () => {
     const root = inst({ collapsed: true, side: { ctx: [] }, main: { ctx: [] } });
     assert.ok(root.class.includes('ric-splitter--collapsed'));
     const side_panel = find_by_class(root, 'ric-splitter__side')[0];
-    assert.ok(side_panel.style.includes('flex-basis:0px'));
+    assert.equal(side_panel.style.flexBasis, '0px');
   });
 
   it('collapsed:false → 通常表示', () => {
@@ -152,7 +152,7 @@ describe('create_ui_splitter: controlled collapse', () => {
     const root = inst({ collapsed: false, side: { ctx: [] }, main: { ctx: [] } });
     assert.ok(!root.class.includes('ric-splitter--collapsed'));
     const side_panel = find_by_class(root, 'ric-splitter__side')[0];
-    assert.ok(side_panel.style.includes('flex-basis:240px'));
+    assert.equal(side_panel.style.flexBasis, '240px');
   });
 
   it('collapsed 変化で _tg=true（トランジション有効化）', () => {

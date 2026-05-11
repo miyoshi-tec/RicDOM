@@ -15,19 +15,19 @@ const make_popup_dir = (trigger_el, content_h) => {
     ? 'below' : 'above';
 };
 
-// ── position:fixed スタイル文字列 ─────────────────────────────────
+// ── position:fixed スタイル (object 形式) ─────────────────────────
 // ポータル配置のため z-index:401 固定。
 // オーバーレイも z:401 だが、DOM 順でポップアップが後方に置かれるため
 // 自然に前面になる。
 const _pos_style = (pos) => {
-  const p = ['position:fixed', 'z-index:401'];
-  if (pos.top    !== undefined) p.push('top:'    + pos.top    + 'px');
-  if (pos.bottom !== undefined) p.push('bottom:' + pos.bottom + 'px');
-  if (pos.left   !== undefined) p.push('left:'   + pos.left   + 'px');
-  if (pos.right  !== undefined) p.push('right:'  + pos.right  + 'px');
-  if (pos.width    !== undefined) p.push('width:'     + pos.width    + 'px');
-  if (pos.minWidth !== undefined) p.push('min-width:' + pos.minWidth + 'px');
-  return p.join(';');
+  const s = { position: 'fixed', zIndex: 401 };
+  if (pos.top      !== undefined) s.top      = pos.top      + 'px';
+  if (pos.bottom   !== undefined) s.bottom   = pos.bottom   + 'px';
+  if (pos.left     !== undefined) s.left     = pos.left     + 'px';
+  if (pos.right    !== undefined) s.right    = pos.right    + 'px';
+  if (pos.width    !== undefined) s.width    = pos.width    + 'px';
+  if (pos.minWidth !== undefined) s.minWidth = pos.minWidth + 'px';
+  return s;
 };
 
 // ── Containing Block 取得（ポータル版）────────────────────────────
