@@ -140,7 +140,7 @@ create_RicDOM('#mount-demo', {
     // ── page 設定メニュー ──
     const pg_note = `${s.page.theme} — ${s.page.density} / ${s.page.font_size}`;
 
-    return s.page({ style: 'min-height:100vh; padding: 20px', ctx: [
+    return s.page({ style: { minHeight: '100vh', padding: '20px' }, ctx: [
       ui_col({ ctx: [
         ui_text({ variant: 'title', ctx: ['ui_panel テーマ上書きデモ'] }),
         ui_text({ variant: 'muted', ctx: [
@@ -215,9 +215,9 @@ create_RicDOM('#mount-demo', {
                  display: 'flex', flexDirection: 'column' },
         ctx: [
           s.outer_sp({
-            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%;overflow:auto' }] },
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%', overflow: 'auto' } }] },
             side: {
-              style: 'height:100%;overflow:auto;padding:0',
+              style: { height: '100%', overflow: 'auto', padding: 0 },
               ctx: [
                 ui_code_pre({
                   lang: 'javascript',

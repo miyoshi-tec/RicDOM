@@ -190,10 +190,10 @@ create_RicDOM('#mount-demo', {
         ctx: [
           s.outer_sp({
             // main: デモ本体のマウント先。ctx 省略で child の DOM が親 re-render でも保持される。
-            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%' } }] },
             // side: ソースコード表示
             side: {
-              style: 'height:100%;overflow:auto;padding:0',
+              style: { height: '100%', overflow: 'auto', padding: 0 },
               ctx: [
                 ui_code_pre({
                   lang: 'javascript',

@@ -192,13 +192,13 @@ try {
       const summary = cfg.theme === '—' ? '...' : `${theme_label} / ${cfg.font_size} / ${cfg.density}`;
 
       return s.page({
-        style: 'padding:0;overflow:visible',
+        style: { padding: 0, overflow: 'visible' },
         ctx: [
           // ── ナビバー本体 ──
-          { tag: 'div', style: 'display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--ric-color-border);font-size:0.9em;flex-shrink:0;position:sticky;top:0;z-index:100;flex-wrap:wrap', ctx: [
+          { tag: 'div', style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderBottom: '1px solid var(--ric-color-border)', fontSize: '0.9em', flexShrink: 0, position: 'sticky', top: 0, zIndex: 100, flexWrap: 'wrap' }, ctx: [
             // ── 左: ← Top ──
             ui_button({ variant: 'ghost', ctx: ['← Top'], onclick: () => { location.href = '../index.html'; } }),
-            { tag: 'span', style: 'color:var(--ric-color-border)', ctx: ['|'] },
+            { tag: 'span', style: { color: 'var(--ric-color-border)' }, ctx: ['|'] },
 
             // ── 中央: prev / サンプル一覧（create_ui_popup） / next ──
             // data-sample がないページ（ドキュメント等）ではサンプルナビを省略し
@@ -227,14 +227,14 @@ try {
                 : ui_button({ variant: 'ghost', ctx: ['→'], disabled: true }),
             ] : [
               // ドキュメントページ: data-doc 属性からタイトルを表示
-              { tag: 'span', style: 'font-weight:600', ctx: [nav_el.dataset.doc ?? ''] },
+              { tag: 'span', style: { fontWeight: 600 }, ctx: [nav_el.dataset.doc ?? ''] },
             ]),
 
             // ── スペーサー ──
-            { tag: 'span', style: 'flex:1;min-width:8px' },
+            { tag: 'span', style: { flex: 1, minWidth: '8px' } },
 
             // ── 右: 設定サマリー + ≡（create_ui_popup）──
-            { tag: 'span', style: 'font-size:0.8em;color:var(--ric-color-fg-muted);white-space:nowrap', ctx: [summary] },
+            { tag: 'span', style: { fontSize: '0.8em', color: 'var(--ric-color-fg-muted)', whiteSpace: 'nowrap' }, ctx: [summary] },
             (() => {
               const settings_popup = s._settings_popup ??= create_ui_popup();
               // s.tweak に代入することで __notify が注入され folder 開閉で再描画される

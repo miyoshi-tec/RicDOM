@@ -72,10 +72,10 @@ const sparkline = (values, css_stroke) => {
   }).join(' ');
   return {
     tag: 'svg', viewBox: `0 0 ${W} ${H}`,
-    style: 'display:block;width:100%;height:auto',
+    style: { display: 'block', width: '100%', height: 'auto' },
     ctx: [
       { tag: 'polyline', fill: 'none', points,
-        style: `stroke:${css_stroke};stroke-width:2;stroke-linejoin:round;stroke-linecap:round` },
+        style: { stroke: css_stroke, strokeWidth: 2, strokeLinejoin: 'round', strokeLinecap: 'round' } },
     ],
   };
 };
@@ -87,7 +87,7 @@ const bars = (values, css_fill) => {
   const bar_w = (W - PAD * 2) / values.length - GAP;
   return {
     tag: 'svg', viewBox: `0 0 ${W} ${H}`,
-    style: 'display:block;width:100%;height:auto',
+    style: { display: 'block', width: '100%', height: 'auto' },
     ctx: values.map((v, i) => {
       const h = (H - PAD * 2) * (v / max);
       return {
@@ -97,7 +97,7 @@ const bars = (values, css_fill) => {
         width:  bar_w.toFixed(1),
         height: h.toFixed(1),
         rx: 2,
-        style: `fill:${css_fill}`,
+        style: { fill: css_fill },
       };
     }),
   };
@@ -150,16 +150,14 @@ create_RicDOM('#mount-demo', {
             ]}),
             ui_text({ variant: 'label', ctx: ['現在の state.ui（値の変化がそのまま UI に反映されます）:'] }),
             { tag: 'pre',
-              style: 'margin:0;padding:10px 12px;background:rgba(0,0,0,0.05);'
-                   + 'border-radius:4px;font-size:12px;line-height:1.5;'
-                   + 'font-family:ui-monospace,Menlo,Consolas,monospace',
+              style: { margin: 0, padding: '10px 12px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', fontSize: '12px', lineHeight: 1.5, fontFamily: 'ui-monospace,Menlo,Consolas,monospace' },
               ctx: [JSON.stringify(s.ui, null, 2)],
             },
           ],
         }),
 
         // ── Splitter（controlled collapsed + 双方向同期）──
-        { tag: 'div', style: 'flex:1;min-height:0', ctx: [
+        { tag: 'div', style: { flex: 1, minHeight: 0 }, ctx: [
           s.sp({
             // checkbox の OR 条件を collapsed に直接つなぐ。
             // 両方 OFF → collapsed=true（自動で閉じアニメ再生）。
@@ -277,10 +275,10 @@ create_RicDOM('#mount-demo', {
         ctx: [
           s.outer_sp({
             // main: デモ本体のマウント先。ctx 省略で child の DOM が親 re-render でも保持される。
-            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: 'height:100%' }] },
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%' } }] },
             // side: ソースコード表示
             side: {
-              style: 'height:100%;overflow:auto;padding:0',
+              style: { height: '100%', overflow: 'auto', padding: 0 },
               ctx: [
                 ui_code_pre({
                   lang: 'javascript',

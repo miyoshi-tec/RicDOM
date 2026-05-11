@@ -282,8 +282,7 @@ create_RicDOM('#mount-rui', {
         ui_panel({ ctx: [
           // ── タイトル行 + ハンバーガーメニュー ─────
           { tag: 'div',
-            style: 'display:flex;align-items:center;justify-content:space-between;' +
-                   'margin-bottom:var(--ric-gap-md)',
+            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--ric-gap-md)' },
             ctx: [
               s.nav_l({ ctx: MENU_CTX }),
               ui_text({ variant: 'title', ctx: ['ポップアップ'] }),
@@ -301,7 +300,7 @@ create_RicDOM('#mount-rui', {
           ui_col({ ctx: [
             ui_text({ variant: 'label', ctx: ['ツールチップ'] }),
             { tag: 'div',
-              style: 'display:flex;align-items:center;gap:var(--ric-gap-md);flex-wrap:wrap',
+              style: { display: 'flex', alignItems: 'center', gap: 'var(--ric-gap-md)', flexWrap: 'wrap' },
               ctx: [
                 s.tip1({ content: 'ファイルを開く', ctx: [ui_button({ ctx: ['開く'] })] }),
                 s.tip2({ content: '変更を保存（Ctrl+S）', ctx: [ui_button({ ctx: ['保存'], variant: 'primary' })] }),
