@@ -103,7 +103,7 @@ create_RicDOM('#app', {
         },
         s.name
           ? { tag: 'p', ctx: [`こんにちは、${s.name}さん！`] }
-          : { tag: 'p', style: 'color:#aaa', ctx: ['（名前を入力してください）'] },
+          : { tag: 'p', style: { color: '#aaa' }, ctx: ['（名前を入力してください）'] },
       ],
     };
   },
