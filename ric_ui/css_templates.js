@@ -269,6 +269,40 @@ ${_P}.ric-button--ghost {
 ${_P}.ric-button--ghost:hover:not(:disabled) {
   border-color: ${_fm};
   background: ${_bd};
+}
+${_P}.ric-button--link {
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  height: auto;
+  padding: 1px 5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+${_P}.ric-button--link:hover:not(:disabled) {
+  background: ${_bd};
+  border-color: transparent;
+}
+${_P}.ric-button--link:active:not(:disabled) {
+  transform: none;
+  filter: none;
+  background: color-mix(in srgb, ${_fg} 14%, transparent);
+}
+${_P}.ric-button--sm {
+  height: 22px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+${_P}.ric-button--md {
+  height: 28px;
+  font-size: 14px;
+  padding: 0 10px;
+}
+${_P}.ric-button--lg {
+  height: 36px;
+  font-size: 16px;
+  padding: 0 14px;
 }`,
 
   'ric-input': () => `
@@ -965,6 +999,22 @@ ${_P}.ric-tooltip { display: inline-flex; }
   color: ${_af};
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}`,
+
+  // ── inline-menu ──────────────────────────────
+  // trigger 要素の近くに absolute 配置するポップオーバー。portal を使わない
+  // 軽量版。CSS は箱の見た目だけを担当し、位置は ui_inline_menu の style で
+  // 直接指定する（anchor → top/left/right/bottom を組み立てる）。
+  'ric-inline-menu': () => `
+${_P}.ric-inline-menu {
+  background: ${_ct};
+  border: ${_b1};
+  border-radius: ${_r};
+  padding: 4px;
+  box-shadow: ${_sh};
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }`,
 
   'ric-md-pre': () => `

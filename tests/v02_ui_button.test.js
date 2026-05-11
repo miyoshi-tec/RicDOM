@@ -120,3 +120,56 @@ describe('ui_button: rest スプレッド', () => {
     assert.equal(n.class, 'ric-button ric-button--primary');
   });
 });
+
+// =====================================================================
+// size プロパティ（density と直交する、単体ボタン寸法の上書き）
+// =====================================================================
+
+describe('ui_button: size', () => {
+
+  test('size 省略時は size class が付かない（density に従う）', () => {
+    assert.equal(ui_button().class, 'ric-button');
+  });
+
+  test('size=sm のとき ric-button--sm が付く', () => {
+    assert.equal(ui_button({ size: 'sm' }).class, 'ric-button ric-button--sm');
+  });
+
+  test('size=md のとき ric-button--md が付く', () => {
+    assert.equal(ui_button({ size: 'md' }).class, 'ric-button ric-button--md');
+  });
+
+  test('size=lg のとき ric-button--lg が付く', () => {
+    assert.equal(ui_button({ size: 'lg' }).class, 'ric-button ric-button--lg');
+  });
+
+  test('variant + size を組み合わせると両方付く（順序: variant → size）', () => {
+    const n = ui_button({ variant: 'primary', size: 'sm' });
+    assert.equal(n.class, 'ric-button ric-button--primary ric-button--sm');
+  });
+
+  test('variant=link + size=sm のような併用も成立する', () => {
+    const n = ui_button({ variant: 'link', size: 'sm' });
+    assert.equal(n.class, 'ric-button ric-button--link ric-button--sm');
+  });
+
+  test('rest.class が指定されても size class は保たれる', () => {
+    const n = ui_button({ size: 'sm', class: 'my-extra' });
+    assert.equal(n.class, 'ric-button ric-button--sm my-extra');
+  });
+});
+
+// =====================================================================
+// variant=link（breadcrumb / inline link 用の最小ボタン）
+// =====================================================================
+
+describe('ui_button: variant=link', () => {
+
+  test('variant=link で class が ric-button ric-button--link になる', () => {
+    assert.equal(ui_button({ variant: 'link' }).class, 'ric-button ric-button--link');
+  });
+
+  test('variant=link でも tag は button のまま（accessibility 上の選択）', () => {
+    assert.equal(ui_button({ variant: 'link' }).tag, 'button');
+  });
+});
