@@ -695,9 +695,11 @@ test('SVG: HTML 要素の差分更新は従来通り HTML namespace', async () =
 // 修正後: else 分岐冒頭で prev が string なら cssText='' で一括クリアする。
 
 // 共通のヘルパ — mode を切り替えて span の style 遷移を検証する。
-// 初回 render は create_RicDOM の同期描画で prev が当たる。s.mode を切り替えて
-// flush_raf することで次 render に進み、next を当てる。
-const _run_style_transition = async ({ prev, next }) => {
+// 初回 render は create_RicDOM の同期描画で prev が当たる。s.mode を 'b' に
+// 切り替えて flush_raf することで次 render に進み、next が当たる。
+// next === undefined のときは VDOM の style キーごと省略する（「style プロパティ
+// 自体が無いノード」と「style:{} なノード」を呼び分けたいため）。
+const run_style_transition = async ({ prev, next }) => {
   const dom = setup_jsdom();
   const { create_RicDOM } = require('../src/ricdom');
   const target = dom.window.document.querySelector('#app');
@@ -707,14 +709,11 @@ const _run_style_transition = async ({ prev, next }) => {
     render: (s) => {
       const node = { tag: 'span', ctx: ['X'] };
       const style = s.mode === 'a' ? prev : next;
-      // undefined のときは style キーごと省略する（VDOM に style プロパティが
-      // 無いケース）— 「{}」とは別ケースとして扱いたいため
       if (style !== undefined) node.style = style;
       return node;
     },
   });
 
-  // s.mode を b に切り替えると次 render で next style が当たる
   s.mode = 'b';
   await flush_raf();
 
@@ -722,7 +721,7 @@ const _run_style_transition = async ({ prev, next }) => {
 };
 
 test('style diff: string → string で cssText が完全に上書きされる', async () => {
-  const span = await _run_style_transition({
+  const span = await run_style_transition({
     prev: 'color:red',
     next: 'background:blue',
   });
@@ -731,36 +730,35 @@ test('style diff: string → string で cssText が完全に上書きされる',
   assert.equal(span.style.background, 'blue');
 });
 
-test('style diff: string → object で旧 cssText がクリアされる (旧バグ)', async () => {
-  const span = await _run_style_transition({
+test('style diff: string → object で旧 cssText がクリアされる', async () => {
+  const span = await run_style_transition({
     prev: 'color:red',
     next: { background: 'blue' },
   });
-  // 旧実装ではここで color:red が残っていた
   assert.equal(span.style.color, '', 'prev の color が残ってはいけない');
   assert.equal(span.style.background, 'blue', 'next の background は適用される');
 });
 
-test('style diff: string → 無し（style キーなし）で inline style が消える (旧バグ)', async () => {
-  const span = await _run_style_transition({
+test('style diff: string → style キー無しで inline style が消える', async () => {
+  const span = await run_style_transition({
     prev: 'color:red',
-    next: undefined,  // style キーごと省略
+    next: undefined,  // VDOM から style プロパティ自体を省略
   });
-  // 旧実装では 'color: red' が残留していた
   assert.equal(span.getAttribute('style') || '', '', 'inline style が空になっている');
 });
 
-test('style diff: string → 空 object で inline style が消える (旧バグ)', async () => {
-  const span = await _run_style_transition({
+test('style diff: string → 空 object で inline style が消える', async () => {
+  // Rancha の path bar で踏んだ症状（spacer span の style:'flex:1' が、
+  // style を持たない sibling span に差し替えたとき残留する）と同質のケース。
+  const span = await run_style_transition({
     prev: 'flex:1',
     next: {},
   });
-  // Rancha の path bar で踏んだのとほぼ同じケース
   assert.equal(span.getAttribute('style') || '', '', 'flex:1 が残ってはいけない');
 });
 
 test('style diff: object → string で cssText が完全に上書きされる', async () => {
-  const span = await _run_style_transition({
+  const span = await run_style_transition({
     prev: { color: 'red' },
     next: 'background:blue',
   });
@@ -769,17 +767,16 @@ test('style diff: object → string で cssText が完全に上書きされる',
 });
 
 test('style diff: object → object で消えたキーがリセットされる', async () => {
-  const span = await _run_style_transition({
+  const span = await run_style_transition({
     prev: { color: 'red', background: 'yellow' },
     next: { background: 'blue' },
   });
-  // color は消える、background は更新
-  assert.equal(span.style.color, '');
-  assert.equal(span.style.background, 'blue');
+  assert.equal(span.style.color, '', '消えた color はクリアされる');
+  assert.equal(span.style.background, 'blue', '残った background は更新される');
 });
 
-test('style diff: object → 無し（style キーなし）で inline style が消える', async () => {
-  const span = await _run_style_transition({
+test('style diff: object → style キー無しで inline style が消える', async () => {
+  const span = await run_style_transition({
     prev: { color: 'red' },
     next: undefined,
   });
