@@ -27,7 +27,7 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 | **control (ヘルパ)** | `focus_when(el, cond)` |
 | **text** | `ui_text` / `ui_code_pre` / `ui_md_pre` |
 | **popup（ファクトリ）** | `create_ui_popup` / `create_ui_tooltip` / `create_ui_dialog` / `create_ui_toast` |
-| **composite（ファクトリ）** | `create_ui_accordion` / `create_ui_splitter` / `create_ui_scroll_pane` / `create_ui_tweak_panel` |
+| **composite（ファクトリ）** | `create_ui_accordion` / `create_ui_splitter` / `create_ui_scroll_pane` / `create_ui_collapse_box` / `create_ui_tweak_panel` |
 | **composite (純関数)** | `ui_tabs` / `bind_tabs` / `ui_inline_menu` / `ui_tweak_panel` / `ui_tweak_folder` / `ui_tweak_row` / `tweak_infer_type` |
 | **helpers** | `watch_outside_click` |
 | **theme util** | `create_theme` / `create_density` / `create_font_size` / `export_theme` / `export_settings` |
@@ -57,6 +57,7 @@ consumer 側で CSS カスタマイズや E2E テストの selector として使
 | `create_ui_tooltip`  | `tooltip-target` / `tooltip` |
 | `create_ui_accordion`| `accordion` / `accordion-item` / `accordion-header` / `accordion-title` / `accordion-arrow` / `accordion-body` |
 | `ui_tabs`            | `tabs` / `tabs-bar` / `tabs-tab` / `tabs-panel` |
+| `create_ui_collapse_box` | `collapse-box` |
 
 使い方の例:
 
@@ -165,7 +166,7 @@ ric_ui/
   control/               # ui_button, ui_input, bind_input, ui_textarea, bind_textarea, ui_range, bind_range, ui_color, bind_color, ui_separator, focus_when, etc.
   text/                  # ui_text, ui_code_pre, ui_md_pre
   popup/                 # create_ui_popup, create_ui_tooltip, create_ui_dialog, create_ui_toast
-  composite/             # create_ui_accordion, create_ui_splitter, create_ui_scroll_pane, ui_tabs, bind_tabs, ui_inline_menu, create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row
+  composite/             # create_ui_accordion, create_ui_splitter, create_ui_scroll_pane, create_ui_collapse_box, ui_tabs, bind_tabs, ui_inline_menu, create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row
   dom_helpers.js         # watch_outside_click
 ```
 
@@ -802,6 +803,50 @@ s.pane.scroll_to_top();
 ```
 
 render 直前に現在の scrollTop を読んで「端にいるか」を判定し、描画完了（`requestAnimationFrame`）後に端まで scrollTop を更新する。インスタンスは `data-ric-sp` 属性で特定するため、minify 時のクラス短縮の影響を受けない。
+
+#### create_ui_collapse_box(opts?) (v0.3.9〜)
+
+「子要素をアニメーションで現す/消す」汎用 container primitive。
+`width` / `height` を JS で `0 ↔ natural` に切り替え、CSS transition で
+ブラウザ補間させる。アニメーション中は JS / RicDOM 共に走らない (transition は
+browser compositor で完結)。
+
+```javascript
+s.box = create_ui_collapse_box({
+  direction: 'v',     // 'v' (default) | 'h' | 'both'
+  duration:  200,     // ms
+  easing:    'ease',  // CSS easing 文字列
+});
+
+// 呼び出し側 — controlled mode 必須 (visible を渡す)
+s.box({
+  visible: s.expanded,
+  ctx:     [...],
+})
+```
+
+戻り値: VDOM ノード or `null` (完全に閉じている and 閉じる動作中でもないとき)。
+
+状態機械:
+
+```
+        visible:true              transitionend
+[closed] ────────→ [entering] ───────────────────→ [open]
+   ↑                                                  │
+   │ transitionend                       visible:false│
+   └──── [closing] ←─────────────────────────────────┘
+```
+
+中断 (`visible` がアニメ中に反転) は `entering ⇄ closing` 直接遷移。現在の
+補間値を `getBoundingClientRect` で snapshot して新 transition の起点にする。
+
+実装は browser の CSS transition に補間を委譲する **宣言的 API**。1 つの
+collapse_box につき JS が走るのはアニメの開始 / 終了の 2 点のみ。10 個並行で
+動かしても CPU 負荷は変わらない。`prefers-reduced-motion` は user 側 CSS で
+`transition: none` を当てれば自動的に瞬時遷移になる。
+
+DOM の `data-ric-cb` 属性でインスタンスを特定。`data-ric-role="collapse-box"`
+も付与される (CSS / E2E test の selector に使える)。
 
 ### Controlled / Uncontrolled パターン
 

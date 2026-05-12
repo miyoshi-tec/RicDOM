@@ -83,6 +83,15 @@ ${_P}.ric-grid {
   gap: ${_gm};
 }`,
 
+  // collapse-box は inline style の overflow / transition / width / height で
+  // 動作するため、CSS template 側ではセマンティクスとしての class 名だけ用意。
+  // user 側で .ric-collapse-box--entering / --closing を見て追加演出 (border /
+  // shadow など) を載せたい場合に使う。
+  'ric-collapse-box': () => `
+${_P}.ric-collapse-box {
+  display: block;
+}`,
+
   // ── ric-tweak（パラメータ調整パネル）────────────
   // ui_tweak_panel / create_ui_tweak_panel のルートコンテナ + タイトル。
 
