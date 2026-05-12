@@ -282,6 +282,117 @@ describe('create_ui_collapse_box: アニメ中の re-render で壊れない (reg
   });
 });
 
+describe('create_ui_collapse_box: multi-instance (key パラメータ)', () => {
+
+  beforeEach(setup_jsdom);
+
+  test('同一 factory で異なる key を渡すと独立した DOM ノードが返る', () => {
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+    const box = create_ui_collapse_box();
+    const a = box({ key: 'a', visible: true, ctx: ['A'] });
+    const b = box({ key: 'b', visible: true, ctx: ['B'] });
+    assert.ok(a, 'a の VDOM が出る');
+    assert.ok(b, 'b の VDOM が出る');
+    assert.notEqual(a['data-ric-cb'], b['data-ric-cb'],
+      '異なる key は異なる data-ric-cb 値を持つ');
+  });
+
+  test('key 省略時は \'_default\' として扱われ後方互換', () => {
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+    const box = create_ui_collapse_box();
+    const n1 = box({ visible: true });
+    const n2 = box({ key: '_default', visible: true });
+    // 両方とも同じ key の state を参照する → 同じ data-ric-cb
+    assert.equal(n1['data-ric-cb'], n2['data-ric-cb'],
+      'key 省略と key:\'_default\' は同一の state を共有する');
+  });
+
+  test('key 同士の state が独立: 一方を close しても他方は影響を受けない', () => {
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+    const box = create_ui_collapse_box();
+    box({ key: 'a', visible: true });
+    box({ key: 'b', visible: true });
+    // key='a' を close (corner case: measure 前なので即 closed=null)
+    const a_after = box({ key: 'a', visible: false });
+    assert.equal(a_after, null, 'a は closed (null)');
+    // b は entering 中のまま
+    const b_after = box({ key: 'b', visible: true });
+    assert.ok(b_after, 'b は維持される');
+    assert.match(b_after.class, /--entering/, 'b は entering 状態');
+  });
+
+  test('encodeURIComponent: path 風の key (スラッシュ・コロン・空白) も安全に扱える', () => {
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+    const box = create_ui_collapse_box();
+    const n = box({ key: 'C:/Users/foo bar/baz.txt', visible: true, ctx: ['x'] });
+    // attr 値に attribute selector で問題になる生の '/' ':' ' ' が含まれない
+    // (encodeURIComponent は '.' '~' '!' '*' "'" '(' ')' '-' '_' を encode しないが、
+    // これらは attribute selector で問題にならない。'/' ':' ' ' は encode される。)
+    assert.doesNotMatch(n['data-ric-cb'], /[/: ]/,
+      'data-ric-cb は危険文字を encode 済み (querySelector で正しくマッチ)');
+    // 念のため、原 path が attr 文字列に部分一致しないことも確認
+    assert.doesNotMatch(n['data-ric-cb'], /C:\/Users/,
+      '生の path 部分文字列は出ない');
+  });
+
+  test('closing 完了で state Map から entry が GC される', async () => {
+    // jsdom scrollHeight を 200 に mock してアニメが実際に発火するように
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
+      configurable: true, get() { return 200; },
+    });
+
+    const { create_RicDOM } = require('../src/ricdom');
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+
+    const handle = create_RicDOM('#app', {
+      visible: true,
+      box: create_ui_collapse_box(),
+      render: (s) => s.box({ key: 'k', visible: s.visible, ctx: ['x'] }),
+    });
+    await flush();   // measure → re-render で height:200px
+    handle.visible = false;
+    await flush();  // closing 開始
+
+    // transitionend 発火 → state delete + 次 render で null
+    const el = document.querySelector('[data-ric-role="collapse-box"]');
+    el.ontransitionend({ propertyName: 'height', target: el });
+    await flush();
+
+    // DOM が消えている = state が GC されて inst が null を返した
+    const el2 = document.querySelector('[data-ric-role="collapse-box"]');
+    assert.equal(el2, null, 'closing 完了で DOM 削除 = state GC 済み');
+  });
+
+  test('Rancha 風 sparse animation: 同 render で複数 instance を呼んでも独立に動く', async () => {
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
+      configurable: true, get() { return 200; },
+    });
+
+    const { create_RicDOM } = require('../src/ricdom');
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+
+    create_RicDOM('#app', {
+      box: create_ui_collapse_box(),
+      // 3 つの key を同時に enter させる (v0.3.10 までは 2 つ目以降が固まっていた)
+      render: (s) => ({ tag: 'div', ctx: [
+        s.box({ key: 'k1', visible: true, ctx: ['row1'] }),
+        s.box({ key: 'k2', visible: true, ctx: ['row2'] }),
+        s.box({ key: 'k3', visible: true, ctx: ['row3'] }),
+      ]}),
+    });
+    await flush();  // measure → re-render
+
+    const boxes = document.querySelectorAll('[data-ric-role="collapse-box"]');
+    assert.equal(boxes.length, 3, '3 つの DOM が並ぶ');
+    // 全 instance が height:200px (measure 完了済み = 全部独立に rAF が走った証拠)
+    for (let i = 0; i < boxes.length; i++) {
+      const style_attr = boxes[i].getAttribute('style') || '';
+      assert.match(style_attr, /height:\s*200px/,
+        `box[${i}] が height:200px (= measure が独立に走った)`);
+    }
+  });
+});
+
 describe('create_ui_collapse_box: state 配置の正しさ', () => {
   beforeEach(setup_jsdom);
 
