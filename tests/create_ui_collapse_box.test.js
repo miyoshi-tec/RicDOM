@@ -61,30 +61,31 @@ describe('create_ui_collapse_box: enter 開始時の VDOM', () => {
     assert.match(n.class, /ric-collapse-box--entering/);
   });
 
-  test('direction:v (default) で height:0 が initial style に出る', () => {
+  test('direction:v (default) で height:"0px" が initial style に出る', () => {
     const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
     const box = create_ui_collapse_box();
     const n = box({ visible: true });
-    assert.equal(n.style.height, 0);
+    // 初回 render は target=0 で entering 中なので "0px" (vdom が直接 string を持つ設計)
+    assert.equal(n.style.height, '0px');
     assert.equal(n.style.width, undefined, 'width は v では出ない');
     assert.match(n.style.transition, /height 200ms/);
   });
 
-  test('direction:h で width:0 が initial style に出る', () => {
+  test('direction:h で width:"0px" が initial style に出る', () => {
     const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
     const box = create_ui_collapse_box({ direction: 'h' });
     const n = box({ visible: true });
-    assert.equal(n.style.width, 0);
+    assert.equal(n.style.width, '0px');
     assert.equal(n.style.height, undefined);
     assert.match(n.style.transition, /width 200ms/);
   });
 
-  test('direction:both で width / height 両方 0 が initial style に出る', () => {
+  test('direction:both で width / height 両方 "0px" が initial style に出る', () => {
     const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
     const box = create_ui_collapse_box({ direction: 'both' });
     const n = box({ visible: true });
-    assert.equal(n.style.width, 0);
-    assert.equal(n.style.height, 0);
+    assert.equal(n.style.width, '0px');
+    assert.equal(n.style.height, '0px');
     assert.match(n.style.transition, /width 200ms.*height 200ms/);
   });
 
@@ -149,14 +150,17 @@ describe('create_ui_collapse_box: ライフサイクル (jsdom)', () => {
     assert.match(n2.class, /--entering/);
   });
 
-  test('visible:true → false で closing 状態に遷移する', () => {
+  test('measure 前に visible:false なら即 closed (null) に短絡する', () => {
+    // rAF が走っていない状態 (= scrollHeight 測定前) で visible:false を受けた
+    // 場合、target=0 のままで closing 状態に入っても transitionend が発火しない
+    // (height が 0→0 で変化ゼロ → CSS transition が走らない) ため、stuck を防ぐ
+    // ために corner case として即 closed に短絡する設計。
     const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
     const box = create_ui_collapse_box();
-    box({ visible: true });   // open に向かう (entering)
-    // entering 中に false → closing (中断)
+    box({ visible: true });   // open に向かう (entering, _tw/_th=0)
+    // rAF の measure は走らない (jsdom セットアップ無しのテスト)
     const n = box({ visible: false });
-    assert.match(n.class, /--closing/);
-    assert.doesNotMatch(n.class, /--entering/);
+    assert.equal(n, null, 'measure 未実行で close されたら null (即 closed) を返す');
   });
 
   test('transitionend (exit 完了) で次 render が null になる', () => {
@@ -180,6 +184,17 @@ describe('create_ui_collapse_box: ライフサイクル (jsdom)', () => {
   test('実 DOM を介した exit ライフサイクル (mount → transitionend で null)', async () => {
     const { create_RicDOM } = require('../src/ricdom');
     const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+
+    // jsdom はレイアウト計算をしないので scrollHeight/scrollWidth が 0。
+    // collapse_box は scrollHeight=0 だと「アニメ不要」として corner case
+    // (即 closed) に短絡するため、テスト目的で見かけ上 200px の content
+    // があることにする。
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
+      configurable: true, get() { return 200; },
+    });
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollWidth', {
+      configurable: true, get() { return 300; },
+    });
 
     const target = document.querySelector('#app');
     const handle = create_RicDOM(target, {
@@ -216,6 +231,56 @@ describe('create_ui_collapse_box: ライフサイクル (jsdom)', () => {
 // --------------------------------------------------------------------------
 // safe_notify 連携
 // --------------------------------------------------------------------------
+
+describe('create_ui_collapse_box: アニメ中の re-render で壊れない (regression)', () => {
+
+  beforeEach(setup_jsdom);
+
+  test('entering 中に無関係な state 変更で re-render しても height は target を維持する', async () => {
+    // v0.3.9 までの実装には潜在バグがあり、entering 中の re-render で VDOM の
+    // 条件分岐により height が消え、imperative inline (rAF で setされた値) が
+    // RicDOM diff の reset ループでクリアされてアニメーションが中断していた。
+    // v0.3.10 の VDOM 一元管理設計でこの問題を解消した。
+
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
+      configurable: true, get() { return 200; },
+    });
+
+    const { create_RicDOM } = require('../src/ricdom');
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+
+    const handle = create_RicDOM('#app', {
+      visible: true,
+      counter: 0,
+      box: create_ui_collapse_box(),
+      render: (s) => ({
+        tag: 'div',
+        ctx: [
+          String(s.counter),
+          s.box({ visible: s.visible, ctx: [{ tag: 'span', ctx: ['x'] }] }),
+        ],
+      }),
+    });
+
+    await flush();  // 初回 render (height:0) → measure → 再 render (height:200px)
+
+    // entering 中の VDOM が height:200px を持っている
+    let el = document.querySelector('[data-ric-role="collapse-box"]');
+    assert.ok(el, 'entering 中の DOM');
+    assert.match(el.getAttribute('style') || '', /height:\s*200px/,
+      'measure 後 height:200px が inline に出る');
+
+    // 無関係な state 変更 → re-render
+    handle.counter++;
+    await flush();
+
+    // height が依然として 200px のまま (アニメ破綻していない)
+    el = document.querySelector('[data-ric-role="collapse-box"]');
+    assert.ok(el, 're-render 後も DOM が存在する');
+    assert.match(el.getAttribute('style') || '', /height:\s*200px/,
+      '無関係な re-render で height が消されない (= アニメーション破綻しない)');
+  });
+});
 
 describe('create_ui_collapse_box: state 配置の正しさ', () => {
   beforeEach(setup_jsdom);

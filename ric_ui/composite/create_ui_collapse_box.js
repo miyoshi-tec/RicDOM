@@ -8,41 +8,27 @@
 //     easing:    'ease',    // CSS easing 文字列 (default 'ease')
 //   });
 //
-//   // render 内で呼ぶ
-//   s.box({ visible: s.expanded, ctx: [...] })
+//   s.box({ visible: s.expanded, ctx: [...] })   // controlled mode 一本
 //
-// controlled mode 一本: visible を渡さないと開かない (uncontrolled trigger は
-// 別 component の責務として持たない)。dialog / splitter の controlled パターンと
-// 同じ哲学。
+// 動作原理 — VDOM が style の唯一の真実源:
+//   - 入る:   visible:true で _tw/_th=0 → VDOM が height:0 を emit → mount。
+//             rAF で scrollWidth/Height を測定 → _tw/_th 更新 → safe_notify で
+//             再描画 → VDOM が height:Npx を emit → RicDOM diff が 0→N で
+//             inline 適用 → browser が transition で補間。
+//   - 出る:   visible:false で _tw/_th=0 → VDOM が height:0 を emit →
+//             RicDOM diff が prev(natural)→0 で apply → browser が transition。
+//   - 中断:   _tw/_th の値を変えるだけで、CSS transition は「現在の補間値から
+//             新ターゲットへ」を自動で行うため、snapshot ロジックは要らない。
 //
-// 動作原理 — JS のループ無し、CSS transition + transitionend で完結:
-//   - 開始時: 1 回だけ inline style に target サイズを書く
-//   - アニメ中: ブラウザの compositor が補間 (JS / RicDOM は走らない)
-//   - 終了時: transitionend が 1 回発火 → cleanup
-//
-// 状態機械 (4 状態):
-//   closed   ─ visible:true ──→  entering ─ transitionend ─→  open
-//      ↑                                                       │
-//      │                                       visible:false   │
-//      └── transitionend ── closing ←────────────────────────  ┘
-//
-//   中断 (アニメ中に visible が反転) は entering ⇄ closing 直接遷移。
-//   現在の補間値を getBoundingClientRect で snapshot して新 transition の
-//   start にする。
-//
-// 内部状態 (短縮名 → 原名):
-//   _o  — open       DOM が存在する (entering / open / closing いずれか)
-//   _e  — entering   enter アニメ進行中
-//   _c  — closing    exit アニメ進行中
+// アニメ中は JS / RicDOM は走らない (transition は browser の compositor で
+// 補間)。状態変更タイミング (mount / measure / transitionend) でだけ RicDOM
+// が再描画される (= 1 つの開閉サイクルで合計 4 回程度)。
 
 'use strict';
 
 const { safe_notify } = require('../_factory_helpers');
 
 // 複数インスタンス識別用のモジュールレベルカウンタ。
-// 各 instance に unique な data-ric-cb 属性を付け、querySelector で DOM
-// 参照する (RicDOM の ref: はファクトリから handle.refs にアクセスできない
-// ため、scroll_pane と同じ data 属性 lookup を採用)。
 let _next_id = 0;
 
 const create_ui_collapse_box = ({
@@ -52,180 +38,95 @@ const create_ui_collapse_box = ({
 } = {}) => {
 
   const _id   = ++_next_id;
-  const _attr = 'data-ric-cb';
+  const _do_h = direction !== 'h';   // direction 'v' or 'both' で height を制御
+  const _do_w = direction !== 'v';   // direction 'h' or 'both' で width を制御
+  const _trans = [
+    _do_w && `width ${duration}ms ${easing}`,
+    _do_h && `height ${duration}ms ${easing}`,
+  ].filter(Boolean).join(', ');
 
   const _find_el = () =>
     (typeof document !== 'undefined')
-      ? document.querySelector(`[${_attr}="${_id}"]`)
+      ? document.querySelector(`[data-ric-cb="${_id}"]`)
       : null;
 
-  // 「width/height の transition」だけを定義 (direction に応じて)
-  const _transition_str =
-      direction === 'both' ? `width ${duration}ms ${easing}, height ${duration}ms ${easing}`
-    : direction === 'h'    ? `width ${duration}ms ${easing}`
-    :                        `height ${duration}ms ${easing}`;
-
-  // inline style の width / height を指定する (direction で対象軸だけ)
-  const _set_size = (el, w, h) => {
-    if (direction === 'v' || direction === 'both') el.style.height = h === null ? '' : (h + 'px');
-    if (direction === 'h' || direction === 'both') el.style.width  = w === null ? '' : (w + 'px');
+  // entering 中の rAF コールバック: natural サイズを測って _tw/_th を更新し、
+  // 再描画 (VDOM が新ターゲットを emit → CSS transition が発動) を予約する。
+  const _measure = () => {
+    const el = _find_el();
+    if (!el || !inst._e) return;        // visible 反転で entering が消えていたら no-op
+    if (_do_w) inst._tw = el.scrollWidth;
+    if (_do_h) inst._th = el.scrollHeight;
+    safe_notify(inst, 'create_ui_collapse_box');
   };
 
-  // natural サイズを測る (overflow:hidden + height:0 でも scrollHeight は
-  // 子要素の自然サイズを返すので、temporarily 解除する必要はない)
-  const _measure_natural = (el) => ({ w: el.scrollWidth, h: el.scrollHeight });
-
-  // 現在の補間値を測る (中断時の snapshot 用)
-  const _measure_current = (el) => {
-    const r = el.getBoundingClientRect();
-    return { w: r.width, h: r.height };
-  };
-
-  // transitionend → cleanup
-  const _on_transition_end = (e) => {
-    // 親要素の transition は無視 (collapse-box 自身の width/height のみ反応)
+  // transitionend ハンドラ: closing 完了で unmount、entering 完了で _e=false
+  // (次 render で VDOM から height/width が消え、RicDOM diff が inline を
+  // clear して natural reflow に戻る)。
+  const _on_end = (e) => {
     if (e.propertyName !== 'width' && e.propertyName !== 'height') return;
     const el = _find_el();
     if (!el || e.target !== el) return;
-
     if (inst._c) {
-      // exit 完了 → unmount
-      inst._o = false;
-      inst._c = false;
+      inst._o = inst._c = false;
       safe_notify(inst, 'create_ui_collapse_box');
-      return;
-    }
-    if (inst._e) {
-      // enter 完了 → inline style を全部外して natural reflow に戻す
+    } else if (inst._e) {
       inst._e = false;
-      el.style.width      = '';
-      el.style.height     = '';
-      el.style.overflow   = '';
-      el.style.transition = '';
+      safe_notify(inst, 'create_ui_collapse_box');
     }
-  };
-
-  // 「mount 直後 (entering) に target サイズを書いて transition を発火させる」
-  // ハンドラ。rAF 2 回分待ってから走らせる:
-  //   - 1 frame 目: render() が emit した height:0 で DOM がコミット
-  //   - 2 frame 目: scrollHeight 読み (force reflow) → height:natural を set
-  //                 → browser が transition を発火
-  const _kick_enter = () => {
-    const el = _find_el();
-    if (!el || !inst._e) return;
-    const nat = _measure_natural(el);
-    _set_size(el, nat.w, nat.h);
-  };
-
-  // 「visible:false 受信時に現在サイズを snapshot して 0 へ向ける」ハンドラ。
-  // rAF を 1 つ挟むことで、snapshot 値が DOM にコミットされてから 0 へ
-  // 遷移する → browser が transition を発火する。
-  const _kick_exit = () => {
-    const el = _find_el();
-    if (!el || !inst._c) return;
-    _set_size(el, 0, 0);
   };
 
   const inst = ({ visible = false, ctx = [] } = {}) => {
 
     // ── 状態遷移 ────────────────────────────────────────
-    if (visible) {
-      if (inst._c) {
-        // 中断: closing → entering。current サイズを snapshot して natural へ。
-        const el = _find_el();
-        if (el) {
-          const cur = _measure_current(el);
-          _set_size(el, cur.w, cur.h);
-          // transition は既に live、次フレームで natural サイズへ
-          if (typeof requestAnimationFrame !== 'undefined') {
-            requestAnimationFrame(_kick_enter);
-          }
-        }
-        inst._c = false;
-        inst._e = true;
-      } else if (!inst._o) {
-        // 通常 enter 開始
-        inst._o = true;
-        inst._e = true;
-      }
-      // _e が立っていて _o も既に true なら、render は entering 状態を続ける
-    } else {
-      if (inst._e) {
-        // 中断: entering → closing。current サイズを snapshot して 0 へ。
-        const el = _find_el();
-        if (el) {
-          const cur = _measure_current(el);
-          _set_size(el, cur.w, cur.h);
-          if (typeof requestAnimationFrame !== 'undefined') {
-            requestAnimationFrame(_kick_exit);
-          }
-        }
-        inst._e = false;
+    if (visible && !inst._o) {
+      // 通常 enter (mount)
+      inst._o = true; inst._e = true;
+      inst._tw = inst._th = 0;
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(_measure);
+    } else if (visible && inst._c) {
+      // 中断: closing → entering (再 measure。transition は VDOM diff が発動)
+      inst._c = false; inst._e = true;
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(_measure);
+    } else if (!visible && inst._o && !inst._c) {
+      // 通常 close (entering 中断含む)
+      inst._e = false;
+      if (inst._th === 0 && inst._tw === 0) {
+        // measure が走る前に閉じた corner case (連打など): アニメ不要、即 closed
+        inst._o = false;
+      } else {
         inst._c = true;
-      } else if (inst._o && !inst._c) {
-        // 通常 close 開始: 現在 (natural) サイズを焼き付けてから 0 へ
-        const el = _find_el();
-        if (el) {
-          const cur = _measure_current(el);
-          _set_size(el, cur.w, cur.h);
-          el.style.overflow   = 'hidden';
-          el.style.transition = _transition_str;
-          if (typeof requestAnimationFrame !== 'undefined') {
-            requestAnimationFrame(_kick_exit);
-          }
-        }
-        inst._c = true;
+        inst._tw = inst._th = 0;
       }
     }
 
     // ── render ────────────────────────────────────────
-    // どの状態にも該当しない (= 完全に閉じている) なら描画しない
     if (!inst._o && !inst._c) return null;
 
-    // entering の最初の commit では height:0 (or width:0) を直接 inline で
-    // 出す。これが render の DOM コミット → rAF 後の _kick_enter で natural
-    // へ遷移、というシーケンスの起点。
-    const initial_style = {
-      overflow:   'hidden',
-      transition: _transition_str,
-    };
-    if (inst._e && !inst._c) {
-      // ただし「中断: closing → entering」のときは _kick_enter が既に
-      // snapshot 値を inline に焼き付けているので、ここで 0 を書くと
-      // 値が衝突する。_find_el() を見て既に inline style があれば書かない。
-      const el = _find_el();
-      if (!el) {
-        // まだマウントされていない (= 初回 enter)
-        if (direction === 'v' || direction === 'both') initial_style.height = 0;
-        if (direction === 'h' || direction === 'both') initial_style.width  = 0;
-      }
-    }
-
-    // 初回 entering の場合、rAF 2 回分待って _kick_enter を呼ぶ
-    if (inst._e && typeof requestAnimationFrame !== 'undefined') {
-      const el = _find_el();
-      if (!el) {
-        requestAnimationFrame(() => requestAnimationFrame(_kick_enter));
-      }
+    // VDOM が style の真値を持つ。imperative な inline 操作は一切しない。
+    // entering/closing 中だけ height/width を明示し、open 完了後は除外して
+    // natural reflow に戻す。
+    const style = { overflow: 'hidden', transition: _trans };
+    if (inst._e || inst._c) {
+      if (_do_h) style.height = inst._th + 'px';
+      if (_do_w) style.width  = inst._tw + 'px';
     }
 
     return {
-      tag:   'div',
+      tag: 'div',
       class: 'ric-collapse-box'
            + (inst._e ? ' ric-collapse-box--entering' : '')
            + (inst._c ? ' ric-collapse-box--closing'  : ''),
-      [_attr]:         String(_id),
+      'data-ric-cb':   String(_id),
       'data-ric-role': 'collapse-box',
-      style:           initial_style,
-      ontransitionend: _on_transition_end,
+      style,
+      ontransitionend: _on_end,
       ctx,
     };
   };
 
-  inst._o = false;  // open: DOM が存在する
-  inst._e = false;  // entering: enter アニメ進行中
-  inst._c = false;  // closing: exit アニメ進行中
-
+  inst._o = inst._e = inst._c = false;   // open / entering / closing
+  inst._tw = inst._th = 0;               // target width / height (px、entering/closing 中の target)
   return inst;
 };
 
