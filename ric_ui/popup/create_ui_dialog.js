@@ -29,6 +29,7 @@
 
 const _portal                   = require('./_page_portal_queue');
 const { apply_theme_to_portal } = require('./_wrap_portal');
+const { safe_notify } = require('../_factory_helpers');
 
 const create_ui_dialog = () => {
 
@@ -37,14 +38,14 @@ const create_ui_dialog = () => {
     if (!inst._c) return;
     if (!inst._cd) inst._o = false;   // uncontrolled のみ内部 open をリセット
     inst._c = false;
-    inst.__notify?.(); // 再描画してポータルから除去
+    safe_notify(inst, 'create_ui_dialog'); // 再描画してポータルから除去
   };
 
   // アニメーション付きクローズ（uncontrolled 専用）
   const _do_close = () => {
     if (inst._c) return; // 二重呼び出し防止
     inst._c = true;
-    inst.__notify?.(); // 再描画して --out クラスを付与
+    safe_notify(inst, 'create_ui_dialog'); // 再描画して --out クラスを付与
   };
 
   // 閉じ要求（overlay / ✕ / ESC から呼ばれる共通エントリポイント）
@@ -110,11 +111,13 @@ const create_ui_dialog = () => {
         // 半透明バックドロップ（外クリックで閉じる）
         { tag: 'div',
           class: 'ric-dialog__overlay' + (inst._c ? ' ric-dialog__overlay--out' : ''),
+          'data-ric-role': 'dialog-overlay',
           style: { position: 'fixed', inset: 0, zIndex: 500 },
           onclick: _request_close },
         // ダイアログ本体（DOM 順でバックドロップの後 → 自然に前面）
         { tag: 'div',
           class: 'ric-dialog' + (inst._c ? ' ric-dialog--out' : ''),
+          'data-ric-role': 'dialog',
           style: {
             position:  'fixed',
             zIndex:    501,
@@ -124,14 +127,15 @@ const create_ui_dialog = () => {
           },
           onanimationend: _on_anim_end,
           ctx: [
-            { tag: 'div', class: 'ric-dialog__header', ctx: [
-              { tag: 'span', class: 'ric-dialog__title', ctx: [title] },
+            { tag: 'div', class: 'ric-dialog__header', 'data-ric-role': 'dialog-header', ctx: [
+              { tag: 'span', class: 'ric-dialog__title', 'data-ric-role': 'dialog-title', ctx: [title] },
               { tag: 'button', class: 'ric-dialog__close',
+                'data-ric-role': 'dialog-close',
                 onclick: _request_close,
                 ctx: ['✕'] },
             ]},
-            ctx.length    ? { tag: 'div', class: 'ric-dialog__body',   ctx }     : null,
-            actions.length ? { tag: 'div', class: 'ric-dialog__footer', ctx: actions } : null,
+            ctx.length    ? { tag: 'div', class: 'ric-dialog__body',   'data-ric-role': 'dialog-body',   ctx }     : null,
+            actions.length ? { tag: 'div', class: 'ric-dialog__footer', 'data-ric-role': 'dialog-footer', ctx: actions } : null,
           ].filter(Boolean),
         },
       ];
@@ -151,7 +155,7 @@ const create_ui_dialog = () => {
         } else {
           inst._c = false;
           inst._o = true;
-          inst.__notify?.();
+          safe_notify(inst, 'create_ui_dialog');
         }
       },
       ctx: trigger_ctx ?? ['開く'],
@@ -173,7 +177,7 @@ const create_ui_dialog = () => {
     if (inst._cd) return;
     if (inst._o || inst._c) return;
     inst._o = true;
-    inst.__notify?.();
+    safe_notify(inst, 'create_ui_dialog');
   };
 
   return inst;

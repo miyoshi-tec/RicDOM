@@ -20,31 +20,37 @@
 
 'use strict';
 
+const { safe_notify } = require('../_factory_helpers');
+
 const create_ui_accordion = ({ default_open = {} } = {}) => {
   const inst = ({ items = [], multi = true } = {}) => ({
     tag: 'div', class: 'ric-accordion',
+    'data-ric-role': 'accordion',
     ctx: items.map(({ id, title, ctx: item_ctx }) => {
       const is_open = !!inst._om[id];
       return {
         tag: 'div', class: 'ric-accordion__item',
+        'data-ric-role': 'accordion-item',
         ctx: [
           { tag: 'button',
             class: 'ric-accordion__header' + (is_open ? ' ric-accordion__header--open' : ''),
+            'data-ric-role': 'accordion-header',
             onclick: () => {
               if (!multi) {
                 // 排他モード：他をすべて閉じる
                 Object.keys(inst._om).forEach(k => { inst._om[k] = false; });
               }
               inst._om[id] = !is_open;
-              inst.__notify?.();
+              safe_notify(inst, 'create_ui_accordion');
             },
             ctx: [
-              { tag: 'span', class: 'ric-accordion__title', ctx: [title] },
-              { tag: 'span', class: 'ric-accordion__arrow', ctx: ['❯'] },
+              { tag: 'span', class: 'ric-accordion__title', 'data-ric-role': 'accordion-title', ctx: [title] },
+              { tag: 'span', class: 'ric-accordion__arrow', 'data-ric-role': 'accordion-arrow', ctx: ['❯'] },
             ],
           },
           { tag: 'div',
             class: 'ric-accordion__body' + (is_open ? ' ric-accordion__body--open' : ''),
+            'data-ric-role': 'accordion-body',
             ctx: [
               { tag: 'div', class: 'ric-accordion__body-inner',
                 ctx: Array.isArray(item_ctx) ? item_ctx : [item_ctx] },

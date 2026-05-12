@@ -29,6 +29,7 @@ const { make_css_vars }              = require('../context');
 const { collect_classes, build_css } = require('../css_registry');
 const { style_to_css_string }        = require('../style_utils');
 const _portal                         = require('../popup/_page_portal_queue');
+const { safe_notify }                = require('../_factory_helpers');
 
 const create_ui_page = (initial = {}) => {
   // rest: onclick / id / data-* / aria-* 等の任意属性を透過する
@@ -94,7 +95,7 @@ const create_ui_page = (initial = {}) => {
       const { key, value } = e.detail ?? {};
       if (key === 'theme' || key === 'density' || key === 'font_size') {
         inst[key] = value;
-        inst.__notify?.();
+        safe_notify(inst, 'create_ui_page');
       }
     });
   }

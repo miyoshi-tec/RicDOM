@@ -5,7 +5,7 @@
 //
 // 公開カテゴリ：
 //   meta      : version
-//   layout    : create_ui_page / ui_col / ui_row
+//   layout    : create_ui_page / ui_col / ui_row / ui_grid
 //   surface   : ui_panel / create_ui_panel
 //   control   : ui_button / ui_input / bind_input
 //               ui_textarea / bind_textarea
@@ -32,6 +32,7 @@
 const { create_ui_page } = require('./layout/ui_page');
 const { ui_col  } = require('./layout/ui_col');
 const { ui_row  } = require('./layout/ui_row');
+const { ui_grid } = require('./layout/ui_grid');
 
 const { ui_panel, create_ui_panel } = require('./surface/ui_panel');
 
@@ -89,6 +90,7 @@ module.exports = {
   create_ui_page,
   ui_col,
   ui_row,
+  ui_grid,
   // surface
   ui_panel,
   create_ui_panel,

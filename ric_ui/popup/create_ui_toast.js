@@ -19,6 +19,7 @@
 
 const _portal                   = require('./_page_portal_queue');
 const { apply_theme_to_portal } = require('./_wrap_portal');
+const { safe_notify } = require('../_factory_helpers');
 
 const create_ui_toast = () => {
 
@@ -26,14 +27,14 @@ const create_ui_toast = () => {
   const _remove = (id) => {
     const idx = inst._it.findIndex(x => x.id === id);
     if (idx >= 0) inst._it.splice(idx, 1);
-    inst.__notify?.();
+    safe_notify(inst, 'create_ui_toast');
   };
 
   // アニメーション付きクローズ
   const _do_close = (item) => {
     if (item._c) return;
     item._c = true;
-    inst.__notify?.();
+    safe_notify(inst, 'create_ui_toast');
   };
 
   // inst({ theme, density, font_size }) → null（ポータル登録のみ）
@@ -43,6 +44,7 @@ const create_ui_toast = () => {
       const portal_items = [{
         tag:   'div',
         class: 'ric-toast__container',
+        'data-ric-role': 'toast-container',
         style: {
           position:      'fixed',
           bottom:        '20px',
@@ -60,11 +62,13 @@ const create_ui_toast = () => {
                + (item._e ? ' ric-toast__item--in' : '')
                + (item.type && item.type !== 'default' ? ' ric-toast__item--' + item.type : '')
                + (item._c ? ' ric-toast__item--out' : ''),
+          'data-ric-role': 'toast-item',
           style: { pointerEvents: 'auto' },
           onanimationend: item._c ? () => _remove(item.id) : item._e ? () => { item._e = false; } : undefined,
           ctx: [
-            { tag: 'span', class: 'ric-toast__msg',   ctx: [item.msg] },
+            { tag: 'span', class: 'ric-toast__msg', 'data-ric-role': 'toast-msg', ctx: [item.msg] },
             { tag: 'button', class: 'ric-toast__close',
+              'data-ric-role': 'toast-close',
               onclick: () => _do_close(item),
               ctx: ['✕'] },
           ],
@@ -82,7 +86,7 @@ const create_ui_toast = () => {
   inst.show = (msg, { type = 'default', duration = 3000 } = {}) => {
     const item = { id: inst._ni++, msg, type, _c: false, _e: true };
     inst._it.push(item);
-    inst.__notify?.();
+    safe_notify(inst, 'create_ui_toast');
     if (duration > 0) {
       setTimeout(() => _do_close(item), duration);
     }

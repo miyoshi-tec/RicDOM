@@ -239,6 +239,53 @@ return s.page({ ctx: [/* 子要素だけ書けばいい */] });
 他の `create_ui_xxx()` 系（`create_ui_popup` / `create_ui_dialog` / `create_ui_splitter` 等）
 もすべて同じパターンです。`s` のトップレベルに格納し、render 内で関数として呼びます。
 
+### ありがちな誤用 — `create_ui_*` を state 外に置かない
+
+React の `const Sidebar = () => ...` や Vue の `<Sidebar>` に慣れていると、
+ファクトリも「module レベルの const で 1 度だけ作ればいい」と直感的に思いがちです。
+しかしこれは **ハマりやすい誤用** で、ボタンを押しても何も起きない silent failure
+を引き起こします。
+
+❌ **これだと collapse / theme 切替が動きません**
+
+```javascript
+const split = create_ui_splitter({ side: 'left', size: 240 });   // module level const
+
+create_RicDOM('#app', {
+  render: () => split({ side: { ctx: [...] }, main: { ctx: [...] } }),
+});
+```
+
+✅ **正しくは state のトップレベルに格納します**
+
+```javascript
+create_RicDOM('#app', {
+  split: create_ui_splitter({ side: 'left', size: 240 }),
+  render: (s) => s.split({ side: { ctx: [...] }, main: { ctx: [...] } }),
+});
+```
+
+**理由**: RicDOM の Proxy は、state のトップレベルに置かれたファクトリ instance に
+`__notify` というコールバックを注入します。splitter の collapse ボタンや内部の
+transitionend など「内部イベントから再描画を発火したい」場面で、ファクトリは
+この `__notify` を呼びます。state 外に置くと `__notify` が undefined のまま
+**内部状態は変化するが DOM が更新されない**、という気付きにくい挙動になります。
+
+v0.3.8 以降は誤用を検知すると `console.warn` が一度だけ出ます:
+
+```
+[RicDOM] create_ui_splitter() instance has no __notify — place the factory at the
+top level of state so RicDOM can wire it up:
+  create_RicDOM(target, { my_widget: create_ui_splitter({...}) })
+```
+
+このメッセージが出たら、上の ✅ パターンに直してください。
+
+> **「render のたびに作り直したくない」と思ったときも、state 配置で OK**:
+> state に置けば一度生成された instance を使い回せます (再代入しない限り
+> Proxy はそのまま `s.split` を返す)。「state 外に置けば 1 度だけ生成される」
+> という発想は誤り — state に置いても 1 度だけ生成されます。
+
 ### テーマの動的切替
 
 テーマはプログラムからも変更できます:

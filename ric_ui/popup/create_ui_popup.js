@@ -34,6 +34,7 @@ const { apply_theme_to_portal } = require('./_wrap_portal');
 const {
   make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others,
 } = require('./_popup_utils');
+const { safe_notify } = require('../_factory_helpers');
 
 const create_ui_popup = () => {
 
@@ -42,14 +43,14 @@ const create_ui_popup = () => {
     if (!inst._c) return;
     inst._o = false;
     inst._c = false;
-    inst.__notify?.();
+    safe_notify(inst, 'create_ui_popup');
   };
 
   // アニメーション付きクローズ
   const _do_close = () => {
     if (inst._c) return;
     inst._c = true;
-    inst.__notify?.();
+    safe_notify(inst, 'create_ui_popup');
   };
 
 
@@ -62,12 +63,15 @@ const create_ui_popup = () => {
     if (inst._o) {
       const portal_items = [
         // 透明オーバーレイ：外クリックで閉じる
-        { tag: 'div', style: { position: 'fixed', inset: 0, zIndex: 401 },
+        { tag: 'div',
+          'data-ric-role': 'popup-overlay',
+          style: { position: 'fixed', inset: 0, zIndex: 401 },
           onclick: _do_close },
         // ポップアップ本体
         { tag: 'div',
           class: 'ric-popup__body ric-popup__body--' + inst._d
                + (inst._c ? ' ric-popup__body--out' : ''),
+          'data-ric-role': 'popup-body',
           style: _pos_style(inst._p),
           onclick: _do_close,
           onanimationend: _on_anim_end,
@@ -87,6 +91,7 @@ const create_ui_popup = () => {
       tag: 'div', class: 'ric-popup',
       ctx: [
         { tag: 'button', class: trigger_cls,
+          'data-ric-role': 'popup-trigger',
           onclick: (e) => {
             if (inst._c) return;
             if (inst._o) {
@@ -118,7 +123,7 @@ const create_ui_popup = () => {
               }
 
               inst._o = true;
-              inst.__notify?.();
+              safe_notify(inst, 'create_ui_popup');
             }
           },
           ctx: is_label

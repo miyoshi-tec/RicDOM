@@ -19,6 +19,7 @@
 const _portal                        = require('./_page_portal_queue');
 const { apply_theme_to_portal }      = require('./_wrap_portal');
 const { _pos_style, _get_portal_cb } = require('./_popup_utils');
+const { safe_notify }                = require('../_factory_helpers');
 
 const create_ui_tooltip = () => {
   const inst = ({ content, ctx, dir = 'auto', theme, density, font_size }) => {
@@ -26,6 +27,7 @@ const create_ui_tooltip = () => {
       const portal_items = [{
         tag:   'div',
         class: 'ric-tooltip__popup ric-tooltip__popup--' + inst._d,
+        'data-ric-role': 'tooltip',
         style: _pos_style(inst._p),
         ctx:   [typeof content === 'string' ? { tag: 'span', ctx: [content] } : content],
       }];
@@ -33,6 +35,7 @@ const create_ui_tooltip = () => {
     }
     return {
       tag: 'span', class: 'ric-tooltip',
+      'data-ric-role': 'tooltip-target',
       onmouseenter: (e) => {
         const rect  = e.currentTarget.getBoundingClientRect();
         const cb    = _get_portal_cb(e.currentTarget);
@@ -53,9 +56,9 @@ const create_ui_tooltip = () => {
         else if (chosen === 'right')  inst._p = { left:   rect.right - cb.left    + GAP, top:  cy };
         else                          inst._p = { right:  cb.right   - rect.left  + GAP, top:  cy };
         inst._o = true;
-        inst.__notify?.();
+        safe_notify(inst, 'create_ui_tooltip');
       },
-      onmouseleave: () => { inst._o = false; inst.__notify?.(); },
+      onmouseleave: () => { inst._o = false; safe_notify(inst, 'create_ui_tooltip'); },
       ctx,
     };
   };

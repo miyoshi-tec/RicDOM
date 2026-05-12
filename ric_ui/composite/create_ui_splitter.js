@@ -33,6 +33,8 @@
 
 'use strict';
 
+const { safe_notify } = require('../_factory_helpers');
+
 const create_ui_splitter = ({
   side        = 'left',  // 'left' | 'right' | 'top' | 'bottom'
   size        = 240,
@@ -111,7 +113,7 @@ const create_ui_splitter = ({
       // CSS クラスには transition を持たせず、この inline style フラグで制御する。
       // タブ切り替えなど「意図しない flex-basis 変化」でアニメーションが走るのを防ぐため。
       inst._tg = true;
-      inst.__notify?.();
+      safe_notify(inst, 'create_ui_splitter');
     }
   };
 
@@ -147,6 +149,7 @@ const create_ui_splitter = ({
       tag:   'div',
       class: 'ric-splitter__side'
            + (inst._cl ? ' ric-splitter__side--collapsed' : ''),
+      'data-ric-role': 'splitter-side',
       style: {
         flexShrink: 0,
         flexBasis:  (inst._cl ? 0 : inst._sz) + 'px',
@@ -154,7 +157,7 @@ const create_ui_splitter = ({
         // _tg (toggling) 中だけ transition を効かせる
         ...(inst._tg ? { transition: 'flex-basis var(--ric-duration, 200ms) var(--ric-easing, ease)' } : {}),
       },
-      ontransitionend: inst._tg ? () => { inst._tg = false; inst.__notify?.(); } : undefined,
+      ontransitionend: inst._tg ? () => { inst._tg = false; safe_notify(inst, 'create_ui_splitter'); } : undefined,
       ctx:   side_arg.ctx || [],
     };
 
@@ -163,6 +166,7 @@ const create_ui_splitter = ({
     const divider = {
       tag:         'div',
       class:       'ric-splitter__divider',
+      'data-ric-role': 'splitter-divider',
       onmousedown: _on_mouse_down,
       // 折り畳み中のみ有効。折り畳みボタン由来のバブルはスキップ（二重トグル防止）
       onclick:     inst._cl
@@ -171,6 +175,7 @@ const create_ui_splitter = ({
       ctx: collapsible ? [{
         tag:     'button',
         class:   'ric-splitter__collapse-btn',
+        'data-ric-role': 'splitter-toggle',
         onclick: _toggle,
         ctx:     [_arrow()],
       }] : [],
@@ -180,6 +185,7 @@ const create_ui_splitter = ({
     const main_panel = {
       tag:   'div',
       class: 'ric-splitter__main',
+      'data-ric-role': 'splitter-main',
       style: { flex: 1, overflow: 'auto', minWidth: 0, minHeight: 0 },
       ctx:   main_arg.ctx || [],
     };

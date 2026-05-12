@@ -33,6 +33,7 @@ const { ui_range       } = require('../control/ui_range');
 const { ui_select      } = require('../control/ui_select');
 const { ui_radiobutton } = require('../control/ui_radiobutton');
 const { ui_color       } = require('../control/ui_color');
+const { safe_notify    } = require('../_factory_helpers');
 
 // ─────────────────────────────────────────────────────────────
 // 型推論
@@ -295,7 +296,7 @@ const create_ui_tweak_panel = ({
   class: cls,
 } = {}) => {
   const inst = () => {
-    const notify = () => inst.__notify?.();
+    const notify = () => safe_notify(inst, 'create_ui_tweak_panel');
     // keys が関数なら毎 render で評価する（動的 disabled / min / max 等に対応）。
     // ネストした keys も _generate_rows 内で再帰的に解決される。
     const auto_rows = data ? _generate_rows(data, _resolve_keys(keys), notify) : [];

@@ -5,7 +5,7 @@ Electron・社内ツール・IoT デバイス UI 向け。JSON で書く 8KB の
 | レイヤー | サイズ | 役割 |
 |---------|------:|------|
 | **RicDOM** | 8KB | コア — JSON → DOM 差分更新 + Proxy リアクティビティ |
-| **RicUI** | 61KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
+| **RicUI** | 63KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
 
 Virtual DOM を持たず、JSON オブジェクトの差分から実 DOM を直接パッチします。
 Electron やブラウザで、リアルタイムなダッシュボード・パラメータ調整 UI・データ可視化ツールを素早く構築できます。
@@ -80,7 +80,7 @@ npm パッケージとしては公開していません。
 | バンドル | サイズ | 内容 |
 |---------|------:|------|
 | `RicDOM.min.js` | 8KB | コア（必須） |
-| `RicUI.min.js` | 61KB | UI コンポーネント集 + パラメータ調整パネル |
+| `RicUI.min.js` | 63KB | UI コンポーネント集 + パラメータ調整パネル |
 
 ### Hello World（RicDOM のみ）
 
@@ -310,6 +310,7 @@ create_ui_page ─ テーマの入口。CSS 変数を注入する
 │
 ├─ ui_col ─── 縦に並べる（透明、padding なし）
 ├─ ui_row ─── 横に並べる（透明、padding なし）
+├─ ui_grid ── CSS grid で並べる（透明、padding なし）
 │
 └─ create_ui_panel ─ 背景 + ボーダー。テーマ上書き・disabled 対応
 ```
@@ -319,6 +320,7 @@ create_ui_page ─ テーマの入口。CSS 変数を注入する
 | `create_ui_page` | 有 | — | 標準 | テーマの入口（最外層に1つ） |
 | `ui_col` | — | — | — | 縦に並べる（純レイアウト） |
 | `ui_row` | — | — | — | 横に並べる（純レイアウト） |
+| `ui_grid` | — | — | — | CSS grid で並べる（`columns: 3` / `'120px 1fr'` / `'auto-fit 200px'`） |
 | `create_ui_panel` | 有 | 有 | 標準 | セクションの区切り |
 
 ### コンポーネント一覧
