@@ -35,7 +35,7 @@ describe('data-ric-role: splitter', () => {
   test('side / divider / toggle / main の 4 役割が出る', async () => {
     const { create_RicDOM } = require('../src/ricdom');
     const { create_ui_splitter } = require('../ric_ui/composite/create_ui_splitter');
-    const s = create_RicDOM('#app', {
+    create_RicDOM('#app', {
       sp: create_ui_splitter({ side: 'left', size: 200, collapsible: true }),
       render: (s) => s.sp({ side: { ctx: ['L'] }, main: { ctx: ['R'] } }),
     });
@@ -45,7 +45,6 @@ describe('data-ric-role: splitter', () => {
     assert.ok(roles.includes('splitter-divider'), 'divider');
     assert.ok(roles.includes('splitter-toggle'),  'toggle (collapsible:true)');
     assert.ok(roles.includes('splitter-main'),    'main');
-    void s;
   });
 });
 
@@ -55,7 +54,7 @@ describe('data-ric-role: dialog', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const { create_ui_page  } = require('../ric_ui/layout/ui_page');
     const { create_ui_dialog } = require('../ric_ui/popup/create_ui_dialog');
-    const s = create_RicDOM('#app', {
+    create_RicDOM('#app', {
       page: create_ui_page({ theme: 'light' }),
       dlg:  create_ui_dialog(),
       render: (s) => s.page({ ctx: [
@@ -71,7 +70,6 @@ describe('data-ric-role: dialog', () => {
                      'dialog-footer']) {
       assert.ok(roles.includes(r), r + ' missing in: ' + roles.join(','));
     }
-    void s;
   });
 });
 
@@ -81,7 +79,7 @@ describe('data-ric-role: popup', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const { create_ui_page  } = require('../ric_ui/layout/ui_page');
     const { create_ui_popup } = require('../ric_ui/popup/create_ui_popup');
-    const s = create_RicDOM('#app', {
+    create_RicDOM('#app', {
       page: create_ui_page({ theme: 'light' }),
       pop:  create_ui_popup(),
       render: (s) => s.page({ ctx: [s.pop({ label: 'menu', ctx: [] })] }),
@@ -89,7 +87,6 @@ describe('data-ric-role: popup', () => {
     await flush();
     const roles = roles_in(document.body);
     assert.ok(roles.includes('popup-trigger'), 'trigger: ' + roles.join(','));
-    void s;
   });
 });
 
@@ -110,7 +107,6 @@ describe('data-ric-role: toast', () => {
     for (const r of ['toast-container', 'toast-item', 'toast-msg', 'toast-close']) {
       assert.ok(roles.includes(r), r + ' missing in: ' + roles.join(','));
     }
-    void s;
   });
 });
 
@@ -120,7 +116,7 @@ describe('data-ric-role: tooltip', () => {
     const { create_RicDOM } = require('../src/ricdom');
     const { create_ui_page  } = require('../ric_ui/layout/ui_page');
     const { create_ui_tooltip } = require('../ric_ui/popup/create_ui_tooltip');
-    const s = create_RicDOM('#app', {
+    create_RicDOM('#app', {
       page: create_ui_page({ theme: 'light' }),
       tt:   create_ui_tooltip(),
       render: (s) => s.page({ ctx: [
@@ -130,7 +126,6 @@ describe('data-ric-role: tooltip', () => {
     await flush();
     const roles = roles_in(document.body);
     assert.ok(roles.includes('tooltip-target'), 'tooltip-target: ' + roles.join(','));
-    void s;
   });
 });
 
@@ -139,7 +134,7 @@ describe('data-ric-role: accordion', () => {
   test('accordion / -item / -header / -title / -arrow / -body の 6 役割', async () => {
     const { create_RicDOM } = require('../src/ricdom');
     const { create_ui_accordion } = require('../ric_ui/composite/create_ui_accordion');
-    const s = create_RicDOM('#app', {
+    create_RicDOM('#app', {
       acc: create_ui_accordion(),
       render: (s) => s.acc({ items: [{ id: 'a', title: 'T', ctx: [{ tag: 'span', ctx: ['x'] }] }] }),
     });
@@ -149,7 +144,6 @@ describe('data-ric-role: accordion', () => {
                      'accordion-title', 'accordion-arrow', 'accordion-body']) {
       assert.ok(roles.includes(r), r + ' missing in: ' + roles.join(','));
     }
-    void s;
   });
 });
 
@@ -158,7 +152,7 @@ describe('data-ric-role: tabs', () => {
   test('tabs / -bar / -tab / -panel の 4 役割', async () => {
     const { create_RicDOM } = require('../src/ricdom');
     const { ui_tabs } = require('../ric_ui/composite/ui_tabs');
-    const s = create_RicDOM('#app', {
+    create_RicDOM('#app', {
       tab: 'a',
       render: (s) => ui_tabs({
         active: s.tab,
@@ -174,6 +168,5 @@ describe('data-ric-role: tabs', () => {
     for (const r of ['tabs', 'tabs-bar', 'tabs-tab', 'tabs-panel']) {
       assert.ok(roles.includes(r), r + ' missing in: ' + roles.join(','));
     }
-    void s;
   });
 });

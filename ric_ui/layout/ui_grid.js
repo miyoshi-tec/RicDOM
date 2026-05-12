@@ -32,6 +32,14 @@ const _expand_tracks = (v) => {
   return v;
 };
 
+// style 引数が plain object のときだけ columns/rows/gap をマージする。
+// string / 配列が渡された場合は ui_col / ui_row と同じく透過 (RicDOM 側の
+// normalize_style が cssText 直設定 / 配列マージで処理する) — ただし
+// 透過時は columns/rows/gap の引数は無効 (style と columns を同時に渡したい
+// ときは object 形式で書く前提)。v0.3.7 canon に従い object 形式を推奨。
+const _is_plain_object = (v) =>
+  v !== null && typeof v === 'object' && !Array.isArray(v);
+
 const ui_grid = ({
   columns,
   rows,
@@ -40,16 +48,23 @@ const ui_grid = ({
   style = {},
   ...rest
 } = {}) => {
-  const final_style = { ...style };
-  if (columns !== undefined) final_style.gridTemplateColumns = _expand_tracks(columns);
-  if (rows    !== undefined) final_style.gridTemplateRows    = _expand_tracks(rows);
-  if (gap     !== undefined) final_style.gap = typeof gap === 'number' ? gap + 'px' : gap;
+  const is_obj = _is_plain_object(style);
+  const final_style = is_obj ? { ...style } : style;
+
+  if (is_obj) {
+    if (columns !== undefined) final_style.gridTemplateColumns = _expand_tracks(columns);
+    if (rows    !== undefined) final_style.gridTemplateRows    = _expand_tracks(rows);
+    if (gap     !== undefined) final_style.gap = typeof gap === 'number' ? gap + 'px' : gap;
+  }
+
+  // style を node に乗せるかの判定: object なら key があるか、string/array なら truthy か
+  const has_style = is_obj ? Object.keys(final_style).length > 0 : !!final_style;
 
   return {
     ...rest,
     tag: 'div',
     class: rest.class ? 'ric-grid ' + rest.class : 'ric-grid',
-    ...(Object.keys(final_style).length ? { style: final_style } : {}),
+    ...(has_style ? { style: final_style } : {}),
     ctx,
   };
 };

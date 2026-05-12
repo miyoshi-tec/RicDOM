@@ -73,14 +73,29 @@ describe('ui_grid: gap', () => {
   });
 });
 
+describe('ui_grid: 後方互換 style', () => {
+  test('string 形式の style は透過する (RicDOM normalize_style が処理)', () => {
+    // v0.3.7 canon は object 形式だが、string も legacy API として残っている。
+    // ui_grid が string を破壊 (キー単位に分解) しないことを確認する regression test。
+    const n = ui_grid({ style: 'color:red' });
+    assert.equal(n.style, 'color:red');
+  });
+  test('string style 透過時は columns/rows/gap 引数は無効 (object 形式で書く前提)', () => {
+    const n = ui_grid({ style: 'color:red', columns: 3 });
+    // columns:3 は無視され、string style がそのまま乗る
+    assert.equal(n.style, 'color:red');
+  });
+});
+
 describe('ui_grid: style override / rest スプレッド契約', () => {
   test('style で追加 CSS を渡せる', () => {
     const n = ui_grid({ columns: 2, style: { padding: '8px' } });
     assert.equal(n.style.gridTemplateColumns, '1fr 1fr');
     assert.equal(n.style.padding, '8px');
   });
-  test('style で gridTemplateColumns を明示しても columns 引数が優先される (後出し)', () => {
-    // 仕様: 引数で渡したものが後 spread されるため引数勝ち。
+  test('style で gridTemplateColumns を明示しても columns 引数が優先される', () => {
+    // 仕様: 実装内部で { ...style } したあと columns/rows/gap を set で
+    // 上書きするため、専用引数が後勝ちになる。
     const n = ui_grid({ columns: 3, style: { gridTemplateColumns: '1fr' } });
     assert.equal(n.style.gridTemplateColumns, '1fr 1fr 1fr');
   });
