@@ -310,6 +310,7 @@ create_ui_page ─ テーマの入口。CSS 変数を注入する
 │
 ├─ ui_col ─── 縦に並べる（透明、padding なし）
 ├─ ui_row ─── 横に並べる（透明、padding なし）
+├─ ui_grid ── CSS grid で並べる（透明、padding なし）
 │
 └─ create_ui_panel ─ 背景 + ボーダー。テーマ上書き・disabled 対応
 ```
@@ -319,6 +320,7 @@ create_ui_page ─ テーマの入口。CSS 変数を注入する
 | `create_ui_page` | 有 | — | 標準 | テーマの入口（最外層に1つ） |
 | `ui_col` | — | — | — | 縦に並べる（純レイアウト） |
 | `ui_row` | — | — | — | 横に並べる（純レイアウト） |
+| `ui_grid` | — | — | — | CSS grid で並べる（`columns: 3` / `'120px 1fr'` / `'auto-fit 200px'`） |
 | `create_ui_panel` | 有 | 有 | 標準 | セクションの区切り |
 
 ### コンポーネント一覧

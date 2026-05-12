@@ -77,6 +77,12 @@ ${_P}.ric-row {
   gap: ${_gm};
 }`,
 
+  'ric-grid': () => `
+${_P}.ric-grid {
+  display: grid;
+  gap: ${_gm};
+}`,
+
   // ── ric-tweak（パラメータ調整パネル）────────────
   // ui_tweak_panel / create_ui_tweak_panel のルートコンテナ + タイトル。
 

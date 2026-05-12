@@ -20,7 +20,7 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 
 | カテゴリ | API |
 |---|---|
-| **layout** | `create_ui_page` / `ui_col` / `ui_row` |
+| **layout** | `create_ui_page` / `ui_col` / `ui_row` / `ui_grid` |
 | **surface** | `ui_panel` / `create_ui_panel` |
 | **control (純関数)** | `ui_button` / `ui_input` / `ui_textarea` / `ui_checkbox` / `ui_radiobutton` / `ui_range` / `ui_color` / `ui_select` / `ui_separator` |
 | **control (state バインド)** | `bind_input` / `bind_textarea` / `bind_checkbox` / `bind_radiobutton` / `bind_range` / `bind_color` / `bind_select` |
@@ -95,7 +95,7 @@ ric_ui/
   css_registry.js        # CSS クラス収集・ビルドキャッシュ
   css_templates.js       # CSS テンプレート（コンポーネント別）
   style_utils.js         # style プロパティ → cssText 文字列変換ヘルパ
-  layout/                # ui_page, ui_col, ui_row
+  layout/                # ui_page, ui_col, ui_row, ui_grid
   surface/               # ui_panel, create_ui_panel
   control/               # ui_button, ui_input, bind_input, ui_textarea, bind_textarea, ui_range, bind_range, ui_color, bind_color, ui_separator, focus_when, etc.
   text/                  # ui_text, ui_code_pre, ui_md_pre
@@ -341,6 +341,28 @@ s.page.density = 'compact';
 ui_col({ ctx: [...], style: {} })  // flex-direction: column
 ui_row({ ctx: [...], style: {} })  // flex-direction: row, align-items: center
 ```
+
+#### ui_grid
+
+CSS grid を簡潔に書くための layout コンポーネント。
+
+```javascript
+// 数値: '1fr 1fr ...' (n 個) に展開
+ui_grid({ columns: 3, ctx: [a, b, c, d, e, f] })
+
+// 文字列: そのまま grid-template-columns に渡す
+ui_grid({ columns: '120px 1fr', rows: '80px auto', ctx: [...] })
+
+// 'auto-fit / auto-fill SIZE' は repeat(auto-fit, minmax(SIZE, 1fr)) の省略形
+ui_grid({ columns: 'auto-fit 200px', ctx: cards })
+
+// gap: 数値で px / 文字列でそのまま
+ui_grid({ columns: 2, gap: 12, ctx: [...] })          // 12px
+ui_grid({ columns: 2, gap: '8px 16px', ctx: [...] })  // row-gap col-gap
+```
+
+プロパティ: `columns` / `rows` / `gap` / `style` / `ctx`、および任意 DOM 属性
+(rest スプレッド契約)。gap 省略時は `--ric-gap-md` から自動取得。
 
 ### Surface
 
