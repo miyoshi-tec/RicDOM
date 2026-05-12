@@ -363,6 +363,84 @@ describe('create_ui_collapse_box: multi-instance (key パラメータ)', () => {
     assert.equal(el2, null, 'closing 完了で DOM 削除 = state GC 済み');
   });
 
+  test('closing 中断: visible:true で再 enter すると --entering 状態に戻る', async () => {
+    // 多段 rAF (re-enter render → _measure → 再 render) は jsdom + flush(10ms)
+    // で必ず完走するとは限らないため、ここでは「factory の状態遷移として
+    // closing → entering が起きる」ところまでを保証する。height:N px 復活の
+    // 実 transition 部分は real browser に委ねる。
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
+      configurable: true, get() { return 200; },
+    });
+
+    const { create_RicDOM } = require('../src/ricdom');
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+
+    const handle = create_RicDOM('#app', {
+      visible: true,
+      box: create_ui_collapse_box(),
+      render: (s) => s.box({ key: 'k', visible: s.visible, ctx: ['x'] }),
+    });
+    await flush();   // 初期 enter
+
+    // closing 開始
+    handle.visible = false;
+    await flush();
+    let el = document.querySelector('[data-ric-role="collapse-box"]');
+    assert.match(el.className, /--closing/, 'closing 中');
+
+    // transitionend が発火する前に visible:true に戻す → 中断: closing → entering
+    handle.visible = true;
+    await flush();
+
+    el = document.querySelector('[data-ric-role="collapse-box"]');
+    assert.ok(el, '要素は維持される (unmount されていない)');
+    assert.match(el.className, /--entering/, '中断後は --entering に遷移');
+    assert.doesNotMatch(el.className, /--closing/, '--closing は外れる');
+  });
+
+  test('1 key の transitionend は他の key の DOM を消さない (closure 独立性)', async () => {
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
+      configurable: true, get() { return 200; },
+    });
+
+    const { create_RicDOM } = require('../src/ricdom');
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+
+    const handle = create_RicDOM('#app', {
+      vis_a: true,
+      vis_b: true,
+      box: create_ui_collapse_box(),
+      render: (s) => ({ tag: 'div', ctx: [
+        s.box({ key: 'a', visible: s.vis_a, ctx: ['A'] }),
+        s.box({ key: 'b', visible: s.vis_b, ctx: ['B'] }),
+      ]}),
+    });
+    await flush();   // 両 key 初期 enter
+    assert.equal(document.querySelectorAll('[data-ric-role="collapse-box"]').length, 2,
+      '両 key の DOM が並ぶ');
+
+    // a だけ close
+    handle.vis_a = false;
+    await flush();
+    const a_el = document.querySelector('[data-ric-cb^="' + 'A'.charCodeAt(0) + '"]') ||
+                 document.querySelectorAll('[data-ric-role="collapse-box"]')[0];
+    // ↑ 不安定な selector を避けて、role の 0 番目を a として扱う
+    const all_before = document.querySelectorAll('[data-ric-role="collapse-box"]');
+    assert.equal(all_before.length, 2, 'close 開始時点では両方 DOM 上に存在 (deferred unmount)');
+    assert.match(all_before[0].className, /--closing/, 'a (0 番目) が closing');
+
+    // a の transitionend を発火 → a の state delete + 次 render で a だけ消える
+    all_before[0].ontransitionend({ propertyName: 'height', target: all_before[0] });
+    await flush();
+
+    const all_after = document.querySelectorAll('[data-ric-role="collapse-box"]');
+    assert.equal(all_after.length, 1, 'a が消えて b だけ残る (b は影響を受けない)');
+    // a の transitionend が b の state を巻き込んでいたら b も消えてしまう。
+    // length=1 のままなら b は無事。
+
+    void handle, a_el;
+  });
+
   test('Rancha 風 sparse animation: 同 render で複数 instance を呼んでも独立に動く', async () => {
     Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
       configurable: true, get() { return 200; },
