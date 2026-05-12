@@ -20,7 +20,7 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 
 | カテゴリ | API |
 |---|---|
-| **layout** | `create_ui_page` / `ui_col` / `ui_row` |
+| **layout** | `create_ui_page` / `ui_col` / `ui_row` / `ui_grid` |
 | **surface** | `ui_panel` / `create_ui_panel` |
 | **control (純関数)** | `ui_button` / `ui_input` / `ui_textarea` / `ui_checkbox` / `ui_radiobutton` / `ui_range` / `ui_color` / `ui_select` / `ui_separator` |
 | **control (state バインド)** | `bind_input` / `bind_textarea` / `bind_checkbox` / `bind_radiobutton` / `bind_range` / `bind_color` / `bind_select` |
@@ -35,6 +35,38 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 
 全 `ui_*` は rest スプレッド契約（任意 DOM 属性透過）、`create_ui_*` は `s` のトップレベル格納＋`__notify` 自動注入、という共通ルール。詳細は [rest スプレッド契約](#任意属性の透過rest-スプレッド契約) と [Controlled / Uncontrolled パターン](#controlled--uncontrolled-パターン) を参照。
 
+### data-ric-role 属性 (v0.3.8〜)
+
+composite / popup の各内部要素には `data-ric-role` 属性が付与される。
+class 名 (`.ric-splitter__divider` 等) は build 時に minify されるが、
+`data-ric-role` 属性は minify 対象外で **常に semantic な値が残る**。
+consumer 側で CSS カスタマイズや E2E テストの selector として使える契約として
+公開している (regression test あり、勝手に削除しない)。
+
+| component | role 値 |
+|---|---|
+| `create_ui_splitter` | `splitter-side` / `splitter-divider` / `splitter-toggle` / `splitter-main` |
+| `create_ui_dialog`   | `dialog-overlay` / `dialog` / `dialog-header` / `dialog-title` / `dialog-close` / `dialog-body` / `dialog-footer` |
+| `create_ui_popup`    | `popup-trigger` / `popup-overlay` / `popup-body` |
+| `create_ui_toast`    | `toast-container` / `toast-item` / `toast-msg` / `toast-close` |
+| `create_ui_tooltip`  | `tooltip-target` / `tooltip` |
+| `create_ui_accordion`| `accordion` / `accordion-item` / `accordion-header` / `accordion-title` / `accordion-arrow` / `accordion-body` |
+| `ui_tabs`            | `tabs` / `tabs-bar` / `tabs-tab` / `tabs-panel` |
+
+使い方の例:
+
+```javascript
+// E2E テスト
+await page.click('[data-ric-role="dialog-close"]');
+
+// CSS カスタマイズ
+[data-ric-role="splitter-divider"] { background: hsl(220 30% 80%); }
+```
+
+CSS class (`.ric-xxx__yyy`) も併存しており、内部 minify されているケースで
+JS bundle 側で参照する場合は class 経由でも構わない (ただし minify 名は
+リリース間で変わる可能性があるため、外部からは `data-ric-role` 推奨)。
+
 ---
 
 ## 1. アーキテクチャ概要
@@ -47,6 +79,66 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 | `RicUI.min.js` | UI コンポーネント集（5 テーマ）+ パラメータ調整パネル |
 
 バンドルサイズは README.md を参照。
+
+### JSON の 4 つの層
+
+RicDOM/RicUI を使うアプリは、目的の違う 4 種類の JSON を扱うことがある。
+混同を避けるため、各層の責務と相互変換を明示しておく。
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  ❶ アプリ設計 JSON        ・人 (or GUI Designer) が手書きする       │
+│  (例: { type: 'ui_button', props: {...}, bind: '...' })          │
+│                          ・部品種別 / 位置 / 振る舞いメタの記述      │
+│                          ・round-trip 可 / save & load 可          │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │  ↓ アプリ側で変換ロジックを書く
+┌────────────────────────────▼─────────────────────────────────────┐
+│  ❷ RicUI 部品の JSON      ・関数呼び出しの戻り値                    │
+│  (例: ui_button({ ctx, variant, onclick }))                      │
+│                          ・theme / density / variant 等の意味を    │
+│                            class 名や CSS 変数に焼き込む            │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │  ↓ 関数の戻り値として返る
+┌────────────────────────────▼─────────────────────────────────────┐
+│  ❸ RicDOM JSON (素の VDOM)・{ tag, class, style, ctx, onclick }   │
+│                          ・DOM に最も近い形                        │
+│                          ・create_RicDOM の render が返す形         │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │  ↓ ricdom.js の diff エンジンが解釈
+┌────────────────────────────▼─────────────────────────────────────┐
+│  ❹ 実 DOM                ・document.createElement の結果           │
+│                          ・class や data-ric-role は維持される     │
+└──────────────────────────────────────────────────────────────────┘
+
+別軸:
+┌──────────────────────────────────────────────────────────────────┐
+│  ❺ データ JSON           ・アプリの business state                 │
+│  (例: { name: '', age: 0 })   ・bind_input(s, 'name') 等で結ぶ     │
+│                          ・❶ の bind 指定から空骨格を生成可        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+層の役割分担:
+
+| 層 | 誰が書く | 形式 | 例 |
+|---|---|---|---|
+| ❶ アプリ設計 | 人 / GUI Designer | アプリごとの schema | `{type:'ui_button', props:{text:'保存'}, bind:'name'}` |
+| ❷ RicUI 部品 | ライブラリ (関数戻り値) | 統一スキーマ (factory 呼び出し) | `ui_button({ variant:'primary', ctx:['保存'] })` |
+| ❸ RicDOM (VDOM) | render の戻り値 | DOM 寄り JSON | `{tag:'button', class:'ric-button', ctx:['保存']}` |
+| ❹ 実 DOM | ricdom.js | HTMLElement | `<button class="ric-button">保存</button>` |
+| ❺ データ | アプリの state | 任意 | `s.name = '...'` |
+
+ライブラリが**標準化**しているのは ❷❸❹ (RicUI / RicDOM / 実 DOM の対応規則)。
+❶ アプリ設計 JSON と ❺ データ JSON は **アプリ側の責務** (アプリごとに自由に
+設計してよい)。GUI Designer のようなツールが ❶ ↔ ❷ の変換を担当する場合、
+これは「アプリ側ロジック」であってライブラリの公開 API ではない。
+
+bind 指定 (`{ bind: 'customer.name' }` のような string path) を library が
+標準化することは意図的に避けている。アプリごとに binding 規約は異なるべき
+で、library が決め打つと表現力を狭めてしまう。代わりに RicUI は ❷ レベルで
+`bind_input(s, 'name')` のような **state Proxy と関数の組み合わせ** で binding
+を提供する。
 
 ### ファイル構成
 
@@ -63,7 +155,7 @@ ric_ui/
   css_registry.js        # CSS クラス収集・ビルドキャッシュ
   css_templates.js       # CSS テンプレート（コンポーネント別）
   style_utils.js         # style プロパティ → cssText 文字列変換ヘルパ
-  layout/                # ui_page, ui_col, ui_row
+  layout/                # ui_page, ui_col, ui_row, ui_grid
   surface/               # ui_panel, create_ui_panel
   control/               # ui_button, ui_input, bind_input, ui_textarea, bind_textarea, ui_range, bind_range, ui_color, bind_color, ui_separator, focus_when, etc.
   text/                  # ui_text, ui_code_pre, ui_md_pre
@@ -309,6 +401,28 @@ s.page.density = 'compact';
 ui_col({ ctx: [...], style: {} })  // flex-direction: column
 ui_row({ ctx: [...], style: {} })  // flex-direction: row, align-items: center
 ```
+
+#### ui_grid
+
+CSS grid を簡潔に書くための layout コンポーネント。
+
+```javascript
+// 数値: '1fr 1fr ...' (n 個) に展開
+ui_grid({ columns: 3, ctx: [a, b, c, d, e, f] })
+
+// 文字列: そのまま grid-template-columns に渡す
+ui_grid({ columns: '120px 1fr', rows: '80px auto', ctx: [...] })
+
+// 'auto-fit / auto-fill SIZE' は repeat(auto-fit, minmax(SIZE, 1fr)) の省略形
+ui_grid({ columns: 'auto-fit 200px', ctx: cards })
+
+// gap: 数値で px / 文字列でそのまま
+ui_grid({ columns: 2, gap: 12, ctx: [...] })          // 12px
+ui_grid({ columns: 2, gap: '8px 16px', ctx: [...] })  // row-gap col-gap
+```
+
+プロパティ: `columns` / `rows` / `gap` / `style` / `ctx`、および任意 DOM 属性
+(rest スプレッド契約)。gap 省略時は `--ric-gap-md` から自動取得。
 
 ### Surface
 
