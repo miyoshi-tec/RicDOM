@@ -44,6 +44,7 @@ const create_ui_toast = () => {
       const portal_items = [{
         tag:   'div',
         class: 'ric-toast__container',
+        'data-ric-role': 'toast-container',
         style: {
           position:      'fixed',
           bottom:        '20px',
@@ -61,11 +62,13 @@ const create_ui_toast = () => {
                + (item._e ? ' ric-toast__item--in' : '')
                + (item.type && item.type !== 'default' ? ' ric-toast__item--' + item.type : '')
                + (item._c ? ' ric-toast__item--out' : ''),
+          'data-ric-role': 'toast-item',
           style: { pointerEvents: 'auto' },
           onanimationend: item._c ? () => _remove(item.id) : item._e ? () => { item._e = false; } : undefined,
           ctx: [
-            { tag: 'span', class: 'ric-toast__msg',   ctx: [item.msg] },
+            { tag: 'span', class: 'ric-toast__msg', 'data-ric-role': 'toast-msg', ctx: [item.msg] },
             { tag: 'button', class: 'ric-toast__close',
+              'data-ric-role': 'toast-close',
               onclick: () => _do_close(item),
               ctx: ['✕'] },
           ],

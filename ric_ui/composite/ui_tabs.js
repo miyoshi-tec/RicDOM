@@ -43,9 +43,11 @@ const ui_tabs = ({
   const tab_bar = {
     tag:   'div',
     class: 'ric-tabs__bar',
+    'data-ric-role': 'tabs-bar',
     ctx:   items.map(item => ({
       tag:     'button',
       class:   'ric-tabs__tab' + (item.key === active_key ? ' ric-tabs__tab--active' : ''),
+      'data-ric-role': 'tabs-tab',
       // アクティブが変わった時だけ onchange を呼ぶ（同じタブのクリックは無視）
       onclick: () => { if (item.key !== active_key && typeof onchange === 'function') onchange(item.key); },
       ctx:     [item.label],
@@ -57,12 +59,14 @@ const ui_tabs = ({
   const panel = {
     tag:   'div',
     class: 'ric-tabs__panel',
+    'data-ric-role': 'tabs-panel',
     ctx:   active_item ? (active_item.ctx || []) : [],
   };
 
   return {
     tag:   'div',
     class: 'ric-tabs' + (variant !== 'line' ? ' ric-tabs--' + variant : ''),
+    'data-ric-role': 'tabs',
     ctx:   [tab_bar, panel],
   };
 };

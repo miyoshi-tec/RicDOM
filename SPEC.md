@@ -35,6 +35,38 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 
 全 `ui_*` は rest スプレッド契約（任意 DOM 属性透過）、`create_ui_*` は `s` のトップレベル格納＋`__notify` 自動注入、という共通ルール。詳細は [rest スプレッド契約](#任意属性の透過rest-スプレッド契約) と [Controlled / Uncontrolled パターン](#controlled--uncontrolled-パターン) を参照。
 
+### data-ric-role 属性 (v0.3.8〜)
+
+composite / popup の各内部要素には `data-ric-role` 属性が付与される。
+class 名 (`.ric-splitter__divider` 等) は build 時に minify されるが、
+`data-ric-role` 属性は minify 対象外で **常に semantic な値が残る**。
+consumer 側で CSS カスタマイズや E2E テストの selector として使える契約として
+公開している (regression test あり、勝手に削除しない)。
+
+| component | role 値 |
+|---|---|
+| `create_ui_splitter` | `splitter-side` / `splitter-divider` / `splitter-toggle` / `splitter-main` |
+| `create_ui_dialog`   | `dialog-overlay` / `dialog` / `dialog-header` / `dialog-title` / `dialog-close` / `dialog-body` / `dialog-footer` |
+| `create_ui_popup`    | `popup-trigger` / `popup-overlay` / `popup-body` |
+| `create_ui_toast`    | `toast-container` / `toast-item` / `toast-msg` / `toast-close` |
+| `create_ui_tooltip`  | `tooltip-target` / `tooltip` |
+| `create_ui_accordion`| `accordion` / `accordion-item` / `accordion-header` / `accordion-title` / `accordion-arrow` / `accordion-body` |
+| `ui_tabs`            | `tabs` / `tabs-bar` / `tabs-tab` / `tabs-panel` |
+
+使い方の例:
+
+```javascript
+// E2E テスト
+await page.click('[data-ric-role="dialog-close"]');
+
+// CSS カスタマイズ
+[data-ric-role="splitter-divider"] { background: hsl(220 30% 80%); }
+```
+
+CSS class (`.ric-xxx__yyy`) も併存しており、内部 minify されているケースで
+JS bundle 側で参照する場合は class 経由でも構わない (ただし minify 名は
+リリース間で変わる可能性があるため、外部からは `data-ric-role` 推奨)。
+
 ---
 
 ## 1. アーキテクチャ概要

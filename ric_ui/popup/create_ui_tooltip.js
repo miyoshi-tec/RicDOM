@@ -27,6 +27,7 @@ const create_ui_tooltip = () => {
       const portal_items = [{
         tag:   'div',
         class: 'ric-tooltip__popup ric-tooltip__popup--' + inst._d,
+        'data-ric-role': 'tooltip',
         style: _pos_style(inst._p),
         ctx:   [typeof content === 'string' ? { tag: 'span', ctx: [content] } : content],
       }];
@@ -34,6 +35,7 @@ const create_ui_tooltip = () => {
     }
     return {
       tag: 'span', class: 'ric-tooltip',
+      'data-ric-role': 'tooltip-target',
       onmouseenter: (e) => {
         const rect  = e.currentTarget.getBoundingClientRect();
         const cb    = _get_portal_cb(e.currentTarget);

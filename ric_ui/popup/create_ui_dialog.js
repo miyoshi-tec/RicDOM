@@ -111,11 +111,13 @@ const create_ui_dialog = () => {
         // 半透明バックドロップ（外クリックで閉じる）
         { tag: 'div',
           class: 'ric-dialog__overlay' + (inst._c ? ' ric-dialog__overlay--out' : ''),
+          'data-ric-role': 'dialog-overlay',
           style: { position: 'fixed', inset: 0, zIndex: 500 },
           onclick: _request_close },
         // ダイアログ本体（DOM 順でバックドロップの後 → 自然に前面）
         { tag: 'div',
           class: 'ric-dialog' + (inst._c ? ' ric-dialog--out' : ''),
+          'data-ric-role': 'dialog',
           style: {
             position:  'fixed',
             zIndex:    501,
@@ -125,14 +127,15 @@ const create_ui_dialog = () => {
           },
           onanimationend: _on_anim_end,
           ctx: [
-            { tag: 'div', class: 'ric-dialog__header', ctx: [
-              { tag: 'span', class: 'ric-dialog__title', ctx: [title] },
+            { tag: 'div', class: 'ric-dialog__header', 'data-ric-role': 'dialog-header', ctx: [
+              { tag: 'span', class: 'ric-dialog__title', 'data-ric-role': 'dialog-title', ctx: [title] },
               { tag: 'button', class: 'ric-dialog__close',
+                'data-ric-role': 'dialog-close',
                 onclick: _request_close,
                 ctx: ['✕'] },
             ]},
-            ctx.length    ? { tag: 'div', class: 'ric-dialog__body',   ctx }     : null,
-            actions.length ? { tag: 'div', class: 'ric-dialog__footer', ctx: actions } : null,
+            ctx.length    ? { tag: 'div', class: 'ric-dialog__body',   'data-ric-role': 'dialog-body',   ctx }     : null,
+            actions.length ? { tag: 'div', class: 'ric-dialog__footer', 'data-ric-role': 'dialog-footer', ctx: actions } : null,
           ].filter(Boolean),
         },
       ];

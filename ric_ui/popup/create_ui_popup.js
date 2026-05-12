@@ -63,12 +63,15 @@ const create_ui_popup = () => {
     if (inst._o) {
       const portal_items = [
         // 透明オーバーレイ：外クリックで閉じる
-        { tag: 'div', style: { position: 'fixed', inset: 0, zIndex: 401 },
+        { tag: 'div',
+          'data-ric-role': 'popup-overlay',
+          style: { position: 'fixed', inset: 0, zIndex: 401 },
           onclick: _do_close },
         // ポップアップ本体
         { tag: 'div',
           class: 'ric-popup__body ric-popup__body--' + inst._d
                + (inst._c ? ' ric-popup__body--out' : ''),
+          'data-ric-role': 'popup-body',
           style: _pos_style(inst._p),
           onclick: _do_close,
           onanimationend: _on_anim_end,
@@ -88,6 +91,7 @@ const create_ui_popup = () => {
       tag: 'div', class: 'ric-popup',
       ctx: [
         { tag: 'button', class: trigger_cls,
+          'data-ric-role': 'popup-trigger',
           onclick: (e) => {
             if (inst._c) return;
             if (inst._o) {

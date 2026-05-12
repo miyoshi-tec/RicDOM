@@ -149,6 +149,7 @@ const create_ui_splitter = ({
       tag:   'div',
       class: 'ric-splitter__side'
            + (inst._cl ? ' ric-splitter__side--collapsed' : ''),
+      'data-ric-role': 'splitter-side',
       style: {
         flexShrink: 0,
         flexBasis:  (inst._cl ? 0 : inst._sz) + 'px',
@@ -165,6 +166,7 @@ const create_ui_splitter = ({
     const divider = {
       tag:         'div',
       class:       'ric-splitter__divider',
+      'data-ric-role': 'splitter-divider',
       onmousedown: _on_mouse_down,
       // 折り畳み中のみ有効。折り畳みボタン由来のバブルはスキップ（二重トグル防止）
       onclick:     inst._cl
@@ -173,6 +175,7 @@ const create_ui_splitter = ({
       ctx: collapsible ? [{
         tag:     'button',
         class:   'ric-splitter__collapse-btn',
+        'data-ric-role': 'splitter-toggle',
         onclick: _toggle,
         ctx:     [_arrow()],
       }] : [],
@@ -182,6 +185,7 @@ const create_ui_splitter = ({
     const main_panel = {
       tag:   'div',
       class: 'ric-splitter__main',
+      'data-ric-role': 'splitter-main',
       style: { flex: 1, overflow: 'auto', minWidth: 0, minHeight: 0 },
       ctx:   main_arg.ctx || [],
     };
