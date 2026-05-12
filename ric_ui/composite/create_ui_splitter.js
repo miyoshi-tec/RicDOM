@@ -33,6 +33,8 @@
 
 'use strict';
 
+const { safe_notify } = require('../_factory_helpers');
+
 const create_ui_splitter = ({
   side        = 'left',  // 'left' | 'right' | 'top' | 'bottom'
   size        = 240,
@@ -111,7 +113,7 @@ const create_ui_splitter = ({
       // CSS クラスには transition を持たせず、この inline style フラグで制御する。
       // タブ切り替えなど「意図しない flex-basis 変化」でアニメーションが走るのを防ぐため。
       inst._tg = true;
-      inst.__notify?.();
+      safe_notify(inst, 'create_ui_splitter');
     }
   };
 
@@ -154,7 +156,7 @@ const create_ui_splitter = ({
         // _tg (toggling) 中だけ transition を効かせる
         ...(inst._tg ? { transition: 'flex-basis var(--ric-duration, 200ms) var(--ric-easing, ease)' } : {}),
       },
-      ontransitionend: inst._tg ? () => { inst._tg = false; inst.__notify?.(); } : undefined,
+      ontransitionend: inst._tg ? () => { inst._tg = false; safe_notify(inst, 'create_ui_splitter'); } : undefined,
       ctx:   side_arg.ctx || [],
     };
 

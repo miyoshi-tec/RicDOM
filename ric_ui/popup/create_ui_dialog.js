@@ -29,6 +29,7 @@
 
 const _portal                   = require('./_page_portal_queue');
 const { apply_theme_to_portal } = require('./_wrap_portal');
+const { safe_notify } = require('../_factory_helpers');
 
 const create_ui_dialog = () => {
 
@@ -37,14 +38,14 @@ const create_ui_dialog = () => {
     if (!inst._c) return;
     if (!inst._cd) inst._o = false;   // uncontrolled のみ内部 open をリセット
     inst._c = false;
-    inst.__notify?.(); // 再描画してポータルから除去
+    safe_notify(inst, 'create_ui_dialog'); // 再描画してポータルから除去
   };
 
   // アニメーション付きクローズ（uncontrolled 専用）
   const _do_close = () => {
     if (inst._c) return; // 二重呼び出し防止
     inst._c = true;
-    inst.__notify?.(); // 再描画して --out クラスを付与
+    safe_notify(inst, 'create_ui_dialog'); // 再描画して --out クラスを付与
   };
 
   // 閉じ要求（overlay / ✕ / ESC から呼ばれる共通エントリポイント）
@@ -151,7 +152,7 @@ const create_ui_dialog = () => {
         } else {
           inst._c = false;
           inst._o = true;
-          inst.__notify?.();
+          safe_notify(inst, 'create_ui_dialog');
         }
       },
       ctx: trigger_ctx ?? ['開く'],
@@ -173,7 +174,7 @@ const create_ui_dialog = () => {
     if (inst._cd) return;
     if (inst._o || inst._c) return;
     inst._o = true;
-    inst.__notify?.();
+    safe_notify(inst, 'create_ui_dialog');
   };
 
   return inst;

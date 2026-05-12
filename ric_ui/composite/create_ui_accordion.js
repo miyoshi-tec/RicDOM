@@ -20,6 +20,8 @@
 
 'use strict';
 
+const { safe_notify } = require('../_factory_helpers');
+
 const create_ui_accordion = ({ default_open = {} } = {}) => {
   const inst = ({ items = [], multi = true } = {}) => ({
     tag: 'div', class: 'ric-accordion',
@@ -36,7 +38,7 @@ const create_ui_accordion = ({ default_open = {} } = {}) => {
                 Object.keys(inst._om).forEach(k => { inst._om[k] = false; });
               }
               inst._om[id] = !is_open;
-              inst.__notify?.();
+              safe_notify(inst, 'create_ui_accordion');
             },
             ctx: [
               { tag: 'span', class: 'ric-accordion__title', ctx: [title] },

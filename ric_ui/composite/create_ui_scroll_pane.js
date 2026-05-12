@@ -26,6 +26,7 @@
 'use strict';
 
 const { style_to_css_string } = require('../style_utils');
+const { safe_notify } = require('../_factory_helpers');
 
 // 複数インスタンス識別用のモジュールレベルカウンタ
 let _pane_count = 0;
@@ -100,8 +101,8 @@ const create_ui_scroll_pane = ({
   inst._force_to   = null;   // 'bottom' | 'top' | null (強制スクロール方向)
 
   // 公開 API
-  inst.scroll_to_bottom = () => { inst._force_to = 'bottom'; inst.__notify?.(); };
-  inst.scroll_to_top    = () => { inst._force_to = 'top';    inst.__notify?.(); };
+  inst.scroll_to_bottom = () => { inst._force_to = 'bottom'; safe_notify(inst, 'create_ui_scroll_pane'); };
+  inst.scroll_to_top    = () => { inst._force_to = 'top';    safe_notify(inst, 'create_ui_scroll_pane'); };
 
   return inst;
 };
