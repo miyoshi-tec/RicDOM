@@ -60,8 +60,11 @@ const create_ui_collapse_box = ({
   const _states = new Map();
   const _new_state = () => ({ _o: false, _e: false, _c: false, _tw: 0, _th: 0 });
 
-  // DOM 識別: factory_id + URL-safe key で composite に
-  // (encodeURIComponent で path 中の / や . や空白を安全に)
+  // DOM 識別: factory_id + URL-safe key で composite に。
+  // encodeURIComponent は '/', ':', ' ', '"' 等を encode (attribute selector の
+  // [data-ric-cb="..."] で問題になる文字をすべて escape する)。'.' や '-' '_'
+  // 等は encode されないが、これらは HTML attribute 値 / querySelector で
+  // 問題にならないため OK。
   const _attr_value = (key) => _fid + '-' + encodeURIComponent(key);
 
   const _find_el = (key) =>
@@ -71,13 +74,13 @@ const create_ui_collapse_box = ({
 
   // entering 中の rAF コールバック: natural サイズを測って _tw/_th を更新し、
   // 再描画 (VDOM が新ターゲットを emit → CSS transition が発動) を予約する。
-  // 注意: state が delete 済み (visible 反転で entering が消えた) の場合は
-  // _state_of でなく has() で確認して no-op。stale state を再生成しない。
+  // state が delete 済み (visible 反転で entering が消えた) の場合は
+  // _states.get(key) が undefined を返すので no-op。stale state を再生成しない。
   const _measure = (key) => {
-    if (!_states.has(key)) return;
     const st = _states.get(key);
+    if (!st || !st._e) return;
     const el = _find_el(key);
-    if (!el || !st._e) return;
+    if (!el) return;
     if (_do_w) st._tw = el.scrollWidth;
     if (_do_h) st._th = el.scrollHeight;
     safe_notify(inst, 'create_ui_collapse_box');
@@ -89,23 +92,21 @@ const create_ui_collapse_box = ({
     let st = _states.get(key);
 
     // ── 状態遷移 ────────────────────────────────────────
+    // state は「生きている (entering/open/closing)」ときだけ Map に存在する。
+    // closing 完了 / corner case 即 closed で必ず delete されるので、
+    // 「st が存在 && _o=false」のケースは構造上発生しない。
     if (visible && !st) {
       // 通常 enter (mount)
       st = _new_state();
       st._o = true; st._e = true;
       _states.set(key, st);
       if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => _measure(key));
-    } else if (visible && st && !st._o) {
-      // 既存 state が closed のまま残っていた珍しいケース (理論上は GC で
-      // delete されているので来ない筈だが念のため): enter として扱う
-      st._o = true; st._e = true; st._tw = 0; st._th = 0;
-      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => _measure(key));
     } else if (visible && st && st._c) {
       // 中断: closing → entering (再 measure。transition は VDOM diff が発動)
       st._c = false; st._e = true;
       if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => _measure(key));
-    } else if (!visible && st && st._o && !st._c) {
-      // 通常 close (entering 中断含む)
+    } else if (!visible && st && !st._c) {
+      // 通常 close (entering 中断含む)。st が存在するなら必ず _o=true (上記 invariant)。
       st._e = false;
       if (st._th === 0 && st._tw === 0) {
         // measure 前に閉じた corner case (連打など): アニメ不要、即 closed
@@ -115,7 +116,8 @@ const create_ui_collapse_box = ({
         st._tw = st._th = 0;
       }
     }
-    // !visible && !st の場合: 何もしない (state 未存在は既に closed と等価)
+    // visible && st && (entering or open or closing→entering 既処理): 何もしない (steady state)
+    // !visible && !st: state 未存在 = 既に closed、何もしない
 
     // ── render ────────────────────────────────────────
     // 描画不要 (= 完全に closed) なら state を GC して null を返す
