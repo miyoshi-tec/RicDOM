@@ -88,6 +88,8 @@ describe('safe_notify: state 外のファクトリは warn する (silent failur
       assert.equal(warned.length, 1, 'state 外置きで 1 回 warn する');
       assert.match(warned[0], /create_ui_splitter/);
       assert.match(warned[0], /top level of state/);
+      // user が即ドキュメントに飛べるよう、warning 内で TUTORIAL.md を案内する
+      assert.match(warned[0], /TUTORIAL\.md/);
     } finally {
       w.restore();
     }

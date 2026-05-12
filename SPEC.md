@@ -35,6 +35,11 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 
 全 `ui_*` は rest スプレッド契約（任意 DOM 属性透過）、`create_ui_*` は `s` のトップレベル格納＋`__notify` 自動注入、という共通ルール。詳細は [rest スプレッド契約](#任意属性の透過rest-スプレッド契約) と [Controlled / Uncontrolled パターン](#controlled--uncontrolled-パターン) を参照。
 
+`create_ui_*` を state 外 (module level const 等) に置くと `__notify` が
+注入されず、内部イベントから再描画が発火されない silent failure が起きる。
+v0.3.8 以降は初回呼び出しで `console.warn` が一度出るので、誤用に気付ける。
+詳しくは [TUTORIAL.md「ありがちな誤用」](TUTORIAL.md#ありがちな誤用--create_ui_-を-state-外に置かない) を参照。
+
 ### data-ric-role 属性 (v0.3.8〜)
 
 composite / popup の各内部要素には `data-ric-role` 属性が付与される。

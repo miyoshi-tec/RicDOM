@@ -16,8 +16,8 @@
 //
 // 既存の正しい使い方には何の影響もない (typeof check が増えるだけ)。
 //
-// 詳しくは SPEC.md "Controlled / Uncontrolled パターン" / TUTORIAL.md
-// "ありがちな誤用" 参照。
+// 詳しくは TUTORIAL.md「ありがちな誤用 — create_ui_* を state 外に置かない」
+// 参照 (SPEC.md 冒頭の API 表でも canon を明示)。
 
 'use strict';
 
@@ -38,7 +38,7 @@ const safe_notify = (inst, factory_name) => {
     'place the factory at the top level of state so RicDOM can wire it up:\n' +
     '  create_RicDOM(target, { my_widget: ' + factory_name + '({...}) })\n' +
     'Internal events (collapse / theme-change / etc.) will not trigger re-render ' +
-    'until you do this. See SPEC.md "Controlled / Uncontrolled パターン".'
+    'until you do this. See TUTORIAL.md "ありがちな誤用".'
   );
 };
 
