@@ -818,16 +818,30 @@ s.box = create_ui_collapse_box({
   easing:    'ease',  // CSS easing 文字列
 });
 
-// 呼び出し側 — controlled mode 必須 (visible を渡す)
+// 単独使用 — controlled mode 一本 (visible を渡す)
 s.box({
   visible: s.expanded,
   ctx:     [...],
 })
+
+// 複数 instance (v0.3.11〜): 1 factory を key で識別される多数の独立
+// アニメーションに使える (sparse list animation 用途)
+ctx: sorted.map((f) => animating.has(f.path)
+  ? s.box({ key: f.path, visible: animating.get(f.path), ctx: [row] })
+  : row,
+)
 ```
+
+引数:
+- `key`: string (省略時 `'_default'`)。複数 instance を識別する。同 factory
+  内で異なる key は独立した state machine と独立した DOM を持つ。Rancha 等
+  「sort 順を維持したまま個別 row をアニメ」する用途に使う。
+- `visible`: bool (必須)。controlled mode。
+- `ctx`: 子要素配列。
 
 戻り値: VDOM ノード or `null` (完全に閉じている and 閉じる動作中でもないとき)。
 
-状態機械:
+状態機械 (per-key):
 
 ```
         visible:true              transitionend
@@ -837,15 +851,21 @@ s.box({
    └──── [closing] ←─────────────────────────────────┘
 ```
 
-中断 (`visible` がアニメ中に反転) は `entering ⇄ closing` 直接遷移。現在の
-補間値を `getBoundingClientRect` で snapshot して新 transition の起点にする。
+中断 (`visible` がアニメ中に反転) は `entering ⇄ closing` 直接遷移。CSS
+transition は「現在の補間値から新ターゲットへ」を自動で行うため、JS 側で
+snapshot ロジックは不要。
 
 実装は browser の CSS transition に補間を委譲する **宣言的 API**。1 つの
-collapse_box につき JS が走るのはアニメの開始 / 終了の 2 点のみ。10 個並行で
-動かしても CPU 負荷は変わらない。`prefers-reduced-motion` は user 側 CSS で
-`transition: none` を当てれば自動的に瞬時遷移になる。
+collapse_box (key) につき JS が走るのはアニメの開始 / 終了の 2 点のみ。
+100 個 key を並行で動かしても CPU 負荷は変わらない。
+`prefers-reduced-motion` は user 側 CSS で `transition: none` を当てれば
+自動的に瞬時遷移になる。
 
-DOM の `data-ric-cb` 属性でインスタンスを特定。`data-ric-role="collapse-box"`
+state GC: closing 完了 / 即 closed corner case で内部 Map から該当 key の
+エントリが自動削除される。長時間動作する list アプリで Map が膨らまない。
+
+DOM の `data-ric-cb` 属性に factory id と key を encodeURIComponent した
+複合値が入る (例: `'12-path%2Fto%2Ffile'`)。`data-ric-role="collapse-box"`
 も付与される (CSS / E2E test の selector に使える)。
 
 ### Controlled / Uncontrolled パターン

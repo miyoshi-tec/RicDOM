@@ -1,14 +1,24 @@
 // RicUI — create_ui_collapse_box
 // 子要素を「アニメーションしながら現れる / 消える」コンテナの汎用 primitive。
+// **複数 instance 対応** (v0.3.11〜): 1 factory を `key` で区別される多数の独立
+// アニメーションに使える (Rancha の file row add/remove のような sparse list
+// animation 用途)。
 //
 // 使い方:
-//   s.box = create_ui_collapse_box({
-//     direction: 'v',       // 'v' (default) | 'h' | 'both'
-//     duration:  200,       // ms (default)
-//     easing:    'ease',    // CSS easing 文字列 (default 'ease')
-//   });
+//   s.box = create_ui_collapse_box({ direction, duration, easing });
 //
-//   s.box({ visible: s.expanded, ctx: [...] })   // controlled mode 一本
+//   // 単独 (key 省略 → 内部的に '_default')
+//   s.box({ visible: s.expanded, ctx: [...] })
+//
+//   // 複数 (sparse animation: sort 順を維持したまま個別 row をアニメ)
+//   ctx: sorted.map((f) => animating.has(f.path)
+//     ? s.box({ key: f.path, visible: animating.get(f.path), ctx: [row] })
+//     : row,
+//   )
+//
+// 各 key は **独立した state machine** (_o / _e / _c / _tw / _th) を持つ。
+// closing 完了時 / corner case の即 closed 時に Map から entry を削除して
+// メモリリークを防ぐ (長時間動作する list アプリで Map が膨らまない)。
 //
 // 動作原理 — VDOM が style の唯一の真実源:
 //   - 入る:   visible:true で _tw/_th=0 → VDOM が height:0 を emit → mount。
@@ -21,15 +31,14 @@
 //             新ターゲットへ」を自動で行うため、snapshot ロジックは要らない。
 //
 // アニメ中は JS / RicDOM は走らない (transition は browser の compositor で
-// 補間)。状態変更タイミング (mount / measure / transitionend) でだけ RicDOM
-// が再描画される (= 1 つの開閉サイクルで合計 4 回程度)。
+// 補間)。
 
 'use strict';
 
 const { safe_notify } = require('../_factory_helpers');
 
-// 複数インスタンス識別用のモジュールレベルカウンタ。
-let _next_id = 0;
+// 複数 factory 識別用のモジュールレベルカウンタ。
+let _next_fid = 0;
 
 const create_ui_collapse_box = ({
   direction = 'v',
@@ -37,7 +46,7 @@ const create_ui_collapse_box = ({
   easing    = 'ease',
 } = {}) => {
 
-  const _id   = ++_next_id;
+  const _fid  = ++_next_fid;
   const _do_h = direction !== 'h';   // direction 'v' or 'both' で height を制御
   const _do_w = direction !== 'v';   // direction 'h' or 'both' で width を制御
   const _trans = [
@@ -45,79 +54,111 @@ const create_ui_collapse_box = ({
     _do_h && `height ${duration}ms ${easing}`,
   ].filter(Boolean).join(', ');
 
-  const _find_el = () =>
+  // ── per-key state (multi-instance) ──────────────────
+  // key → { _o, _e, _c, _tw, _th }
+  // closing 完了 / corner case 即 closed で entry を delete (GC)。
+  const _states = new Map();
+  const _new_state = () => ({ _o: false, _e: false, _c: false, _tw: 0, _th: 0 });
+
+  // DOM 識別: factory_id + URL-safe key で composite に
+  // (encodeURIComponent で path 中の / や . や空白を安全に)
+  const _attr_value = (key) => _fid + '-' + encodeURIComponent(key);
+
+  const _find_el = (key) =>
     (typeof document !== 'undefined')
-      ? document.querySelector(`[data-ric-cb="${_id}"]`)
+      ? document.querySelector(`[data-ric-cb="${_attr_value(key)}"]`)
       : null;
 
   // entering 中の rAF コールバック: natural サイズを測って _tw/_th を更新し、
   // 再描画 (VDOM が新ターゲットを emit → CSS transition が発動) を予約する。
-  const _measure = () => {
-    const el = _find_el();
-    if (!el || !inst._e) return;        // visible 反転で entering が消えていたら no-op
-    if (_do_w) inst._tw = el.scrollWidth;
-    if (_do_h) inst._th = el.scrollHeight;
+  // 注意: state が delete 済み (visible 反転で entering が消えた) の場合は
+  // _state_of でなく has() で確認して no-op。stale state を再生成しない。
+  const _measure = (key) => {
+    if (!_states.has(key)) return;
+    const st = _states.get(key);
+    const el = _find_el(key);
+    if (!el || !st._e) return;
+    if (_do_w) st._tw = el.scrollWidth;
+    if (_do_h) st._th = el.scrollHeight;
     safe_notify(inst, 'create_ui_collapse_box');
   };
 
-  // transitionend ハンドラ: closing 完了で unmount、entering 完了で _e=false
-  // (次 render で VDOM から height/width が消え、RicDOM diff が inline を
-  // clear して natural reflow に戻る)。
-  const _on_end = (e) => {
-    if (e.propertyName !== 'width' && e.propertyName !== 'height') return;
-    const el = _find_el();
-    if (!el || e.target !== el) return;
-    if (inst._c) {
-      inst._o = inst._c = false;
-      safe_notify(inst, 'create_ui_collapse_box');
-    } else if (inst._e) {
-      inst._e = false;
-      safe_notify(inst, 'create_ui_collapse_box');
-    }
-  };
+  const inst = ({ key = '_default', visible = false, ctx = [] } = {}) => {
 
-  const inst = ({ visible = false, ctx = [] } = {}) => {
+    // ── 状態取得 (必要なときだけ作る; visible:false かつ未存在なら作らない) ──
+    let st = _states.get(key);
 
     // ── 状態遷移 ────────────────────────────────────────
-    if (visible && !inst._o) {
+    if (visible && !st) {
       // 通常 enter (mount)
-      inst._o = true; inst._e = true;
-      inst._tw = inst._th = 0;
-      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(_measure);
-    } else if (visible && inst._c) {
+      st = _new_state();
+      st._o = true; st._e = true;
+      _states.set(key, st);
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => _measure(key));
+    } else if (visible && st && !st._o) {
+      // 既存 state が closed のまま残っていた珍しいケース (理論上は GC で
+      // delete されているので来ない筈だが念のため): enter として扱う
+      st._o = true; st._e = true; st._tw = 0; st._th = 0;
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => _measure(key));
+    } else if (visible && st && st._c) {
       // 中断: closing → entering (再 measure。transition は VDOM diff が発動)
-      inst._c = false; inst._e = true;
-      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(_measure);
-    } else if (!visible && inst._o && !inst._c) {
+      st._c = false; st._e = true;
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => _measure(key));
+    } else if (!visible && st && st._o && !st._c) {
       // 通常 close (entering 中断含む)
-      inst._e = false;
-      if (inst._th === 0 && inst._tw === 0) {
-        // measure が走る前に閉じた corner case (連打など): アニメ不要、即 closed
-        inst._o = false;
+      st._e = false;
+      if (st._th === 0 && st._tw === 0) {
+        // measure 前に閉じた corner case (連打など): アニメ不要、即 closed
+        st._o = false;
       } else {
-        inst._c = true;
-        inst._tw = inst._th = 0;
+        st._c = true;
+        st._tw = st._th = 0;
       }
     }
+    // !visible && !st の場合: 何もしない (state 未存在は既に closed と等価)
 
     // ── render ────────────────────────────────────────
-    if (!inst._o && !inst._c) return null;
+    // 描画不要 (= 完全に closed) なら state を GC して null を返す
+    if (!st || (!st._o && !st._c)) {
+      if (st) _states.delete(key);
+      return null;
+    }
 
     // VDOM が style の真値を持つ。imperative な inline 操作は一切しない。
     // entering/closing 中だけ height/width を明示し、open 完了後は除外して
     // natural reflow に戻す。
     const style = { overflow: 'hidden', transition: _trans };
-    if (inst._e || inst._c) {
-      if (_do_h) style.height = inst._th + 'px';
-      if (_do_w) style.width  = inst._tw + 'px';
+    if (st._e || st._c) {
+      if (_do_h) style.height = st._th + 'px';
+      if (_do_w) style.width  = st._tw + 'px';
     }
+
+    // transitionend は closure で key (と st) を捕捉。各 instance の DOM が
+    // 自分の key に応じた handler を持つ。
+    const _on_end = (e) => {
+      if (e.propertyName !== 'width' && e.propertyName !== 'height') return;
+      const el = _find_el(key);
+      if (!el || e.target !== el) return;
+      // state が外から delete されている corner case を保護 (closure は古い
+      // st を持っていても Map は最新)
+      const cur = _states.get(key);
+      if (!cur || cur !== st) return;
+      if (st._c) {
+        st._o = st._c = false;
+        _states.delete(key);   // closing 完了 → GC
+        safe_notify(inst, 'create_ui_collapse_box');
+      } else if (st._e) {
+        st._e = false;
+        safe_notify(inst, 'create_ui_collapse_box');
+      }
+    };
 
     return {
       tag: 'div',
       class: 'ric-collapse-box'
-           + (inst._e ? ' ric-collapse-box--entering' : '')
-           + (inst._c ? ' ric-collapse-box--closing'  : ''),
-      'data-ric-cb':   String(_id),
+           + (st._e ? ' ric-collapse-box--entering' : '')
+           + (st._c ? ' ric-collapse-box--closing'  : ''),
+      'data-ric-cb':   _attr_value(key),
       'data-ric-role': 'collapse-box',
       style,
       ontransitionend: _on_end,
@@ -125,8 +166,6 @@ const create_ui_collapse_box = ({
     };
   };
 
-  inst._o = inst._e = inst._c = false;   // open / entering / closing
-  inst._tw = inst._th = 0;               // target width / height (px、entering/closing 中の target)
   return inst;
 };
 
