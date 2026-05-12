@@ -19,6 +19,7 @@
 //   text      : ui_text / ui_code_pre / ui_md_pre
 //   popup     : create_ui_popup / create_ui_tooltip / create_ui_dialog / create_ui_toast
 //   composite : create_ui_accordion / create_ui_splitter / create_ui_scroll_pane
+//               create_ui_collapse_box
 //               ui_tabs / bind_tabs
 //               ui_inline_menu
 //               create_ui_tweak_panel / ui_tweak_panel / ui_tweak_folder / ui_tweak_row
@@ -66,6 +67,7 @@ const { create_ui_toast    } = require('./popup/create_ui_toast');
 const { create_ui_accordion } = require('./composite/create_ui_accordion');
 const { create_ui_splitter    } = require('./composite/create_ui_splitter');
 const { create_ui_scroll_pane } = require('./composite/create_ui_scroll_pane');
+const { create_ui_collapse_box } = require('./composite/create_ui_collapse_box');
 const { ui_tabs             } = require('./composite/ui_tabs');
 const { bind_tabs           } = require('./composite/bind_tabs');
 const { ui_inline_menu      } = require('./composite/ui_inline_menu');
@@ -125,6 +127,7 @@ module.exports = {
   create_ui_accordion,
   create_ui_splitter,
   create_ui_scroll_pane,
+  create_ui_collapse_box,
   ui_tabs,
   bind_tabs,
   ui_inline_menu,

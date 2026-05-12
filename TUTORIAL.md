@@ -461,6 +461,30 @@ dialog と splitter は **controlled mode** にも対応しています。
 `open` / `collapsed` を render 時に渡すと、開閉状態を外部の state で管理できます。
 詳しくは SPEC.md の「Controlled / Uncontrolled パターン」を参照してください。
 
+### 開閉アニメーション付きのコンテナ (`create_ui_collapse_box`)
+
+panel / settings 領域などを「アニメーションで現す / 消す」場合は
+`create_ui_collapse_box` が便利です。`visible: true/false` で開閉、
+width / height が 0 ↔ 自然サイズに CSS transition で補間されます。
+
+```javascript
+create_RicDOM('#app', {
+  expanded: false,
+  box:      create_ui_collapse_box({ direction: 'v', duration: 200 }),
+  render: (s) => s.page({ ctx: [
+    ui_button({ ctx: ['詳細を' + (s.expanded ? '隠す' : '開く')],
+                onclick: () => { s.expanded = !s.expanded; } }),
+    s.box({ visible: s.expanded, ctx: [
+      ui_panel({ ctx: ['詳細コンテンツ...'] }),
+    ]}),
+  ]}),
+});
+```
+
+direction: `'v'` (縦折り、デフォルト) / `'h'` (横折り) / `'both'`。
+アニメ中は JS / RicDOM は一切走らず、ブラウザの compositor で補間されるため
+複数同時に開閉しても CPU 負荷は変わりません。
+
 ---
 
 ## 8. フォーム部品を使う
