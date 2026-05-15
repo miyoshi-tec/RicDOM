@@ -182,6 +182,31 @@ const _set_class = (el, value) => {
   }
 };
 
+// 単一 style プロパティを inline style に書き込む。
+// 通常プロパティは el.style[key] = val、CSS Custom Property (`--*`) は
+// el.style.setProperty(key, val) を使う必要がある (bracket setter は --*
+// に対して silent no-op になる仕様)。
+// 値が現状と同じならスキップする (mount/diff 共通使用、わずかな最適化)。
+const _set_style_prop = (el, key, val) => {
+  if (key.startsWith('--')) {
+    if (el.style.getPropertyValue(key) !== String(val)) {
+      el.style.setProperty(key, val);
+    }
+  } else {
+    if (el.style[key] !== val) {
+      el.style[key] = val;
+    }
+  }
+};
+
+// 単一 style プロパティを inline style から削除する。
+// 通常プロパティは el.style[key] = ''、CSS Custom Property (`--*`) は
+// el.style.removeProperty(key) を使う必要がある。
+const _remove_style_prop = (el, key) => {
+  if (key.startsWith('--')) el.style.removeProperty(key);
+  else                      el.style[key] = '';
+};
+
 // DOM プロパティとして直接代入すべきキー（setAttribute ではなく代入する）
 const DOM_PROPERTY_KEYS = new Set([
   'value', 'checked', 'selected', 'disabled',
@@ -216,10 +241,7 @@ const apply_attributes_to_element = (el, normalized_node) => {
       el.style.cssText = style;
     } else {
       for (const [key, val] of Object.entries(style)) {
-        // CSS Custom Property (`--*`) は setProperty 必須 (el.style[key] では
-        // silent no-op になる仕様)。
-        if (key.startsWith('--')) el.style.setProperty(key, val);
-        else                      el.style[key] = val;
+        _set_style_prop(el, key, val);
       }
     }
   }
@@ -386,26 +408,16 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
       el.style.cssText = '';
     }
 
-    // 次のスタイルを適用する。CSS Custom Property (`--*`) は setProperty
-    // 必須 (el.style[key] では silent no-op になる仕様)。
+    // 次のスタイルを適用する (--* / 通常プロパティの分岐は helper に集約)
     for (const [key, val] of Object.entries(next_style)) {
-      if (key.startsWith('--')) {
-        if (el.style.getPropertyValue(key) !== String(val)) {
-          el.style.setProperty(key, val);
-        }
-      } else {
-        if (el.style[key] !== val) {
-          el.style[key] = val;
-        }
-      }
+      _set_style_prop(el, key, val);
     }
     // 前にあったが次にないスタイルをリセットする（prev も object のケース）。
     // prev が string のケースは上の cssText='' で一括クリア済み。
     if (typeof prev_style !== 'string') {
       for (const key of Object.keys(prev_style)) {
         if (!(key in next_style)) {
-          if (key.startsWith('--')) el.style.removeProperty(key);
-          else                       el.style[key] = '';
+          _remove_style_prop(el, key);
         }
       }
     }
