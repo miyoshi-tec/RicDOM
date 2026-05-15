@@ -168,6 +168,20 @@ const is_json_equal = (a, b) => {
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
+// class 属性を要素種別に応じて正しく書き込む。
+// HTML 要素: el.className = val で OK (DOM の string プロパティ)。
+// SVG 要素:  el.className は SVGAnimatedString (object) で、文字列代入は
+//            silent no-op。setAttribute('class', val) を使う必要がある。
+// 空文字列が来たら属性自体を削除する (cleaner)。
+const _set_class = (el, value) => {
+  if (el.namespaceURI === SVG_NAMESPACE) {
+    if (value) el.setAttribute('class', value);
+    else       el.removeAttribute('class');
+  } else {
+    el.className = value || '';
+  }
+};
+
 // DOM プロパティとして直接代入すべきキー（setAttribute ではなく代入する）
 const DOM_PROPERTY_KEYS = new Set([
   'value', 'checked', 'selected', 'disabled',
@@ -190,9 +204,9 @@ const apply_attributes_to_element = (el, normalized_node) => {
     el.id = normalized_node.id;
   }
 
-  // class
+  // class (SVG では setAttribute 必須なので _set_class 経由)
   if (normalized_node.class && normalized_node.class.length > 0) {
-    el.className = normalized_node.class.join(' ');
+    _set_class(el, normalized_node.class.join(' '));
   }
 
   // style
@@ -347,11 +361,11 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
     }
   }
 
-  // class の差分
+  // class の差分 (SVG では setAttribute 必須なので _set_class 経由)
   const prev_class = (prev_normalized.class ?? []).join(' ');
   const next_class = (next_normalized.class ?? []).join(' ');
   if (prev_class !== next_class) {
-    el.className = next_class;
+    _set_class(el, next_class);
   }
 
   // style の差分
