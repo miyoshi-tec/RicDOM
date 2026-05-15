@@ -782,3 +782,114 @@ test('style diff: object → style キー無しで inline style が消える', a
   });
   assert.equal(span.getAttribute('style') || '', '');
 });
+
+// =====================================================================
+// CSS Custom Property (`--*`) 対応
+// =====================================================================
+// 旧バグ: vdom の style object に `'--my-var': 'red'` を書いても DOM に
+//        反映されない。原因は 2 つ:
+//   1) convert_style_key_to_camel が '--ric-color-bg' を '-RicColorBg' に
+//      壊してしまう (leading -- が - 1 個になり CSS variable 認識しなくなる)
+//   2) el.style[key] = val は CSS Custom Property に対して silent no-op
+//      (必ず el.style.setProperty(key, val) を使う必要がある)
+// 修正後: convert は --* を保護、apply/reset ループは --* を setProperty /
+//        removeProperty で扱う。
+
+const { create_RicDOM } = require('../src/ricdom');
+
+test('CSS Custom Property: vdom style に --* を書くと DOM に setProperty で適用される', () => {
+  const dom = setup_jsdom();
+  const target = dom.window.document.querySelector('#app');
+
+  create_RicDOM(target, {
+    render: () => ({
+      tag: 'div', id: 'box',
+      style: { '--my-var': 'red', background: 'var(--my-var)' },
+    }),
+  });
+
+  const el = dom.window.document.querySelector('#box');
+  // getPropertyValue で読めること = setProperty で書かれた証拠
+  assert.equal(el.style.getPropertyValue('--my-var'), 'red', '--my-var が setProperty で書かれている');
+  // var() 参照も inline style に残る (browser が解決するのは表示時)
+  assert.match(el.style.cssText, /var\(--my-var\)/);
+});
+
+test('CSS Custom Property: --* を含む key が camelCase に壊されない', () => {
+  // 単体ユニットテストとして convert を直接叩く
+  const r = require('../src/ricdom');
+  // 内部関数なので __test_exports 経由でアクセス
+  const conv = r.__test_exports?.convert_style_key_to_camel
+            ?? r.convert_style_key_to_camel;
+  assert.ok(conv, 'convert_style_key_to_camel が test から触れる必要あり');
+  assert.equal(conv('--ric-color-bg'), '--ric-color-bg', '--* はそのまま');
+  assert.equal(conv('--x'), '--x', '短い --* もそのまま');
+  // 通常の kebab-case 変換は維持されている (regression guard)
+  assert.equal(conv('padding-top'), 'paddingTop');
+  assert.equal(conv('background-color'), 'backgroundColor');
+});
+
+test('CSS Custom Property: 値変更で DOM が追従する', async () => {
+  const dom = setup_jsdom();
+  const target = dom.window.document.querySelector('#app');
+  const s = create_RicDOM(target, {
+    color: 'red',
+    render: (s) => ({
+      tag: 'div', id: 'box', style: { '--my-var': s.color },
+    }),
+  });
+
+  let el = dom.window.document.querySelector('#box');
+  assert.equal(el.style.getPropertyValue('--my-var'), 'red');
+
+  s.color = 'blue';
+  await flush_raf();
+
+  el = dom.window.document.querySelector('#box');
+  assert.equal(el.style.getPropertyValue('--my-var'), 'blue', '値変更で DOM 追従');
+});
+
+test('CSS Custom Property: style から削除すると DOM からも removeProperty される', async () => {
+  const dom = setup_jsdom();
+  const target = dom.window.document.querySelector('#app');
+  const s = create_RicDOM(target, {
+    has_var: true,
+    render: (s) => ({
+      tag: 'div', id: 'box',
+      style: s.has_var ? { '--my-var': 'red' } : {},
+    }),
+  });
+
+  let el = dom.window.document.querySelector('#box');
+  assert.equal(el.style.getPropertyValue('--my-var'), 'red');
+
+  s.has_var = false;
+  await flush_raf();
+
+  el = dom.window.document.querySelector('#box');
+  assert.equal(el.style.getPropertyValue('--my-var'), '',
+    '--* が style から消えると DOM の custom property も消える');
+});
+
+test('CSS Custom Property: 通常の style プロパティと混在しても両方反映', () => {
+  const dom = setup_jsdom();
+  const target = dom.window.document.querySelector('#app');
+
+  create_RicDOM(target, {
+    render: () => ({
+      tag: 'div', id: 'box',
+      style: {
+        '--theme-fg': '#111',
+        '--theme-bg': '#fff',
+        padding:      '8px',
+        background:   'var(--theme-bg)',
+      },
+    }),
+  });
+
+  const el = dom.window.document.querySelector('#box');
+  assert.equal(el.style.getPropertyValue('--theme-fg'), '#111');
+  assert.equal(el.style.getPropertyValue('--theme-bg'), '#fff');
+  assert.equal(el.style.padding, '8px');
+  assert.match(el.style.cssText, /var\(--theme-bg\)/);
+});

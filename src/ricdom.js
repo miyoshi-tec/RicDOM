@@ -28,8 +28,16 @@ const NOOP_PROXY = new Proxy(noop_function, {
 
 // ハイフンケース → キャメルケース変換
 // 例: 'padding-top' → 'paddingTop'
-const convert_style_key_to_camel = (key) =>
-  key.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+// 注: CSS Custom Property (`--*`) はそのまま返す。`--ric-color-bg` を
+// 変換すると `-RicColorBg` になり、leading `--` が `-` 1 個になって
+// CSS variable として認識されなくなるため。Custom Property は
+// el.style.setProperty(key, value) で書き込む必要があり (普通の
+// `el.style[key] = value` では silent no-op になる仕様)、そのためにも
+// 元のキー名を保つ必要がある。
+const convert_style_key_to_camel = (key) => {
+  if (key.startsWith('--')) return key;
+  return key.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+};
 
 // style の正規化（3形式 + 配列マージ形式を受け付ける）
 // 戻り値はキャメルケースオブジェクト、または文字列（cssText 用）
@@ -194,7 +202,10 @@ const apply_attributes_to_element = (el, normalized_node) => {
       el.style.cssText = style;
     } else {
       for (const [key, val] of Object.entries(style)) {
-        el.style[key] = val;
+        // CSS Custom Property (`--*`) は setProperty 必須 (el.style[key] では
+        // silent no-op になる仕様)。
+        if (key.startsWith('--')) el.style.setProperty(key, val);
+        else                      el.style[key] = val;
       }
     }
   }
@@ -361,10 +372,17 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
       el.style.cssText = '';
     }
 
-    // 次のスタイルを適用する
+    // 次のスタイルを適用する。CSS Custom Property (`--*`) は setProperty
+    // 必須 (el.style[key] では silent no-op になる仕様)。
     for (const [key, val] of Object.entries(next_style)) {
-      if (el.style[key] !== val) {
-        el.style[key] = val;
+      if (key.startsWith('--')) {
+        if (el.style.getPropertyValue(key) !== String(val)) {
+          el.style.setProperty(key, val);
+        }
+      } else {
+        if (el.style[key] !== val) {
+          el.style[key] = val;
+        }
       }
     }
     // 前にあったが次にないスタイルをリセットする（prev も object のケース）。
@@ -372,7 +390,8 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
     if (typeof prev_style !== 'string') {
       for (const key of Object.keys(prev_style)) {
         if (!(key in next_style)) {
-          el.style[key] = '';
+          if (key.startsWith('--')) el.style.removeProperty(key);
+          else                       el.style[key] = '';
         }
       }
     }
