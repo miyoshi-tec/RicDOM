@@ -166,12 +166,13 @@ const create_ui_dialog = () => {
     // ── 戻り値 ──
     if (controlled) return null;
 
-    // uncontrolled で trigger_ctx が省略 (または明示的に null/false) なら
-    // trigger ボタンを返さない (v0.3.14〜)。「自前で trigger を出して
+    // uncontrolled で trigger_ctx が falsy (省略 / null / false / 空文字列 等)
+    // なら trigger ボタンを返さない (v0.3.14〜)。「自前で trigger を出して
     // .open() / .close() だけ programmatic に呼びたい」use case に対応。
     // v0.3.13 以前は省略時に '開く' (日本語固定) が default だったが、
     // generic library として奇妙なので opt-in に変更。
-    if (trigger_ctx == null) return null;
+    // 空配列 [] は truthy なので「空内容の button を出す」扱い (user の責任)。
+    if (!trigger_ctx) return null;
 
     // uncontrolled + trigger_ctx 明示: trigger ボタンを返す
     // (ダイアログ本体はポータル経由で表示)

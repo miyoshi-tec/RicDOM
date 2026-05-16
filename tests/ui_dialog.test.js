@@ -51,12 +51,8 @@ const drain_portal = () => _portal.drain();
 // ─────────────────────────────────────────────────────────────
 describe('create_ui_dialog: uncontrolled trigger', () => {
 
-  it('trigger_ctx 省略時は null を返す (v0.3.14〜: 自前 trigger + programmatic open/close)', () => {
-    const inst = create_ui_dialog();
-    const result = inst();
-    drain_portal();
-    assert.equal(result, null);
-  });
+  // 注: trigger_ctx 省略時の挙動は "trigger_ctx 省略 (v0.3.14〜)" describe で
+  // まとめてテストするので、ここでは扱わない。
 
   it('trigger_ctx でボタンラベルを指定', () => {
     const inst = create_ui_dialog();
@@ -423,7 +419,7 @@ describe('create_ui_dialog: .close() の冪等性 (v0.3.14〜)', () => {
     assert.equal(inst._o, true, '再度 open できる');
   });
 
-  it('controlled モードでの .close() は on_close を呼ぶ (未 open でも親判断)', () => {
+  it('controlled モードでの .close() は on_close を呼ぶ', () => {
     const inst = create_ui_dialog();
     inst.__notify = () => {};
     let close_calls = 0;
