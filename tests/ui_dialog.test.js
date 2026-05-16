@@ -51,12 +51,11 @@ const drain_portal = () => _portal.drain();
 // ─────────────────────────────────────────────────────────────
 describe('create_ui_dialog: uncontrolled trigger', () => {
 
-  it('デフォルトで trigger ボタンを返す', () => {
+  it('trigger_ctx 省略時は null を返す (v0.3.14〜: 自前 trigger + programmatic open/close)', () => {
     const inst = create_ui_dialog();
-    const btn = inst();
+    const result = inst();
     drain_portal();
-    assert.equal(btn.tag, 'button');
-    assert.ok(btn.class.includes('ric-button'));
+    assert.equal(result, null);
   });
 
   it('trigger_ctx でボタンラベルを指定', () => {
@@ -66,16 +65,16 @@ describe('create_ui_dialog: uncontrolled trigger', () => {
     assert.deepEqual(btn.ctx, ['開く']);
   });
 
-  it('trigger_variant でボタンクラスを変更', () => {
+  it('trigger_variant でボタンクラスを変更 (trigger_ctx 明示必須)', () => {
     const inst = create_ui_dialog();
-    const btn = inst({ trigger_variant: 'ghost' });
+    const btn = inst({ trigger_ctx: ['開く'], trigger_variant: 'ghost' });
     drain_portal();
     assert.ok(btn.class.includes('ric-button--ghost'));
   });
 
-  it('trigger_variant=default でベースクラスのみ', () => {
+  it('trigger_variant=default でベースクラスのみ (trigger_ctx 明示必須)', () => {
     const inst = create_ui_dialog();
-    const btn = inst({ trigger_variant: 'default' });
+    const btn = inst({ trigger_ctx: ['開く'], trigger_variant: 'default' });
     drain_portal();
     assert.equal(btn.class, 'ric-button');
   });
@@ -384,5 +383,115 @@ describe('create_ui_dialog: ESC キー', () => {
     document.dispatchEvent(ev);
     assert.equal(inst._c, false, 'Enter should not trigger close');
     assert.equal(inst._o, true, 'dialog should still be open');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// v0.3.14: .close() の冪等化 / trigger_ctx 省略 / is_open()
+// ─────────────────────────────────────────────────────────────
+
+describe('create_ui_dialog: .close() の冪等性 (v0.3.14〜)', () => {
+
+  it('初期状態 (未 open) で .close() を呼んでも壊れない', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    inst.close();                              // 一度も open していない状態で close
+    assert.equal(inst._o, false, '_o は false のまま');
+    assert.equal(inst._c, false, '_c が true に化けない (これが v0.3.13 までのバグ)');
+  });
+
+  it('初期 .close() の後 .open() が正常に動く (regression for issue 3)', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    inst.close();                              // 旧バグ: _c=true が残る
+    inst.open();                               // 旧バグ: _c で blocked になる
+    assert.equal(inst._o, true, '.open() が効いて _o=true');
+    assert.equal(inst._c, false, '_c はリセット');
+  });
+
+  it('open → close → open の通常サイクルは引き続き動く', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    inst.open();
+    assert.equal(inst._o, true);
+    inst.close();
+    assert.equal(inst._c, true, 'close でアニメ開始');
+    // animationend 相当
+    inst._c = false;
+    inst._o = false;
+    inst.open();
+    assert.equal(inst._o, true, '再度 open できる');
+  });
+
+  it('controlled モードでの .close() は on_close を呼ぶ (未 open でも親判断)', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    let close_calls = 0;
+    inst({ open: true, on_close: () => close_calls++, title: 'T' });
+    drain_portal();
+    inst.close();
+    assert.equal(close_calls, 1, 'controlled で on_close 呼ばれる');
+  });
+});
+
+describe('create_ui_dialog: trigger_ctx 省略 (v0.3.14〜)', () => {
+
+  it('trigger_ctx 省略時は null を返す (trigger ボタンを出さない)', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    const result = inst({ title: 'T', ctx: ['body'] });
+    assert.equal(result, null, '省略時は null (自前 trigger 前提)');
+  });
+
+  it('trigger_ctx 省略でも .open() で portal 登録される', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    inst.open();
+    inst({ title: 'T', ctx: ['body'] });    // factory を render の中で呼ぶ
+    const items = drain_portal();
+    assert.ok(items.length >= 2, 'overlay + dialog body が portal に積まれる');
+  });
+
+  it('trigger_ctx に明示的に null を渡しても null を返す', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    const result = inst({ trigger_ctx: null, title: 'T' });
+    assert.equal(result, null);
+  });
+
+  it('trigger_ctx を配列で渡すと従来通り trigger ボタンが返る', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    const btn = inst({ trigger_ctx: ['カスタムラベル'], title: 'T' });
+    drain_portal();
+    assert.equal(btn.tag, 'button');
+    assert.deepEqual(btn.ctx, ['カスタムラベル']);
+  });
+});
+
+describe('create_ui_dialog: inst.is_open() (v0.3.14〜)', () => {
+
+  it('初期状態は false', () => {
+    const inst = create_ui_dialog();
+    assert.equal(inst.is_open(), false);
+  });
+
+  it('uncontrolled: .open() で true、.close() でアニメ開始しても true 維持', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    inst.open();
+    assert.equal(inst.is_open(), true, 'open 後は true');
+    inst.close();
+    // _c=true (closing animation 中) でも _o=true → is_open() は true
+    assert.equal(inst.is_open(), true, 'closing アニメ中も is_open は true (まだ DOM 上に存在)');
+  });
+
+  it('controlled mode では常に false (_o は使われないため)', () => {
+    const inst = create_ui_dialog();
+    inst.__notify = () => {};
+    inst({ open: true, on_close: () => {}, title: 'T' });
+    drain_portal();
+    // controlled で表示中だが、is_open は _o を返すので false
+    assert.equal(inst.is_open(), false, 'controlled モードでは _o は不使用');
   });
 });
