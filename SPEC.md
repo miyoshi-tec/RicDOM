@@ -646,9 +646,33 @@ s.dlg({
   親が `open` を `false` にすると閉じアニメーションが再生され、完了後にポータルから除去される。
 - ESC キーは uncontrolled / controlled 両モードで有効。
 
+**自前 trigger + programmatic open/close（v0.3.14〜）**:
+
+`trigger_ctx` を省略 (or 明示的に `null`) して `s.dlg({ title, ctx, actions })` と
+書くと、戻り値は `null`、つまり trigger ボタンを返さない。controlled mode では
+ないので `.open()` / `.close()` で外部から駆動できる。「自前 button を出して
+そこから programmatic に開きたい」use case 向け。
+
+```javascript
+s.dlg = create_ui_dialog();
+// render の中で毎フレーム呼ぶ (portal 登録のために必要)
+s.dlg({ title: '確認', ctx: [...], actions: [...] })  // trigger_ctx 省略 → null 返却
+
+// 外部から
+ui_button({ ctx: ['カスタム trigger'], onclick: () => s.dlg.open() })
+```
+
+注: **factory は render の中で毎フレーム呼ぶ必要がある** (portal 登録のため、
+他の `create_ui_*` と同じ canon)。`s.dlg(...)` の戻り値が null でも、副作用と
+して `.open()` 状態のとき portal にダイアログ本体が積まれる。
+
 メソッド:
-- `inst.close()` — アニメーション付きで閉じる。controlled 時は `on_close` を呼ぶ。
 - `inst.open()` — プログラムから開く（uncontrolled のみ。controlled では no-op）。
+- `inst.close()` — 閉じる。**未 open 状態での呼出は no-op (v0.3.14〜、冪等)**。
+  controlled 時は `on_close` を呼ぶ。
+- `inst.is_open()` — 現在表示中か (uncontrolled のみ。controlled では常に false)
+  を返す。`reset()` 等で「開いていたら閉じる」を書くときの選択肢。ただし
+  `.close()` が冪等になったので、単に `.close()` を呼んでも安全。
 
 #### create_ui_toast()
 

@@ -1,21 +1,35 @@
 // RicUI — create_ui_dialog
 // モーダルダイアログ（ポータルパターン）。
 //
-// 使い方（uncontrolled — トリガーボタン付き）:
+// 3 つの使い方:
+//
+// (1) uncontrolled — ライブラリが trigger ボタンも出す:
 //   s.dlg = create_ui_dialog();
 //   dlg({ trigger_ctx: ['開く'], title: '...', ctx: [...], actions: [...] })
+//   ↑ 戻り値は trigger ボタンの VDOM
 //
-// 使い方（controlled — 外部 state 管理）:
+// (2) uncontrolled — 自前 trigger + programmatic open/close (v0.3.14〜):
+//   s.dlg = create_ui_dialog();
+//   dlg({ title: '...', ctx: [...], actions: [...] })   // trigger_ctx 省略
+//   ↑ 戻り値は null。dialog 本体は s.dlg.open() を呼ぶと portal に出る。
+//   外部から開閉: s.dlg.open() / s.dlg.close() / s.dlg.is_open()
+//   注: factory は render 内で毎フレーム呼ぶ必要がある (portal 登録のため)。
+//
+// (3) controlled — 外部 state 管理:
 //   s.dlg = create_ui_dialog();
 //   dlg({ open: s.page.show, on_close: () => { s.page.show = false; },
 //         title: '...', ctx: [...] })
-//   // → 戻り値は null（トリガーボタンなし）
-//
-// trigger_ctx と open の併用は禁止（hybrid 禁止）。
+//   ↑ 戻り値は null。trigger_ctx は併用禁止 (console.error)。
 //
 // 1インスタンス = 1ダイアログ。
 // 開いているときバックドロップ＋ダイアログ本体を _page_portal_queue に積む。
 // ui_page がレンダー時に取り出して .ric-page 末尾に展開する（ポータルパターン）。
+//
+// 公開メソッド (両モード):
+//   inst.open()    — uncontrolled で開く (controlled では no-op)
+//   inst.close()   — uncontrolled で閉じる / controlled で on_close を呼ぶ
+//                    未 open での呼出は no-op (v0.3.14〜冪等化)
+//   inst.is_open() — uncontrolled で現在表示中かを返す (controlled では常に false)
 //
 // 内部状態（短縮名 → 原名）:
 //   _o  — open        開閉状態（uncontrolled 用）
@@ -49,8 +63,15 @@ const create_ui_dialog = () => {
   };
 
   // 閉じ要求（overlay / ✕ / ESC から呼ばれる共通エントリポイント）
+  // uncontrolled で **まだ開いていない** 場合は no-op (v0.3.14〜):
+  //   テストの reset() や stop_run() で「念のため .close()」と書きがちだが、
+  //   未 open 状態で呼ぶと _c=true が残って以降 .open() が blocked になる
+  //   バグがあった (.open() 内の `if (_c) return` ガードに引っかかる)。
+  //   未 open での .close() は意味が無い + 状態を壊すだけなので、早期 return で
+  //   保護する。controlled mode では引き続き on_close を呼ぶ (親が状態管理)。
   const _request_close = () => {
     if (inst._c) return;                     // 閉じアニメーション中
+    if (!inst._cd && !inst._o) return;       // uncontrolled で未 open → 冪等 no-op
     if (inst._cd) {
       inst._oc?.();                          // controlled: 親に通知（状態は変更しない）
     } else {
@@ -145,7 +166,15 @@ const create_ui_dialog = () => {
     // ── 戻り値 ──
     if (controlled) return null;
 
-    // uncontrolled: trigger ボタンを返す（ダイアログ本体はポータル経由で表示）
+    // uncontrolled で trigger_ctx が省略 (または明示的に null/false) なら
+    // trigger ボタンを返さない (v0.3.14〜)。「自前で trigger を出して
+    // .open() / .close() だけ programmatic に呼びたい」use case に対応。
+    // v0.3.13 以前は省略時に '開く' (日本語固定) が default だったが、
+    // generic library として奇妙なので opt-in に変更。
+    if (trigger_ctx == null) return null;
+
+    // uncontrolled + trigger_ctx 明示: trigger ボタンを返す
+    // (ダイアログ本体はポータル経由で表示)
     return {
       tag: 'button',
       class: trigger_variant !== 'default' ? `ric-button ric-button--${trigger_variant}` : 'ric-button',
@@ -158,7 +187,7 @@ const create_ui_dialog = () => {
           safe_notify(inst, 'create_ui_dialog');
         }
       },
-      ctx: trigger_ctx ?? ['開く'],
+      ctx: trigger_ctx,
     };
   };
 
@@ -169,7 +198,7 @@ const create_ui_dialog = () => {
   inst._cd = false;     // controlled フラグ（直近 render）
   inst._oc = null;      // on_close コールバック（直近 render）
 
-  // 外部から閉じるための API（両モード対応）
+  // 外部から閉じるための API（両モード対応、未 open での呼出は no-op）
   inst.close = _request_close;
 
   // 外部から開くための API（uncontrolled のみ。controlled では no-op）
@@ -179,6 +208,12 @@ const create_ui_dialog = () => {
     inst._o = true;
     safe_notify(inst, 'create_ui_dialog');
   };
+
+  // 現在 dialog が表示中か (uncontrolled モード用 public API)。
+  // entering / open / closing アニメ中はすべて true、完全に閉じている時のみ false。
+  // controlled モードでは _o は使わないので常に false を返す (controlled の
+  // 開閉状態は呼び出し側の state で管理されているため、library 側で持たない)。
+  inst.is_open = () => inst._o;
 
   return inst;
 };
