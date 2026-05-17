@@ -183,8 +183,10 @@ create_RicDOM(target, state_with_render) → instance_handle
 
 | 引数 | 型 | 説明 |
 |------|---|------|
-| `target` | string \| HTMLElement | マウント先（CSS セレクタ or DOM 要素） |
+| `target` | string \| Element | マウント先（CSS セレクタ or DOM 要素）。SVGElement (`<svg>` 等) も可（v0.3.15〜） |
 | `state_with_render` | object | 初期 state。`render: (s) => VDOM` を含めると描画関数として使われる |
+
+target が SVG 要素 (`<svg>` / `<g>` 等) の場合、render が返す `path` / `circle` 等は自動的に SVG namespace で生成される（target の `namespaceURI` を引き継ぐ canon、v0.3.15〜）。
 
 `render` は後から `handle.render = fn` でも設定可能（`render` 未指定で作成した場合、最初の代入まで描画は保留される）。`handle.render = fn` の代入は **per-instance**：複数の instance が同じ `raw_state` を共有していても、各 instance は独立した render を持てる。
 

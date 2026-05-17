@@ -686,6 +686,101 @@ test('SVG: HTML 要素の差分更新は従来通り HTML namespace', async () =
 });
 
 // =====================================================================
+// SVG namespace: target が SVG 要素のケース (v0.3.15〜)
+// =====================================================================
+// 旧バグ (UnizonTool dev 報告): 静的 HTML の `<svg id="stage">` を target に
+// して create_RicDOM すると、初回 build_dom_node が inherited_namespace 無しで
+// 呼ばれ、生成される `<path>` / `<g>` / `<circle>` 等が HTML namespace になる。
+// DOM 上には存在するが SVG renderer が認識しないため画面が真っ白になる。
+// 修正後: do_render の初回マウントで target_el.namespaceURI を引き継ぐ。
+
+test('SVG: target=<svg> selector で初回マウントしても子は SVG namespace', () => {
+  const dom = new JSDOM(
+    '<!DOCTYPE html><html><body><svg id="stage" viewBox="0 0 100 100"></svg></body></html>'
+  );
+  global.window = dom.window;
+  global.document = dom.window.document;
+  global.Node = dom.window.Node;
+  global.HTMLElement = dom.window.HTMLElement;
+  global.Element = dom.window.Element;
+  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+
+  const { create_RicDOM } = require('../src/ricdom');
+
+  create_RicDOM('#stage', { render: () => ({
+    tag: 'path', d: 'M 0,0 L 100,100', stroke: 'red',
+  })});
+
+  const path = dom.window.document.querySelector('path');
+  assert.ok(path, 'path が DOM 上に存在する');
+  assert.equal(path.namespaceURI, SVG_NS,
+    '<svg> target に対する初回 path も SVG namespace で生成される');
+});
+
+test('SVG: target=<svg> 要素を直接渡しても受け付ける (HTMLElement 派生でなくとも)', () => {
+  const dom = new JSDOM(
+    '<!DOCTYPE html><html><body><svg id="stage" viewBox="0 0 100 100"></svg></body></html>'
+  );
+  global.window = dom.window;
+  global.document = dom.window.document;
+  global.Node = dom.window.Node;
+  global.HTMLElement = dom.window.HTMLElement;
+  global.Element = dom.window.Element;
+  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+
+  const { create_RicDOM } = require('../src/ricdom');
+
+  const svg_el = dom.window.document.querySelector('#stage');
+  // SVGElement は HTMLElement を継承していないので、HTMLElement 判定だけだと reject される。
+  // Element 判定に変わったことを保証する regression test。
+  const handle = create_RicDOM(svg_el, { render: () => ({
+    tag: 'circle', cx: 50, cy: 50, r: 40,
+  })});
+
+  assert.ok(handle, 'handle が NOOP_PROXY ではなく実 instance');
+  const circle = dom.window.document.querySelector('circle');
+  assert.ok(circle, 'circle が DOM 上に存在する');
+  assert.equal(circle.namespaceURI, SVG_NS, 'circle も SVG namespace');
+});
+
+test('SVG: target=<svg> での差分更新後も子は SVG namespace を維持', async () => {
+  const dom = new JSDOM(
+    '<!DOCTYPE html><html><body><svg id="stage" viewBox="0 0 100 100"></svg></body></html>'
+  );
+  global.window = dom.window;
+  global.document = dom.window.document;
+  global.Node = dom.window.Node;
+  global.HTMLElement = dom.window.HTMLElement;
+  global.Element = dom.window.Element;
+  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+
+  const { create_RicDOM } = require('../src/ricdom');
+
+  const s = create_RicDOM('#stage', {
+    n: 1,
+    render: (s) => ({
+      tag: 'g',
+      ctx: Array.from({ length: s.n }, (_, i) => ({
+        tag: 'circle', cx: 10 + i * 10, cy: 50, r: 4,
+      })),
+    }),
+  });
+
+  // 初回 g + 1 circle, ともに SVG namespace
+  assert.equal(dom.window.document.querySelector('g').namespaceURI, SVG_NS);
+  assert.equal(dom.window.document.querySelector('circle').namespaceURI, SVG_NS);
+
+  // 差分追加
+  s.n = 3;
+  await flush_raf();
+  const circles = dom.window.document.querySelectorAll('circle');
+  assert.equal(circles.length, 3, '差分追加で circle が 3 個');
+  for (const c of circles) {
+    assert.equal(c.namespaceURI, SVG_NS, '差分追加された circle も SVG namespace');
+  }
+});
+
+// =====================================================================
 // style diff: prev/next の (string | object | 無し) 全組み合わせ
 // =====================================================================
 // 旧バグ: prev が文字列形式 (style: 'flex:1' 等) のとき、次の render で
