@@ -613,13 +613,23 @@ const state_proxy_map       = new WeakMap(); // raw state → 共有Proxy
 // target 探索
 // =====================================================================
 
-// target を文字列（CSS セレクタ）または HTMLElement として受け付ける
-// 文字列の場合は document.querySelector で取得する
+// DOM 要素として受け付けられる型かを判定する。
+// 注: HTMLElement だけでなく Element 全般を許容する (v0.3.15〜)。
+// `<svg>` 等の SVGElement は HTMLElement を継承していないため、HTMLElement
+// だけで判定すると SVG 要素を target に指定できない。
+// Element / HTMLElement のどちらも未定義な環境 (古い test setup 等) でも
+// 落ちないように typeof で前置ガードする。
+const _is_dom_element = (target) =>
+  (typeof Element     !== 'undefined' && target instanceof Element) ||
+  (typeof HTMLElement !== 'undefined' && target instanceof HTMLElement);
+
+// target を文字列（CSS セレクタ）または DOM 要素として受け付ける。
+// 文字列の場合は document.querySelector で取得する。
 const resolve_target_element = (target) => {
   if (typeof target === 'string') {
     return document.querySelector(target);
   }
-  if (target instanceof HTMLElement) {
+  if (_is_dom_element(target)) {
     return target;
   }
   return null;
@@ -640,8 +650,9 @@ const create_RicDOM = (target, raw_state = {}) => {
   // 第 1 引数が object だった過去の 3 引数 form（create_RicDOM(state, target, render)）
   // は v0.3.3 で削除した。複数 instance + 共有 state + 独立 render は、
   // 2 引数 form + handle.render = fn で同じことが書ける。
-  if (typeof target !== 'string'
-      && !(typeof HTMLElement !== 'undefined' && target instanceof HTMLElement)) {
+  // target は CSS セレクタ文字列 or DOM 要素 (Element 派生)。
+  // _is_dom_element は HTMLElement / Element の両方を許容する (v0.3.15〜)。
+  if (typeof target !== 'string' && !_is_dom_element(target)) {
     console.error(
       'RicDOM: 第 1 引数は CSS セレクタ文字列または DOM 要素です。\n' +
       '✅ 正しい例: create_RicDOM(\'#app\', { count: 0, render: s => ({ tag: \'div\', ctx: [s.count] }) })\n' +
@@ -840,9 +851,14 @@ const create_RicDOM = (target, raw_state = {}) => {
     const next_raw_tree = _render_fn(shared_proxy);
 
     if (prev_tree === null) {
-      // 初回描画：DOM を全量構築する
+      // 初回描画：DOM を全量構築する。
+      // target が SVG 要素 (`<svg>` / `<g>` 等) のとき、生成する子は SVG
+      // namespace で作る必要がある。`build_dom_node` の第 2 引数で
+      // `target_el.namespaceURI` を引き継ぐ (patch path と同じ canon)。
+      // HTML 要素 (XHTML_NS) を引き継いでも createElementNS は等価に動くため、
+      // namespace 判別は不要 (常に引き継ぐ)。
       target_el.innerHTML = '';
-      const dom_el = build_dom_node(next_raw_tree);
+      const dom_el = build_dom_node(next_raw_tree, target_el.namespaceURI);
       if (dom_el) target_el.appendChild(dom_el);
     } else {
       // 2回目以降：差分更新する
