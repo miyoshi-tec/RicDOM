@@ -10,12 +10,16 @@ const { strict: assert } = require('node:assert');
 const { JSDOM } = require('jsdom');
 
 // jsdom 環境をセットアップする（ricdom.js は window / document を前提とする）
-const setup_jsdom = () => {
-  const dom = new JSDOM('<!DOCTYPE html><html><head></head><body><div id="app"></div></body></html>');
+const setup_jsdom = (body = '<div id="app"></div>') => {
+  const dom = new JSDOM(`<!DOCTYPE html><html><head></head><body>${body}</body></html>`);
   global.window   = dom.window;
   global.document = dom.window.document;
   global.Node     = dom.window.Node;
   global.HTMLElement = dom.window.HTMLElement;
+  // Element は SVGElement target を直接渡すケース (v0.3.15〜) で必要。
+  // _is_dom_element は HTMLElement にも fallback するので、Element 未設定の
+  // 古い setup でも HTML target は動作するが、SVG target テストには必須。
+  global.Element  = dom.window.Element;
   global.requestAnimationFrame = (cb) => setTimeout(cb, 0); // rAF をポーリングで代替
   return dom;
 };
@@ -694,17 +698,10 @@ test('SVG: HTML 要素の差分更新は従来通り HTML namespace', async () =
 // DOM 上には存在するが SVG renderer が認識しないため画面が真っ白になる。
 // 修正後: do_render の初回マウントで target_el.namespaceURI を引き継ぐ。
 
-test('SVG: target=<svg> selector で初回マウントしても子は SVG namespace', () => {
-  const dom = new JSDOM(
-    '<!DOCTYPE html><html><body><svg id="stage" viewBox="0 0 100 100"></svg></body></html>'
-  );
-  global.window = dom.window;
-  global.document = dom.window.document;
-  global.Node = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.Element = dom.window.Element;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+const SVG_STAGE_BODY = '<svg id="stage" viewBox="0 0 100 100"></svg>';
 
+test('SVG: target=<svg> selector で初回マウントしても子は SVG namespace', () => {
+  const dom = setup_jsdom(SVG_STAGE_BODY);
   const { create_RicDOM } = require('../src/ricdom');
 
   create_RicDOM('#stage', { render: () => ({
@@ -718,16 +715,7 @@ test('SVG: target=<svg> selector で初回マウントしても子は SVG namesp
 });
 
 test('SVG: target=<svg> 要素を直接渡しても受け付ける (HTMLElement 派生でなくとも)', () => {
-  const dom = new JSDOM(
-    '<!DOCTYPE html><html><body><svg id="stage" viewBox="0 0 100 100"></svg></body></html>'
-  );
-  global.window = dom.window;
-  global.document = dom.window.document;
-  global.Node = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.Element = dom.window.Element;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-
+  const dom = setup_jsdom(SVG_STAGE_BODY);
   const { create_RicDOM } = require('../src/ricdom');
 
   const svg_el = dom.window.document.querySelector('#stage');
@@ -744,16 +732,7 @@ test('SVG: target=<svg> 要素を直接渡しても受け付ける (HTMLElement 
 });
 
 test('SVG: target=<svg> での差分更新後も子は SVG namespace を維持', async () => {
-  const dom = new JSDOM(
-    '<!DOCTYPE html><html><body><svg id="stage" viewBox="0 0 100 100"></svg></body></html>'
-  );
-  global.window = dom.window;
-  global.document = dom.window.document;
-  global.Node = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.Element = dom.window.Element;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-
+  const dom = setup_jsdom(SVG_STAGE_BODY);
   const { create_RicDOM } = require('../src/ricdom');
 
   const s = create_RicDOM('#stage', {

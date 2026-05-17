@@ -617,8 +617,10 @@ const state_proxy_map       = new WeakMap(); // raw state → 共有Proxy
 // 注: HTMLElement だけでなく Element 全般を許容する (v0.3.15〜)。
 // `<svg>` 等の SVGElement は HTMLElement を継承していないため、HTMLElement
 // だけで判定すると SVG 要素を target に指定できない。
-// Element / HTMLElement のどちらも未定義な環境 (古い test setup 等) でも
-// 落ちないように typeof で前置ガードする。
+// Element 判定が primary path (HTMLElement も Element を継承しているため
+// real DOM 環境ではこれで十分)。HTMLElement への fallback は、`Element` を
+// global に出していない古い test setup 互換のための safety net。
+// `typeof` 前置ガードは Node 等で両方が未定義のときの ReferenceError 回避。
 const _is_dom_element = (target) =>
   (typeof Element     !== 'undefined' && target instanceof Element) ||
   (typeof HTMLElement !== 'undefined' && target instanceof HTMLElement);
