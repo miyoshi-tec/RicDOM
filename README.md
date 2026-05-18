@@ -107,7 +107,45 @@ npm パッケージとしては公開していません。
 ```
 
 両ファイルは **self-contained** で互いに依存しない (decompressor が各自に含まれる
-~280B)。通常版と LZ 版を混ぜることも可能。
+~160B)。通常版と LZ 版を混ぜることも可能。
+
+#### 自分のアプリも LZ 圧縮する (v0.3.20〜)
+
+RicDOM の LZ 圧縮ツールは外部 consumer 向けにも公開されている。自分の `app.js` を
+同じ流儀 (LZSS + base64 + 自己展開 IIFE) で圧縮できる:
+
+**CLI (`ricdom-lz`)** — Unix-style stdin/stdout 対応:
+
+```bash
+# stdin → stdout (pipe)
+$ cat src/app.min.js | npx ricdom-lz > dist/app.lz.min.js
+
+# file → stdout
+$ npx ricdom-lz src/app.min.js > dist/app.lz.min.js
+
+# file → file
+$ npx ricdom-lz src/app.min.js dist/app.lz.min.js
+```
+
+ログ (圧縮率・marker 情報) は stderr に出るので、stdout pipe を汚染しない。
+
+**Node module API** — build script から呼ぶ:
+
+```javascript
+const { lz_compress } = require('ricdom/scripts/lz');
+
+const minified = fs.readFileSync('src/app.min.js', 'utf8');
+const wrapper  = lz_compress(minified);       // → 自己展開 wrapper string
+fs.writeFileSync('dist/app.lz.min.js', wrapper);
+```
+
+詳細情報が必要なら `build_lz_bundle(source)` を使う (`{ wrapper, marker_code,
+substitution, compressed_length }` を返す)。
+
+期待出力は通常の `*.lz.min.js` と同じ形 (自己展開 IIFE)。`window.X = ...` 等の
+global 副作用は decompress 後の `eval` で発火する。consumer の bundle 内に top-level
+`let X` がない限り (= 通常の esbuild minify 出力は IIFE 包まれている)、他の
+`.lz.min.js` と並列に load して問題ない。
 
 ### Hello World（RicDOM のみ）
 

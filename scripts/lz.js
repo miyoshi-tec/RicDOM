@@ -257,7 +257,25 @@ const build_lz_bundle = (original) => {
   return { wrapper, marker_code, substitution, compressed_length: compressed.length };
 };
 
+// ──────────────────────────────────────────────
+// Public API (external consumers): 入力 string → 自己展開 wrapper string
+// ──────────────────────────────────────────────
+// 外部 consumer (Potopeta 等) が「自分の app.js を RicDOM と同じ流儀で LZ 圧縮
+// したい」場合のシンプル API。build_lz_bundle がフル詳細を返すのに対し、
+// lz_compress は wrapper 文字列だけを返す。中で round-trip 検証も行われる。
+//
+// 使い方:
+//   const { lz_compress } = require('ricdom/scripts/lz');
+//   const wrapper = lz_compress(fs.readFileSync('app.min.js', 'utf8'));
+//   fs.writeFileSync('app.lz.min.js', wrapper);
+const lz_compress = (source) => build_lz_bundle(source).wrapper;
+
 module.exports = {
+  // 高レベル API (external consumers 向け)
+  lz_compress,
+  build_lz_bundle,
+
+  // 低レベル API (内部使用 + テスト)
   WINDOW, MIN_MATCH, MAX_MATCH,
   find_marker,
   encode_ref,
@@ -266,5 +284,4 @@ module.exports = {
   escape_for_template,
   escape_regex_char,
   build_wrapper,
-  build_lz_bundle,
 };
