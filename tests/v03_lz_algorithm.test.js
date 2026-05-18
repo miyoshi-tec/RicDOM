@@ -19,6 +19,7 @@ const {
   escape_regex_char,
   build_wrapper,
   build_lz_bundle,
+  lz_compress,
   MIN_MATCH,
   MAX_MATCH,
 } = require('../scripts/lz');
@@ -365,5 +366,124 @@ describe('build_wrapper: 複数 wrapper の共存 (regression for v0.3.18 let-C 
     assert.ok(w.startsWith('(()=>{') || w.startsWith('(function'),
       'wrapper は IIFE で開始する (top-level let を function scope に閉じ込めるため)');
     assert.ok(w.endsWith('})()'), 'wrapper は IIFE 呼び出しで終わる');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Public API: lz_compress (v0.3.20〜、外部 consumer 向け簡易 API)
+// ─────────────────────────────────────────────────────────────
+//
+// Potopeta dev のような外部 consumer が「自分の app.js を RicDOM と同じ
+// 流儀で LZ 圧縮したい」場合の simple API。`build_lz_bundle` がフル詳細
+// (marker_code / substitution / compressed_length) を返すのに対し、
+// `lz_compress` は wrapper 文字列だけを返す。
+
+describe('lz_compress: 外部 consumer 向け simple API', () => {
+
+  test('文字列を受け取って wrapper 文字列を返す', () => {
+    const src = 'console.log("hello");'.repeat(20);
+    const wrapper = lz_compress(src);
+    assert.equal(typeof wrapper, 'string');
+    assert.ok(wrapper.length > 0);
+    assert.ok(wrapper.startsWith('(()=>{') && wrapper.endsWith('})()'));
+  });
+
+  test('build_lz_bundle(...).wrapper と同一の出力', () => {
+    const src = 'function f(){return 42}'.repeat(20);
+    assert.equal(lz_compress(src), build_lz_bundle(src).wrapper);
+  });
+
+  test('eval した結果が原文と一致 (外部 consumer の典型 use case)', () => {
+    // 外部 consumer の use case シミュレーション:
+    // app.js を esbuild minify → lz_compress → <script> で読み込み
+    const app_minified = 'globalThis.myApp={start(){return 1+1}};'.repeat(10);
+    const wrapper = lz_compress(app_minified);
+    // wrapper を eval すると globalThis.myApp が設定される
+    delete globalThis.myApp;
+    (0, eval)(wrapper);
+    assert.ok(globalThis.myApp);
+    assert.equal(globalThis.myApp.start(), 2);
+    delete globalThis.myApp;
+  });
+
+  test('短すぎる入力でも例外を投げない', () => {
+    assert.doesNotThrow(() => lz_compress(''));
+    assert.doesNotThrow(() => lz_compress('x'));
+    assert.doesNotThrow(() => lz_compress('abc'));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// CLI (scripts/build_lz_bundle.js) の動作確認
+// ─────────────────────────────────────────────────────────────
+//
+// `ricdom-lz` (npm bin) として外部 consumer に提供する CLI。Unix-style で
+// stdin/stdout、または file 引数を受け取る。ログは stderr に分離されている
+// ことを確認する (stdout 出力をパイプ汚染しない)。
+
+describe('CLI: scripts/build_lz_bundle.js', () => {
+  const path = require('node:path');
+  const { spawnSync } = require('node:child_process');
+  const fs_t = require('node:fs');
+  const os_t = require('node:os');
+
+  const CLI = path.join(__dirname, '..', 'scripts', 'build_lz_bundle.js');
+
+  test('stdin → stdout: pipe-style 使用', () => {
+    const src = 'globalThis.__cli_test_1=42;'.repeat(20);
+    const r = spawnSync(process.execPath, [CLI], {
+      input: src, encoding: 'utf8',
+    });
+    assert.equal(r.status, 0, 'exit 0');
+    assert.ok(r.stdout.length > 0, 'stdout に wrapper が出る');
+    // stdout を eval すると globalThis に副作用
+    delete globalThis.__cli_test_1;
+    (0, eval)(r.stdout);
+    assert.equal(globalThis.__cli_test_1, 42);
+    delete globalThis.__cli_test_1;
+    // ログは stderr
+    assert.match(r.stderr, /\[build_lz\]/);
+    assert.match(r.stderr, /marker:/);
+  });
+
+  test('INPUT file → stdout: 1 引数', () => {
+    const tmp = path.join(os_t.tmpdir(), 'lz-cli-test-input-' + Date.now() + '.js');
+    fs_t.writeFileSync(tmp, 'globalThis.__cli_test_2=43;'.repeat(20));
+    try {
+      const r = spawnSync(process.execPath, [CLI, tmp], { encoding: 'utf8' });
+      assert.equal(r.status, 0);
+      delete globalThis.__cli_test_2;
+      (0, eval)(r.stdout);
+      assert.equal(globalThis.__cli_test_2, 43);
+      delete globalThis.__cli_test_2;
+    } finally {
+      fs_t.unlinkSync(tmp);
+    }
+  });
+
+  test('INPUT file → OUTPUT file: 2 引数 (従来 build pipeline 互換)', () => {
+    const tmp_in  = path.join(os_t.tmpdir(), 'lz-cli-test-2in-'  + Date.now() + '.js');
+    const tmp_out = path.join(os_t.tmpdir(), 'lz-cli-test-2out-' + Date.now() + '.js');
+    fs_t.writeFileSync(tmp_in, 'globalThis.__cli_test_3=44;'.repeat(20));
+    try {
+      const r = spawnSync(process.execPath, [CLI, tmp_in, tmp_out], { encoding: 'utf8' });
+      assert.equal(r.status, 0);
+      assert.equal(r.stdout, '', 'stdout には何も書かれない (出力先がファイル)');
+      const wrapper = fs_t.readFileSync(tmp_out, 'utf8');
+      assert.ok(wrapper.startsWith('(()=>{'));
+      delete globalThis.__cli_test_3;
+      (0, eval)(wrapper);
+      assert.equal(globalThis.__cli_test_3, 44);
+      delete globalThis.__cli_test_3;
+    } finally {
+      fs_t.unlinkSync(tmp_in);
+      if (fs_t.existsSync(tmp_out)) fs_t.unlinkSync(tmp_out);
+    }
+  });
+
+  test('--help でヘルプを表示して exit 0', () => {
+    const r = spawnSync(process.execPath, [CLI, '--help'], { encoding: 'utf8' });
+    assert.equal(r.status, 0);
+    assert.match(r.stderr, /Usage: ricdom-lz/);
   });
 });
