@@ -319,7 +319,51 @@ describe('build_lz_bundle', () => {
   test('短すぎるソースでは wrapper の方が大きい (overhead 込み)', () => {
     const original = 'short';
     const r = build_lz_bundle(original);
-    // 159 byte の stub overhead があるので、5 byte ソースは確実に膨らむ
+    // ~160 byte の stub overhead があるので、5 byte ソースは確実に膨らむ
     assert.ok(r.wrapper.length > original.length);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 2 つの wrapper が同一 global scope で共存できること (v0.3.19〜)
+// ─────────────────────────────────────────────────────────────
+//
+// v0.3.18 でリリースした LZ wrapper は top-level `let C=...` を持っており、
+// `RicDOM.lz.min.js` + `RicUI.lz.min.js` を同じ <script> 経由で読むと
+// "Identifier 'C' has already been declared" で 2 つ目が SyntaxError になっていた
+// (Potopeta dev 報告)。v0.3.19 で wrapper を IIFE で包み、`let C` を function
+// scope に閉じ込めて回避。本テストは regression 防止のためのもの。
+
+describe('build_wrapper: 複数 wrapper の共存 (regression for v0.3.18 let-C 衝突)', () => {
+
+  test('2 つの wrapper を indirect eval で順次実行しても SyntaxError にならない', () => {
+    const w1 = build_lz_bundle('globalThis.__lz_dual_1=1;'.repeat(20)).wrapper;
+    const w2 = build_lz_bundle('globalThis.__lz_dual_2=2;'.repeat(20)).wrapper;
+    delete globalThis.__lz_dual_1;
+    delete globalThis.__lz_dual_2;
+    // indirect eval で 2 つの「<script>」を順次 load する状況を再現
+    // (script-level lexical binding を共有する worst case)
+    (0, eval)(w1);
+    (0, eval)(w2);
+    assert.equal(globalThis.__lz_dual_1, 1, '1 つ目の bundle が実行された');
+    assert.equal(globalThis.__lz_dual_2, 2, '2 つ目の bundle も SyntaxError なく実行された');
+    delete globalThis.__lz_dual_1;
+    delete globalThis.__lz_dual_2;
+  });
+
+  test('同じ wrapper を 2 回 load しても SyntaxError にならない', () => {
+    const w = build_lz_bundle('globalThis.__lz_twice=(globalThis.__lz_twice||0)+1;').wrapper;
+    delete globalThis.__lz_twice;
+    (0, eval)(w);
+    (0, eval)(w);
+    assert.equal(globalThis.__lz_twice, 2, '2 回読み込まれて counter が +2 になっている');
+    delete globalThis.__lz_twice;
+  });
+
+  test('wrapper が IIFE で包まれていること (構造 sanity)', () => {
+    const w = build_lz_bundle('let x=1;').wrapper;
+    assert.ok(w.startsWith('(()=>{') || w.startsWith('(function'),
+      'wrapper は IIFE で開始する (top-level let を function scope に閉じ込めるため)');
+    assert.ok(w.endsWith('})()'), 'wrapper は IIFE 呼び出しで終わる');
   });
 });
