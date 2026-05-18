@@ -125,3 +125,91 @@ describe('ui_inline_menu: 透過', () => {
     assert.equal(n.style['min-width'], '120px');
   });
 });
+
+// =====================================================================
+// dev warning: 親が positioned でないと silent failure になるのを検知 (v0.3.16〜)
+// =====================================================================
+// `top:100% + right:0` は nearest positioned ancestor を基準に計算されるため、
+// 親が position:static (default) のままだと意図しない場所に出現する。
+// 描画後 1 フレーム以内に親を点検して console.warn を出す。
+
+describe('ui_inline_menu: dev warning (親の positioning)', () => {
+
+  const { JSDOM } = require('jsdom');
+
+  // 各テスト独立の jsdom + console.warn capture + ui_inline_menu の WeakSet を
+  // 隔離するために、毎回 require cache をクリアして fresh module を取り直す。
+  const setup = (parent_style) => {
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><body>` +
+      `<div id="parent" style="${parent_style}">` +
+      `  <!-- menu はここに RicDOM が render する想定だが、test では直接配置 -->` +
+      `</div></body></html>`
+    );
+    global.window   = dom.window;
+    global.document = dom.window.document;
+    global.getComputedStyle = dom.window.getComputedStyle;
+    global.WeakSet = WeakSet;
+    // jsdom 標準には rAF が無いので setTimeout で代替
+    global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+
+    const warns = [];
+    const orig_warn = console.warn;
+    console.warn = (...args) => { warns.push(args); };
+
+    // モジュールキャッシュをクリアして WeakSet を新規にする
+    delete require.cache[require.resolve('../ric_ui/composite/ui_inline_menu')];
+    const { ui_inline_menu: fresh } = require('../ric_ui/composite/ui_inline_menu');
+
+    // menu element を parent 配下に手動で追加 (RicDOM render の代わり)
+    const menu_el = dom.window.document.createElement('div');
+    menu_el.className = 'ric-inline-menu';
+    dom.window.document.getElementById('parent').appendChild(menu_el);
+
+    return {
+      ui_inline_menu: fresh,
+      warns,
+      teardown: () => { console.warn = orig_warn; },
+    };
+  };
+
+  // rAF (= setTimeout(0)) が回るまで待つ
+  const flush = () => new Promise(resolve => setTimeout(resolve, 10));
+
+  test('親が position:static (default) のとき警告を出す', async () => {
+    const { ui_inline_menu: f, warns, teardown } = setup('');
+    f({ open: true });
+    await flush();
+    teardown();
+    assert.equal(warns.length, 1, '警告が 1 回出る');
+    assert.match(warns[0][0], /position/, 'メッセージに position が含まれる');
+  });
+
+  test('親が position:relative のとき警告を出さない', async () => {
+    const { ui_inline_menu: f, warns, teardown } = setup('position: relative;');
+    f({ open: true });
+    await flush();
+    teardown();
+    assert.equal(warns.length, 0, '正しく positioned なので警告なし');
+  });
+
+  test('open=false なら親が static でも警告を出さない (check 自体が走らない)', async () => {
+    const { ui_inline_menu: f, warns, teardown } = setup('');
+    f({ open: false });
+    await flush();
+    teardown();
+    assert.equal(warns.length, 0);
+  });
+
+  test('同じ親で複数回 open しても警告は 1 回だけ', async () => {
+    const { ui_inline_menu: f, warns, teardown } = setup('');
+    f({ open: true });
+    await flush();
+    f({ open: true });   // 同 render を再現
+    await flush();
+    f({ open: true });
+    await flush();
+    teardown();
+    assert.equal(warns.length, 1, 'WeakSet で de-dupe される');
+  });
+});
