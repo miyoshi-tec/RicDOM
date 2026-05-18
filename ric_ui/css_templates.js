@@ -249,14 +249,15 @@ ${_P}.ric-button {
   user-select: none;
   appearance: none;
   white-space: nowrap;
-  transition: background 0.1s, border-color 0.1s, filter 0.1s, transform 0.07s;
+  transition: background 0.1s, border-color 0.1s, filter 0.1s, translate 0.07s;
 }
 ${_P}.ric-button:hover:not(:disabled) {
   background: ${_bd};
   border-color: ${_fm};
 }
 ${_P}.ric-button:active:not(:disabled) {
-  transform: translateY(1px);
+  /* translate を使う: consumer の transform と composable (SPEC「CSS conflict」) */
+  translate: 0 1px;
   filter: brightness(0.85);
 }
 ${_P}.ric-button:disabled {
@@ -274,7 +275,7 @@ ${_P}.ric-button--primary:hover:not(:disabled) {
   filter: brightness(1.15);
 }
 ${_P}.ric-button--primary:active:not(:disabled) {
-  transform: translateY(1px);
+  translate: 0 1px;
   filter: brightness(0.9);
 }
 ${_P}.ric-button--ghost {
@@ -300,7 +301,8 @@ ${_P}.ric-button--link:hover:not(:disabled) {
   border-color: transparent;
 }
 ${_P}.ric-button--link:active:not(:disabled) {
-  transform: none;
+  /* link variant: press-jump しない (テキスト風) */
+  translate: 0;
   filter: none;
   background: color-mix(in srgb, ${_fg} 14%, transparent);
 }
@@ -333,7 +335,7 @@ ${_P}.ric-input {
   font-size: 1em;
   outline: none;
   appearance: none;
-  transition: background 0.1s, border-color 0.15s, box-shadow 0.15s, transform 0.07s, filter 0.1s;
+  transition: background 0.1s, border-color 0.15s, box-shadow 0.15s, translate 0.07s, filter 0.1s;
 }
 ${_P}.ric-input:hover:not(:disabled) {
   background: ${_bd};
@@ -343,7 +345,7 @@ ${_P}.ric-input:focus {
   background: ${_ct};
   border-color: ${_ac};
   box-shadow: 0 0 0 3px color-mix(in srgb, ${_ac} 20%, transparent);
-  transform: none;
+  translate: 0;                 /* defensive: :active 残留沈みクリア */
   filter: none;
 }
 ${_P}.ric-input:active:not(:disabled) {
@@ -411,14 +413,14 @@ ${_P}.ric-checkbox {
   user-select: none;
   font-size: 1em;
   color: ${_fg};
-  transition: background 0.1s, border-color 0.1s, transform 0.07s;
+  transition: background 0.1s, border-color 0.1s, translate 0.07s;
 }
 ${_P}.ric-checkbox:hover {
   background: ${_bd};
   border-color: ${_fm};
 }
 ${_P}.ric-checkbox:active {
-  transform: translateY(1px);
+  translate: 0 1px;
   filter: brightness(0.88);
 }
 ${_P}.ric-checkbox input[type="checkbox"] {
@@ -438,7 +440,7 @@ ${_P}.ric-checkbox--disabled:hover {
   border-color: transparent;
 }
 ${_P}.ric-checkbox--disabled:active {
-  transform: none;
+  translate: 0;
   filter: none;
 }
 ${_P}.ric-checkbox--disabled input[type="checkbox"] {

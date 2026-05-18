@@ -537,6 +537,54 @@ return {
 `...rest` を末尾に置くと `class` キーが rest の値で上書きされ、基底クラスが
 消える（リグレッションあり、`ui_button` / `ui_input` v0.3.1 まで存在）。
 
+### CSS conflict — `:active` で `transform` を使わない (v0.3.17〜)
+
+`ui_button` / `ui_button--primary` / `ui_checkbox` の押下フィードバック
+(`:active` 時の 1px 沈み) は、`transform` プロパティ**ではなく** CSS
+Transforms Level 2 の独立した **`translate` プロパティ**で実装されている。
+
+```css
+/* library 側 */
+.ric-button:active:not(:disabled) {
+  translate: 0 1px;       /* ← transform: translateY(1px) ではない */
+  filter: brightness(0.85);
+}
+```
+
+これは「**consumer が `.ric-button` に `transform` を当てる場合、library 側の
+`:active` で上書きされない**」ことを保証するための契約。`transform` は単一値
+プロパティなので、library が `transform: translateY(1px)` を書いていると、
+以下のような consumer 側コードが押下時に壊れる:
+
+```css
+/* consumer 側 — absolute 配置の中央寄せ */
+.tree-row-dots {
+  position: absolute;
+  right: 4px; top: 50%;
+  transform: translateY(-50%);   /* ← library の :active で消えていた (v0.3.16 まで) */
+}
+```
+
+v0.3.17〜 は library が `transform` ではなく `translate` を使うので、上記の
+ような consumer の `transform` は **何の追加 CSS も書かずに保たれる**。
+`transform` と `translate` は composable に動く (両方適用される)。
+
+**ブラウザサポート**: Chrome 104+ / Edge 104+ / Safari 14.1+ / Firefox 72+。
+RicDOM の推奨環境 (Chrome 135+ / Electron 35+) では問題なし。
+
+**他の単一値 CSS プロパティとの conflict について**:
+
+- **`filter`** — library は `:active` / `:hover` / `:disabled` で `filter:
+  brightness(...)` を使う。consumer が `filter` を併用するケースは稀だが、
+  使う場合は consumer 側 CSS の specificity を上げて `:active` を override
+  すること (`.my-btn:active { filter: blur(2px) brightness(0.85); }` のように
+  自分で chain を組む)。`translate` 同様の仕組みは CSS にない。
+- **`box-shadow`** — `.ric-input:focus` 等で focus ring に使われる。
+  `box-shadow` は **コンマ区切りで多値**を許すが、`:focus` 時の宣言が
+  consumer のベース shadow を「ルールごと」置き換えるので、focus 時に
+  自分の shadow を残したい場合は consumer 側で focus 時のルールも書く
+  必要がある (`.my-input:focus { box-shadow: 0 2px 4px ..., 0 0 0 3px ...; }`)。
+
 ### Control
 
 | 関数 | 説明 |
