@@ -18,8 +18,12 @@ const get_kb = (filename) => {
 
 const ricdom_kb = get_kb('RicDOM.min.js');
 const ricui_kb  = get_kb('RicUI.min.js');
+const ricdom_lz_kb = fs.existsSync(path.join(root, 'RicDOM.lz.min.js')) ? get_kb('RicDOM.lz.min.js') : null;
+const ricui_lz_kb  = fs.existsSync(path.join(root, 'RicUI.lz.min.js'))  ? get_kb('RicUI.lz.min.js')  : null;
 
-console.log(`[update_sizes] RicDOM: ${ricdom_kb}KB, RicUI: ${ricui_kb}KB`);
+console.log(`[update_sizes] RicDOM: ${ricdom_kb}KB, RicUI: ${ricui_kb}KB` +
+  (ricdom_lz_kb !== null ? `, RicDOM.lz: ${ricdom_lz_kb}KB` : '') +
+  (ricui_lz_kb  !== null ? `, RicUI.lz: ${ricui_lz_kb}KB`  : ''));
 
 // ── docs/index.html ──
 const index_path = path.join(root, 'docs', 'index.html');

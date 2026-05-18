@@ -5,7 +5,7 @@ Electron・社内ツール・IoT デバイス UI 向け。JSON で書く 8KB の
 | レイヤー | サイズ | 役割 |
 |---------|------:|------|
 | **RicDOM** | 8KB | コア — JSON → DOM 差分更新 + Proxy リアクティビティ |
-| **RicUI** | 66KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
+| **RicUI** | 62KB | 部品集 — CSS 変数テーマ + ボタン・ポップアップ・スプリッター + 調整パネル |
 
 Virtual DOM を持たず、JSON オブジェクトの差分から実 DOM を直接パッチします。
 Electron やブラウザで、リアルタイムなダッシュボード・パラメータ調整 UI・データ可視化ツールを素早く構築できます。
@@ -79,8 +79,35 @@ npm パッケージとしては公開していません。
 
 | バンドル | サイズ | 内容 |
 |---------|------:|------|
-| `RicDOM.min.js` | 8KB | コア（必須） |
-| `RicUI.min.js` | 66KB | UI コンポーネント集 + パラメータ調整パネル |
+| `RicDOM.min.js`    |  8KB | コア（必須） |
+| `RicDOM.lz.min.js` |  6KB | 同上の LZSS 自己展開版 (v0.3.18〜、下記参照) |
+| `RicUI.min.js`     | 62KB | UI コンポーネント集 + パラメータ調整パネル |
+| `RicUI.lz.min.js`  | 35KB | 同上の LZSS 自己展開版 (v0.3.18〜、下記参照) |
+
+#### LZ 圧縮版 (`*.lz.min.js`) の使い分け
+
+通常版と機能・API は **完全に同一**。違いはファイルサイズと読み込み時の挙動だけ:
+
+- **`*.min.js` (通常版)**: そのまま `window.RicDOM` / `window.RicUI` を expose する
+  従来の bundle。HTTP 配信なら gzip/brotli が走るので transfer 量はこちらでも小さい。
+  debug 性 (DevTools の Source タブで読める) はこちらが上。
+- **`*.lz.min.js` (LZ 版)**: 起動時に内部の base64-encoded LZSS を `atob` で展開し、
+  `(0,eval)(...)` で実行する自己展開版。**HTTP 圧縮が走らない配信** (IoT、組込み、
+  オフライン Electron 配布、CDN なしの社内サーバー等) で **disk / 転送量を 27-43%
+  削減** できる。debug 時は通常版に切り替えるのが楽。
+
+```html
+<!-- 通常: HTTP 圧縮が効く環境 -->
+<script src="RicDOM.min.js"></script>
+<script src="RicUI.min.js"></script>
+
+<!-- LZ: 無圧縮で配信される環境 -->
+<script src="RicDOM.lz.min.js"></script>
+<script src="RicUI.lz.min.js"></script>
+```
+
+両ファイルは **self-contained** で互いに依存しない (decompressor が各自に含まれる
+~280B)。通常版と LZ 版を混ぜることも可能。
 
 ### Hello World（RicDOM のみ）
 
