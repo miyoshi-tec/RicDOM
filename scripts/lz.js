@@ -186,33 +186,43 @@ const escape_regex_char = (c) => /[.*+?^${}()|[\]\\\/]/.test(c) ? '\\' + c : c;
 // 自己展開 wrapper の組み立て (golf-level minified)
 // ──────────────────────────────────────────────
 // 構造:
-//   let C=`...payload...`, s="", r, G=n=>r.charCodeAt(n);
-//   C.replace(/M(....)|./gs, (m, R) => {
-//     if (R) { r = atob(R); for (let l=G(2), b=s.length-G(0)*256-G(1); l--;) s += s[b++] }
-//     else s += m
-//   });
-//   eval(s);
+//   (()=>{
+//     let C=`...payload...`, s="", r, G=n=>r.charCodeAt(n);
+//     C.replace(/M(....)|./gs, (m, R) => {
+//       if (R) { r = atob(R); for (let l=G(2), b=s.length-G(0)*256-G(1); l--;) s += s[b++] }
+//       else s += m
+//     });
+//     eval(s)
+//   })()
+//
+// IIFE で包む理由 (v0.3.19〜): top-level `let C` は classic <script> の script-level
+// lexical binding を作るため、`RicDOM.lz.min.js` + `RicUI.lz.min.js` を同じページに
+// 読み込むと「Identifier 'C' has already been declared」で 2 つ目が SyntaxError に
+// なる (v0.3.18 で Potopeta dev が報告)。IIFE で function scope に閉じ込めることで
+// 複数 .lz ファイルが共存できる (+7 byte/file)。
 //
 // substitution 版は escape char → rare char の復元を 1 alternative 追加。
 const build_wrapper = (compressed, marker_code, substitution) => {
   const escaped = escape_for_template(compressed);
   const M = escape_regex_char(String.fromCharCode(marker_code));
-  if (substitution) {
-    // 展開時は: match が escape byte なら rare char に戻す、それ以外 (普通の literal)
-    // はそのまま append。regex は `/M(....)|./gs` で十分 (escape byte は `.` でマッチ
-    // するので alternative 不要)。
-    const escape_lit = '"\\x' + substitution.to_code.toString(16).padStart(2, '0') + '"';
-    const rare_lit = JSON.stringify(String.fromCharCode(substitution.from_code));
-    return 'let C=`' + escaped + '`,s="",r,G=n=>r.charCodeAt(n);' +
+  const body = substitution
+    ? (() => {
+        // 展開時は: match が escape byte なら rare char に戻す、それ以外 (普通の literal)
+        // はそのまま append。regex は `/M(....)|./gs` で十分 (escape byte は `.` でマッチ
+        // するので alternative 不要)。
+        const escape_lit = '"\\x' + substitution.to_code.toString(16).padStart(2, '0') + '"';
+        const rare_lit = JSON.stringify(String.fromCharCode(substitution.from_code));
+        return 'let C=`' + escaped + '`,s="",r,G=n=>r.charCodeAt(n);' +
+          'C.replace(/' + M + '(....)|./gs,(m,R)=>{' +
+          'if(R){r=atob(R);for(let l=G(2),b=s.length-G(0)*256-G(1);l--;)s+=s[b++]}' +
+          'else if(m==' + escape_lit + ')s+=' + rare_lit + ';' +
+          'else s+=m});eval(s)';
+      })()
+    : 'let C=`' + escaped + '`,s="",r,G=n=>r.charCodeAt(n);' +
       'C.replace(/' + M + '(....)|./gs,(m,R)=>{' +
       'if(R){r=atob(R);for(let l=G(2),b=s.length-G(0)*256-G(1);l--;)s+=s[b++]}' +
-      'else if(m==' + escape_lit + ')s+=' + rare_lit + ';' +
       'else s+=m});eval(s)';
-  }
-  return 'let C=`' + escaped + '`,s="",r,G=n=>r.charCodeAt(n);' +
-    'C.replace(/' + M + '(....)|./gs,(m,R)=>{' +
-    'if(R){r=atob(R);for(let l=G(2),b=s.length-G(0)*256-G(1);l--;)s+=s[b++]}' +
-    'else s+=m});eval(s)';
+  return '(()=>{' + body + '})()';
 };
 
 // ──────────────────────────────────────────────
