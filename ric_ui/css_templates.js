@@ -1030,6 +1030,10 @@ ${_P}.ric-inline-menu {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+${_P}.ric-inline-menu .ric-button {
+  justify-content: flex-start;
+  text-align: left;
 }`,
 
   'ric-md-pre': () => `

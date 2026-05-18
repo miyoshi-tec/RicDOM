@@ -40,6 +40,52 @@ const _ANCHOR = {
   tl: { bottom: '100%', left:  0, marginBottom: '4px' },
 };
 
+// 親要素が positioned (relative / absolute / fixed / sticky) であることを
+// dev mode で警告する (v0.3.16〜)。anchor の `top:100% + right:0` 等は
+// nearest positioned ancestor を基準に計算されるため、親が `static` だと
+// menu が body / 別の祖先を基準に出現する silent failure になる。
+//
+// 仕組み:
+//   - open=true のときに rAF を 1 つ schedule
+//   - 描画コミット後に document を走査して .ric-inline-menu の親を点検
+//   - 警告済みの親は WeakSet で記録、spam を防止
+//   - 環境 (jsdom で getComputedStyle / rAF が無いとき等) では silent skip
+//
+// rAF を使う理由: build_dom_node は同期だが、DOM 反映後に getComputedStyle
+// を読みたいので 1 フレーム遅延させる (create_ui_collapse_box と同じ canon)。
+const _warned_parents = typeof WeakSet === 'function' ? new WeakSet() : null;
+let _parent_check_scheduled = false;
+
+const _schedule_parent_position_check = () => {
+  if (_parent_check_scheduled)          return;
+  if (!_warned_parents)                 return;
+  if (typeof document === 'undefined')  return;
+  if (typeof requestAnimationFrame !== 'function') return;
+  if (typeof getComputedStyle !== 'function')      return;
+
+  _parent_check_scheduled = true;
+  requestAnimationFrame(() => {
+    _parent_check_scheduled = false;
+    const menus = document.querySelectorAll('.ric-inline-menu');
+    for (const el of menus) {
+      const parent = el.parentElement;
+      if (!parent || _warned_parents.has(parent)) continue;
+      const pos = getComputedStyle(parent).position;
+      // jsdom は CSS が未指定の要素に対し '' を返すケースがある。
+      // ブラウザは 'static' を返す。両方を「unpositioned」として扱う。
+      if (pos && pos !== 'static') continue;
+      _warned_parents.add(parent);
+      console.warn(
+        '[ui_inline_menu] 親要素に position 指定がありません ' +
+        '(computed: ' + (pos || 'static') + ')。menu は ' +
+        'nearest positioned ancestor (or <body>) を基準に出現します。' +
+        '親要素に `position: relative` (or absolute/fixed/sticky) を付けてください。',
+        parent,
+      );
+    }
+  });
+};
+
 // style 引数を object に正規化する。string で渡された場合は受け入れず、
 // 'a:b;c:d' を { a: 'b', c: 'd' } に簡易変換する（後方互換のため）。
 // 公式には object 形式を推奨。
@@ -68,6 +114,9 @@ const ui_inline_menu = ({
   class: extra_class = '',
 } = {}) => {
   if (!open) return null;
+
+  // dev warning: 描画後に親要素の positioning を点検する。
+  _schedule_parent_position_check();
 
   const pos = _ANCHOR[anchor] || _ANCHOR.br;
   // base + anchor の position + 呼び出し側追加の style を object でマージ

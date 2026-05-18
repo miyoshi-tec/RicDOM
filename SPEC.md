@@ -267,6 +267,42 @@ s.user.address.city = 'Tokyo';
 s.ignore.cache = someData;
 ```
 
+### state field の型制約
+
+state には **POJO (Plain Old JavaScript Object) のみ** を置く。Proxy が
+プロパティアクセスを差し込むため、internal slot に依存する組み込み型は
+動作しない（`incompatible receiver` 例外）。
+
+サポートされる型:
+
+- POJO (`{}`)、array (`[]`)
+- primitive (string / number / boolean / null / undefined)
+- function (factory 系 / `render` 等)
+
+サポートされない型:
+
+- `Map` / `Set` / `WeakMap` / `WeakSet`
+  → `TypeError: Map.prototype.has called on incompatible receiver`
+- `Date`（read だけなら動くが mutation を Proxy が検出できない）
+- `Promise`、各種 typed array、その他 internal slot 依存の組み込み型
+
+```javascript
+// ❌ NG
+const s = create_RicDOM('#app', { items: new Map() });
+
+// ✅ OK — plain object を key-value store として使う
+const s = create_RicDOM('#app', { items: {} });
+s.items = { ...s.items, [key]: value };  // 再描画したいときは一段目を新オブジェクトに差し替え
+```
+
+「再描画したくない計算結果のキャッシュ」として `Map` を置きたい場合は、
+`s.ignore` 配下なら Proxy がかからないので使える:
+
+```javascript
+const s = create_RicDOM('#app', { ignore: {} });
+s.ignore.cache = new Map();   // Proxy 監視外 → OK
+```
+
 ### JSON ツリー構造
 
 ```javascript
@@ -752,6 +788,18 @@ trigger 要素の near に絶対配置する軽量ポップオーバー。`creat
   ],
 }
 ```
+
+**親要素は必ず positioned** (`position: relative` / `absolute` / `fixed` /
+`sticky` のいずれか) にすること。`anchor` の `top:100% + right:0` 等は
+nearest positioned ancestor を基準に計算されるため、親が `static` のままだと
+menu は `<body>` 等の遠い祖先を基準に配置され、画面外に飛ぶ silent failure
+になる。v0.3.16〜 は dev mode で `console.warn` を出して気付けるようにした
+が、要件自体は変わらない。
+
+メニュー項目は v0.3.16〜 デフォルトで **左揃え**
+（`.ric-inline-menu .ric-button { justify-content: flex-start; }`）。
+アイコン + ラベルのメニューが自然に縦に揃う。center 揃えに戻したい場合は
+アプリ側 CSS で override すること。
 
 含まないもの (意図的):
 - **外クリックで閉じる挙動はライブラリに持たせない**。`onclick` は内部で
