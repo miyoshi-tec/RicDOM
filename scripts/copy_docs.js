@@ -12,9 +12,12 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 
-// min.js をコピー
-for (const f of ['RicDOM.min.js', 'RicUI.min.js']) {
-  fs.copyFileSync(path.join(root, f), path.join(root, 'docs', f));
+// min.js をコピー (LZ 版は存在する場合のみ)
+for (const f of ['RicDOM.min.js', 'RicDOM.lz.min.js', 'RicUI.min.js', 'RicUI.lz.min.js']) {
+  const src = path.join(root, f);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, path.join(root, 'docs', f));
+  }
 }
 
 // Markdown ドキュメントをコピー（spec.html / tutorial.html が fetch する）
