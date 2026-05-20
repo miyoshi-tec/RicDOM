@@ -267,6 +267,21 @@ s.user.address.city = 'Tokyo';
 s.ignore.cache = someData;
 ```
 
+**depth-2+ を再描画したい場合は「一段目を差し替える」のが canon**:
+
+```javascript
+// 配列の深い要素を更新
+s.pages = [...s.pages.slice(0, i), { ...s.pages[i], width: 200 }, ...s.pages.slice(i+1)];
+
+// オブジェクトの深い key を更新
+s.user = { ...s.user, address: { ...s.user.address, city: 'Tokyo' } };
+```
+
+immer 風 / proxy 自動深層追跡は **意図的に持たない**。state を flat に保つ・
+shallow copy で差し替える、の 2 つのルールで RicDOM の reactive 範囲をカバーする
+設計。深い構造が頻発するなら state 設計の見直しサイン (= flat な map に
+正規化、`pages_by_id`、`selected_id` 等)。
+
 ### state field の型制約
 
 state には **POJO (Plain Old JavaScript Object) のみ** を置く。Proxy が
@@ -1019,6 +1034,73 @@ popup / tooltip / dialog / toast はポータル経由で `ui_page` 直下に描
 stacking context 問題（backdrop-filter / clip-path）を回避。
 
 テーマ上書き: `_wrap_portal` が各ポータル要素の style に CSS 変数を注入。
+
+#### portal target ルール
+
+ポータルは **drain した `ui_page` の直接の子** として展開される。これは
+`position: fixed` で配置するポータルにとって意味のある不変条件:
+
+- `ui_page` が DOM ツリーの **どこにあっても** ポータルはその直下に入る
+- ネストした `ui_page` がある場合、ポータルは **最深** (= 一番内側で drain した) 
+  `ui_page` の子になる
+
+**重要な落とし穴**: ポータル本体は `position: fixed` だが、CSS 仕様で
+**祖先要素が `transform` / `filter` / `backdrop-filter` / `perspective` / `contain` /
+`will-change` 等で containing-block を作る** と、`fixed` 配置は **viewport ではなく
+その祖先を基準** に解決される。
+
+```
+<div style="transform: translateX(0)">    ← containing-block creator
+  <div class="ric-page">                  ← portal target
+    ...
+    <div class="ric-dialog"               ← position: fixed
+         style="top:50%; left:50%">
+      ↑ viewport ではなく外側の transform 要素を基準にする
+        → 中央寄せが意図と違う場所に出る
+    </div>
+  </div>
+</div>
+```
+
+このため:
+- **`ui_page` を囲む祖先に containing-block creator を入れない**。`transform`、
+  `filter`、`backdrop-filter`、`contain: layout|paint|strict`、`perspective`、
+  `will-change: transform` 等が該当
+- もし「装飾的に `transform` を当てたい」場合は `ui_page` の **外側** ではなく
+  **内側の別 div** に当てる
+- 「テーマ provider を自前で作りたい」目的で `ui_page` を平 div に降格すると、
+  `color` / `background` などの解決済み CSS プロパティが外側の値を継承する罠が
+  ある。canon は `ui_page` をそのまま使うこと
+
+### Operational facts — render flush の 2 rAF ルール
+
+state 変更後、新しく描画される DOM 要素を `querySelector` で取得するには、
+**2 つの `requestAnimationFrame` を待つ**:
+
+```javascript
+handle.show_dialog = true;
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  const dlg = document.querySelector('.ric-dialog');
+  dlg.querySelector('input').focus();
+}));
+```
+
+仕組み:
+
+1. **mutation (= `handle.show_dialog = true`)**: Proxy の set trap が
+   `schedule_render()` を呼ぶ → scheduler は内部フラグを立てて rAF を予約
+2. **1 つ目の rAF**: scheduler 内で `do_render()` 実行 → VDOM 構築 → DOM patch。
+   この直後はまだ「browser が layout/paint commit 前」の可能性
+3. **2 つ目の rAF**: browser の layout/paint commit が確実に完了。
+   `querySelector` で新要素を確実に取得できる
+
+1 つの rAF だと「flush 前」に空振りすることがある (= scheduler の rAF と同じ
+フレームで動くと、render はまだ走っていない)。**focus / scroll / 寸法計測** など
+DOM 反映前提の操作は 2 rAF wait が確実。
+
+注: 値変更だけ (= `el.value` 等を state 経由で更新) は `bind_input` などの helper
+を使えば RicDOM が patch するので明示 wait は不要。2 rAF wait が要るのは
+「**新規 DOM 要素** にアクセスしたい」場面のみ。
 
 ### テーマユーティリティ
 

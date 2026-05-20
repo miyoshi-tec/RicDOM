@@ -271,6 +271,17 @@ transitionend など「内部イベントから再描画を発火したい」場
 この `__notify` を呼びます。state 外に置くと `__notify` が undefined のまま
 **内部状態は変化するが DOM が更新されない**、という気付きにくい挙動になります。
 
+注入の仕組み:
+- `create_RicDOM(target, raw_state)` は `raw_state` を Proxy で包む
+- Proxy の **set trap** が `s.foo = create_ui_splitter(...)` の代入を観測
+- 代入された値が typeof === 'function' or オブジェクトかつ非配列なら、
+  `value.__notify = schedule_render` を **non-enumerable で注入**する
+- ファクトリの内部イベントが `this.__notify()` を呼ぶことで再描画が走る
+
+つまり「state トップレベルへの代入」が `__notify` 注入の **唯一のフック**
+であり、`const split = create_ui_splitter(...)` のように代入を経由しない
+配置だと注入されない。これが canon pattern の根拠です。
+
 v0.3.8 以降は誤用を検知すると `console.warn` が一度だけ出ます:
 
 ```
