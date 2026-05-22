@@ -1017,6 +1017,60 @@ DOM の `data-ric-cb` 属性に factory id と key を encodeURIComponent した
 複合値が入る (例: `'12-path%2Fto%2Ffile'`)。`data-ric-role="collapse-box"`
 も付与される (CSS / E2E test の selector に使える)。
 
+⚠️ **canon: 閉じアニメは「自分が開けた要素」にしか効かない**
+
+`create_ui_collapse_box` の state machine は、`visible:true` で **mount された
+事実** を `_states` Map で覚えている。**pre-existing な要素を後から wrap して
+`visible:false` を渡しても、内部 state が無いので closing 遷移が起きず、
+要素は無音で消える (アニメなし)。**
+
+典型的な踏み方: list item が `s.files` に並んでいる状態で、後から
+「item を消すアニメを付けたい」と思って `visible:!is_removed` を後付けで
+渡すケース。この場合、もとからあった行は initial render が `visible:false`
+で `state` を作らない (corner case で即 closed) → アニメ無しで消える。
+
+**解決策**: 退場アニメだけは CSS keyframe で代用する canon:
+
+```css
+.list-row--exiting {
+  animation: list-row-exit 180ms ease-in forwards;
+  pointer-events: none;
+  overflow: hidden;
+}
+@keyframes list-row-exit {
+  from { opacity: 1; max-height: 60px; }
+  to   { opacity: 0; max-height: 0; padding: 0; }
+}
+```
+
+そのほうが「collapse_box は登場アニメ専用、退場は CSS keyframe」と
+責務分離されて trace しやすい。
+
+⚠️ **canon: 閉じても wrapper 要素は DOM に残る (closing 中だけ)**
+
+closing アニメ中は `data-ric-visible="false"` の `<div>` が DOM に残る
+(transition の補間を行うため必要)。アニメ完了で要素ごと unmount される。
+そのため:
+
+```javascript
+// ❌ これは closing 中 false / 完了後 0 / open 中 1 と振れる
+await expect(page.locator('.ric-collapse-box')).toHaveCount(0);
+
+// ✅ 「中身が空か」で判定する canon (= 空 ctx パターン)
+return s.box({
+  visible: !!s.selected,
+  ctx: [{
+    tag: 'div', class: 'preview-panel',
+    ctx: s.selected ? [/* 中身 */] : [],   // null 時は空 ctx
+  }],
+});
+// e2e:
+await expect(page.locator('.preview-panel > *')).toHaveCount(0);
+```
+
+「business state が null のとき ctx を空にする」のは、collapse_box の都合と
+**業務状態の表現を一致させる** ためで、副作用として e2e の閉じ判定にも使える。
+
 ### Controlled / Uncontrolled パターン
 
 `create_ui_dialog` と `create_ui_splitter` は **controlled / uncontrolled** の

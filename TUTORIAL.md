@@ -569,7 +569,21 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
 1 rAF だけだと「flush 前」に空振りすることがあります。
 **focus / scroll / `getBoundingClientRect` 等は必ず 2 rAF 後** に。
 
-### 画像 decode を待ちたいときは別途
+### async 境界の整理
+
+「2 rAF で何が保証されるか」をまとめると:
+
+| やりたいこと | canon |
+|---|---|
+| focus / scroll / `getBoundingClientRect` | 2 rAF (上記) で OK |
+| `<img>` の decode 完了後に操作 | 2 rAF 内で `await img.decode()` |
+| フォント読み込み完了後に寸法計測 | `await document.fonts.ready` |
+
+**DOM 反映 (= VDOM patch) ≠ image decode ≠ font load** です。
+2 rAF はあくまで「DOM commit までの同期」であり、media decode や font fetch は
+別 task として非同期に走ります。
+
+### 画像 decode を待ちたいとき
 
 `<img>` の async decode 完了は **2 rAF wait だけでは保証されません**
 (= rAF は layout commit までで、image decode は別 task)。decode 完了が必要なら
@@ -581,6 +595,21 @@ requestAnimationFrame(() => requestAnimationFrame(async () => {
   const img = document.querySelector('.preview img');
   await img.decode();                           // decode 完了を待つ
   img.scrollIntoView({ block: 'center' });      // 確実に layout 済み
+}));
+```
+
+### SVG を VDOM で挿入した場合
+
+VDOM で挿入した `<svg>` 要素は `<img>` と異なり、**decode 待ちは不要** です。
+`<svg>` は layout 上 block 要素として扱われるため、2 rAF 後には
+`scrollWidth` / `scrollHeight` / `getBoundingClientRect` の値が確定しています:
+
+```javascript
+handle.show_chart = true;
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  const svg = document.querySelector('.my-chart svg');
+  const { width, height } = svg.getBoundingClientRect();  // 確定している
+  // ...
 }));
 ```
 

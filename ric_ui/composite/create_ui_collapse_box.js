@@ -25,10 +25,16 @@
 //             rAF で scrollWidth/Height を測定 → _tw/_th 更新 → safe_notify で
 //             再描画 → VDOM が height:Npx を emit → RicDOM diff が 0→N で
 //             inline 適用 → browser が transition で補間。
-//   - 出る:   visible:false で _tw/_th=0 → VDOM が height:0 を emit →
-//             RicDOM diff が prev(natural)→0 で apply → browser が transition。
+//   - 出る:   open steady は inline height 無し (= CSS の auto) なので
+//             auto→0 は transition できない。2 段に分けて解決する:
+//               step 1) visible:false で scrollHeight を再測定して _th=Npx に焼き付け、
+//                       render が height:Npx を inline に emit。
+//               step 2) 次の rAF で _th=0 → safe_notify → 再 render が height:0px を emit。
+//                       browser が Npx → 0px を transition で補間 → transitionend で unmount。
 //   - 中断:   _tw/_th の値を変えるだけで、CSS transition は「現在の補間値から
 //             新ターゲットへ」を自動で行うため、snapshot ロジックは要らない。
+//             step 2 待ちの rAF が中断後に発火しても、`if (!st._c) return;` で
+//             no-op になる。
 //
 // アニメ中は JS / RicDOM は走らない (transition は browser の compositor で
 // 補間)。
@@ -108,12 +114,37 @@ const create_ui_collapse_box = ({
     } else if (!visible && st && !st._c) {
       // 通常 close (entering 中断含む)。st が存在するなら必ず _o=true (上記 invariant)。
       st._e = false;
+      // open 中に content が変わって _th が古くなっている可能性があるので、
+      // この瞬間の DOM の natural size を再測定する (close の起点を確定させる)。
+      const el = _find_el(key);
+      if (el) {
+        if (_do_w) st._tw = el.scrollWidth;
+        if (_do_h) st._th = el.scrollHeight;
+      }
       if (st._th === 0 && st._tw === 0) {
-        // measure 前に閉じた corner case (連打など): アニメ不要、即 closed
+        // 測定値も 0 (content 空 / 未マウント / entering 直後の連打) なら animate せず即 closed
         st._o = false;
       } else {
         st._c = true;
-        st._tw = st._th = 0;
+        // 2 段クロージング: CSS transition は `auto → 0px` を補間しないので、
+        //   1) 今フレームの render で `height: Npx` を inline style に焼き付ける
+        //   2) 次の rAF で _th = 0 にして再 render → `height: 0px` を emit
+        //   3) browser が Npx → 0px を transition で補間
+        // _th を 0 にするのを 1 frame 遅らせるのがポイント。
+        if (typeof requestAnimationFrame !== 'undefined') {
+          requestAnimationFrame(() => {
+            // 中断 (closing → entering) されていたら no-op
+            if (!st._c) return;
+            if (_do_w) st._tw = 0;
+            if (_do_h) st._th = 0;
+            safe_notify(inst, 'create_ui_collapse_box');
+          });
+        } else {
+          // rAF が無い環境 (= 純 Node・SSR 等、本来ここに到達しないが safety net)。
+          // animation 自体が動かないので _th を即 0 にして閉じ切った状態にする。
+          if (_do_w) st._tw = 0;
+          if (_do_h) st._th = 0;
+        }
       }
     }
     // visible && st && (entering or open or closing→entering 既処理): 何もしない (steady state)

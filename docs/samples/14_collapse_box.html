@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collapse Box — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+  <style>
+    body { margin: 0; min-height: 100vh; }
+    /* デモカードの枠 */
+    .demo-card {
+      border: 1px solid var(--ric-color-border);
+      border-radius: 6px; padding: 12px 14px;
+      background: var(--ric-color-bg-elevated);
+    }
+    /* パターン 1〜4 共通の行スタイル */
+    .list-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; border-bottom: 1px solid var(--ric-color-border);
+      background: var(--ric-color-bg);
+    }
+    .list-row__icon { opacity: 0.7; }
+    .list-row__del { margin-left: auto; font-size: 12px; opacity: 0.6; cursor: pointer; }
+    .list-row__del:hover { opacity: 1; color: #dc2626; }
+
+    /* Pattern 2: preview panel の見た目 */
+    .preview-panel {
+      padding: 12px; background: var(--ric-color-bg);
+      border: 1px dashed var(--ric-color-border); border-radius: 4px;
+      margin-top: 6px;
+    }
+
+    /* パターン 4: 削除アニメは CSS animation で実装。
+       collapse_box は「自分が開けた行」しか閉じアニメできないので、
+       最初から並んでいた行の退場はこちらに任せる。 */
+    .list-row--exiting {
+      animation: list-row-exit 200ms ease-in forwards;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    @keyframes list-row-exit {
+      from { opacity: 1; max-height: 40px; transform: translateX(0); }
+      to   { opacity: 0; max-height: 0;    transform: translateX(8px);
+             padding-top: 0; padding-bottom: 0; border-bottom-width: 0; }
+    }
+
+    /* 各セクションの見出しと番号 */
+    .sec-num {
+      display: inline-block; min-width: 22px;
+      font-weight: 700; opacity: 0.5;
+    }
+
+    /* 比較表 (A スタイル vs B スタイル) */
+    .compare-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+      margin: 12px 0; line-height: 1.5;
+    }
+    .compare-table th, .compare-table td {
+      border: 1px solid var(--ric-color-border);
+      padding: 8px 10px; text-align: left; vertical-align: top;
+    }
+    .compare-table th {
+      background: var(--ric-color-bg-hover, rgba(0,0,0,0.05));
+      font-weight: 600;
+    }
+    .compare-table td:first-child {
+      font-weight: 600; opacity: 0.8; white-space: nowrap;
+      background: var(--ric-color-bg-hover, rgba(0,0,0,0.03));
+    }
+    .compare-table code {
+      font-size: 12px;
+      background: var(--ric-color-bg-hover, rgba(0,0,0,0.06));
+      padding: 1px 5px; border-radius: 3px;
+      font-family: 'SF Mono', Consolas, monospace;
+    }
+    .compare-table .pro { color: #16a34a; }
+    .compare-table .con { color: #dc2626; }
+    .style-pick {
+      margin: 8px 0 12px; padding: 10px 12px;
+      background: var(--ric-color-bg-hover, rgba(0,0,0,0.04));
+      border-left: 3px solid var(--ric-color-accent);
+      border-radius: 4px; font-size: 13px; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<div id="nav_bar" data-sample="14"></div>
+<div id="app"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     落とし穴 / テスト方法のドキュメントは markdown で <script type="text/plain"> に持ち、
+     後で ui_md_pre に渡す。コードは hljs でハイライトされる。
+     ════════════════════════════════════════════════════════════ -->
+
+<script type="text/plain" id="md-pitfalls">
+## 落とし穴と対策
+
+### (a) 閉じても wrapper の `<div>` は DOM に残る
+
+閉じている最中は wrapper の `<div>` が DOM に残ります (CSS transition の補間に
+必要なため)。完全に閉じきった瞬間に消えます。
+
+このため、テスト (Playwright 等) で「閉じている」状態を
+`count(0)` で判定すると、アニメ中は要素がまだ存在するので意図しない結果になります。
+
+```js
+// ❌ 閉じ中は count=1、完了で 0、開く時は 1 と振れる
+await expect(page.locator('.ric-collapse-box')).toHaveCount(0);
+
+// ✅ おすすめ: state が null のとき ctx を空配列にして、中身の有無で判定する
+return s.box({
+  visible: !!s.selected,
+  ctx: [{ tag: 'div', class: 'preview-panel',
+          ctx: s.selected ? [/* 中身 */] : [] }],
+});
+await expect(page.locator('.preview-panel > *')).toHaveCount(0);
+```
+
+### (b) state に `Map` / `Set` / `Date` を直接置けない
+
+RicDOM の state は `Map` / `Set` / `Date` 等の組み込みオブジェクトを直接置けません。
+Proxy で透過すると JavaScript の内部仕様の制約で
+`TypeError: Map.prototype.has called on incompatible receiver` のエラーになります。
+
+辞書が必要なら普通のオブジェクト (`{}`)、配列が必要なら `[]` で代用してください。
+更新も「全体を作り直す」スタイルで (mutation NG)。
+
+```js
+// ❌ NG
+some_dict: new Map(),
+
+// ✅ 普通のオブジェクトを辞書として使う
+some_dict: {},
+s.some_dict = { ...s.some_dict, [id]: value };   // 更新は immutable に
+```
+
+### (c) アニメ wrap の中に編集中の `<input>` があると focus が外れる
+
+「行を collapse_box で wrap する」と、その行の DOM ノードが
+collapse_box の wrapper の子として配置し直されます。その行に編集中の `<input>`
+があると、focus が外れて編集が一瞬で終わる症状が出ます
+(実例: ファイル一覧の inline rename 中)。
+
+**対策**: 「すでに表示されている行はアニメ対象から除外」する。
+新しく追加した行だけに `animating: 'enter'` フラグを付け、
+前から並んでいた行は wrap しないようにします。
+
+```js
+// 例: ファイル add ハンドラ内 (file 監視で新規 file 検出)
+const already_in = s.items.some((it) => it.path === info.path);
+if (!already_in) {
+  // 新規追加だけ animating フラグ ON にして add
+  s.items = [...s.items, { ...info, animating: 'enter' }];
+}
+// → 既にあった行は wrap されないので focus が維持される
+```
+
+### (d) 閉じアニメは「自分が開けた行」にしか効かない
+
+`create_ui_collapse_box` は `visible:true` で開いた行を内部で記憶しています。
+**最初から表示されていた行 (= collapse_box が記憶していない行) を後から wrap して
+`visible:false` を渡しても、内部に状態が無いので閉じる遷移が始まらず、無音で消えます。**
+
+**対策**: 削除時のアニメは CSS animation で別途実装する (= パターン 4)。
+「collapse_box は登場専用、退場は CSS animation」と役割を分けると素直に書けます。
+
+```css
+.list-row--exiting {
+  animation: list-row-exit 200ms ease-in forwards;
+}
+@keyframes list-row-exit {
+  from { opacity: 1; max-height: 40px; }
+  to   { opacity: 0; max-height: 0; padding: 0; }
+}
+```
+
+### (e) duration (アニメ時間) の体感
+
+参考値:
+
+- **180ms** = 「サッと出る/消える」。操作の邪魔にならないバナー・パネル向き
+- **200ms** = 「ニョキッと現れる」。注目を引きたいプレビューパネル等
+- 250ms 以上は「もたつき」を感じやすい
+</script>
+
+<script type="text/plain" id="md-e2e">
+## ブラウザテストでアニメ完了を待つ方法
+
+Playwright や Puppeteer などのブラウザ自動操作テストで
+「アニメが終わってから次の操作 / 座標取得をしたい」ときの 2 パターン。
+
+「本番コードを変更しない方針なら (1)、テスト用ビルドで window に状態を露出できる
+プロジェクトなら (2)」と使い分けます。
+
+### (1) class 名を見て待つ (本番コードを変更しない)
+
+collapse_box は登場中の要素に `--entering` class を、
+退場中に `--closing` class を付けます。これが外れたタイミング = アニメ完了です。
+
+```js
+// tests/e2e/smoke.spec.js
+await page.waitForFunction(() => {
+  const cb = [...document.querySelectorAll('[data-ric-role=collapse-box]')]
+    .find((el) => el.querySelector('.preview-panel'));
+  return cb && !cb.className.includes('--entering');
+}, { timeout: 2000 });
+```
+
+長所: 本番コードに手を入れなくて済む。
+短所: selector が DOM 構造に依存する。
+
+### (2) `inst.is_animating(key?)` を呼ぶ (アニメ状態を直接問い合わせ)
+
+collapse_box の factory には `is_animating()` メソッドがあり、
+登場中 / 退場中なら `true` を返します。テストビルド時だけ
+window 経由でアクセスできるようにすれば確実に判定できます。
+
+```js
+// app.js (テストビルド時のみ window に露出)
+if (process.env.NODE_ENV !== 'production') {
+  window.__app_boxes = { preview_box: handle.preview_box };
+}
+
+// テスト側
+await page.waitForFunction(
+  () => !window.__app_boxes.preview_box.is_animating(),
+  { timeout: 2000 }
+);
+```
+
+長所: collapse_box の内部状態を直接見るので確実。
+短所: 本番コードにテスト用の分岐 or ビルドステップが要る。
+
+### `data-ric-visible` 属性の使い所
+
+collapse_box の wrapper には `data-ric-visible="true" / "false"` 属性が付きます
+(true = 登場中 or 開いている、false = 閉じている最中)。
+
+登場中も `"true"` になるので「アニメ完了待ち」用途には使えませんが、
+「閉じている最中の wrapper を識別したい」用途には便利。
+完全に閉じきった状態 = 要素自体がない、なので `count(0)` で判定できます。
+</script>
+
+<!-- ════════════════════════════════════════════════════════════
+     メインスクリプト
+     ════════════════════════════════════════════════════════════ -->
+<script src="_nav_bar.js"></script>
+<script>
+'use strict';
+
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_collapse_box,
+  ui_panel, ui_text, ui_button, ui_code_pre, ui_md_pre,
+} = RicUI;
+
+const MD_PITFALLS = document.getElementById('md-pitfalls').textContent.trim();
+const MD_E2E      = document.getElementById('md-e2e').textContent.trim();
+
+// ════════════════════════════════════════════════════════════
+// 単一の create_RicDOM ですべてのパターンを動かす。各 collapse_box factory は
+// 独立して state を持つので、トップレベルに並べて __notify を注入する。
+// ════════════════════════════════════════════════════════════
+create_RicDOM('#app', {
+  // Pattern 1 (Hello)
+  p1_expanded: false,
+  p1_box: create_ui_collapse_box({ direction: 'v', duration: 180 }),
+
+  // Pattern 2 (Empty ctx)
+  p2_selected: null,
+  p2_box: create_ui_collapse_box({ direction: 'v', duration: 200 }),
+
+  // Pattern 3 (Sparse w/ key) — 行 add だけ collapse_box でアニメ
+  // item は { id, label, animating?: 'enter' } の形。animating フラグを item に直接持たせる。
+  p3_items:   [],
+  p3_next_id: 1,
+  p3_box: create_ui_collapse_box({ direction: 'v', duration: 180 }),
+
+  // Pattern 4 (Sparse + CSS keyframe exit)
+  // item は { id, label, animating?: 'enter', exiting?: true } の形。両方のフラグを item の中に持つ。
+  p4_items:   [{ id: 0, label: '行 0 (最初からあった行)' }, { id: -1, label: '行 -1 (最初からあった行)' }],
+  p4_next_id: 1,
+  p4_box: create_ui_collapse_box({ direction: 'v', duration: 180 }),
+
+  page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+
+  render(s) {
+    // ── 行追加: item に animating:'enter' フラグを付けて追加、200ms 後にフラグを下ろす ──
+    // Proxy は push() では発火しないので、配列ごと再代入する。
+    const add_row_p3 = () => {
+      const id = s.p3_next_id;
+      s.p3_next_id = id + 1;
+      s.p3_items = [...s.p3_items, { id, label: `行 ${id}`, animating: 'enter' }];
+      // 200ms 後 (アニメ完了) に該当 item の animating フラグだけ消す
+      setTimeout(() => {
+        s.p3_items = s.p3_items.map((it) =>
+          it.id === id ? { ...it, animating: null } : it,
+        );
+      }, 200);
+    };
+
+    const add_row_p4 = () => {
+      const id = s.p4_next_id;
+      s.p4_next_id = id + 1;
+      s.p4_items = [...s.p4_items, { id, label: `行 ${id}`, animating: 'enter' }];
+      setTimeout(() => {
+        s.p4_items = s.p4_items.map((it) =>
+          it.id === id ? { ...it, animating: null } : it,
+        );
+      }, 200);
+    };
+
+    // ── 行削除 (パターン 4): 退場フラグを立てる → 200ms 後に物理削除 ──
+    // 「collapse_box の visible:false に倒すと無音で消える」問題への対応。
+    // 退場アニメは CSS keyframe (list-row--exiting) で実装する。
+    const remove_row_p4 = (id) => {
+      // exiting:true を立てて CSS keyframe を発火
+      s.p4_items = s.p4_items.map((it) =>
+        it.id === id ? { ...it, exiting: true } : it,
+      );
+      // アニメ完了後に物理削除
+      setTimeout(() => {
+        s.p4_items = s.p4_items.filter((it) => it.id !== id);
+      }, 200);
+    };
+
+    // ── パターン 3 / 4 共通: 行を item の状態に応じて wrap する helper ──
+    const wrap_anim_row = (box_fn, item, row) => {
+      // 1) 退場中 → CSS keyframe で消す。collapse_box は介在しない。
+      if (item.exiting) {
+        return { ...row, class: (row.class || '') + ' list-row--exiting' };
+      }
+      // 2) 入場アニメ中 → collapse_box で wrap (key は安定 id)。
+      if (item.animating === 'enter') {
+        return box_fn({ key: String(item.id), visible: true, ctx: [row] });
+      }
+      // 3) 静止状態 → そのまま (= 最初から並んでいた行と同じ扱い)
+      return row;
+    };
+
+    return s.page({
+      style: { padding: '20px', maxWidth: '880px', margin: '0 auto' },
+      ctx: [
+
+        // ─────────────────────────────────────────────────
+        // ヘッダー
+        // ─────────────────────────────────────────────────
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['create_ui_collapse_box の使い分け'] }),
+          ui_text({ variant: 'muted', ctx: [
+            '4 つの典型パターンと 5 つの落とし穴を解説します。',
+            '特に覚えておきたい挙動は 2 つ:「閉じている最中は wrapper の <div> が DOM に残る」と',
+            '「閉じアニメは自分が開けた行にしか効かない」。',
+          ]}),
+        ]}),
+
+        // ═════════════════════════════════════════════════
+        // Pattern 1: Hello — singleton, visible:bool
+        // ═════════════════════════════════════════════════
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: [
+            { tag: 'span', class: 'sec-num', ctx: ['1.'] },
+            ' まずは 1 個だけ使う',
+          ]}),
+          ui_text({ variant: 'muted', ctx: [
+            'state の bool で visible を切り替えるだけ。ページに 1 箇所しか置かないなら key は省略 OK。',
+          ]}),
+          { tag: 'div', class: 'demo-card', ctx: [
+            ui_button({ variant: 'primary',
+              ctx: [s.p1_expanded ? '閉じる' : '開く'],
+              onclick: () => { s.p1_expanded = !s.p1_expanded; },
+            }),
+            s.p1_box({
+              visible: s.p1_expanded,
+              ctx: [{ tag: 'div', style: { padding: '12px 0', lineHeight: '1.7' },
+                ctx: [
+                  '中身が表示されました。',
+                  { tag: 'br' },
+                  'もう一度ボタンを押すと閉じます (180ms transition)。',
+                ],
+              }],
+            }),
+          ]},
+          ui_code_pre({ lang: 'javascript', ctx: [
+`s.box = create_ui_collapse_box({ duration: 180 });
+
+s.box({
+  visible: s.expanded,
+  ctx: [{ tag: 'div', ctx: ['中身'] }],
+})`,
+          ]}),
+        ]}),
+
+        // ═════════════════════════════════════════════════
+        // パターン 2: state が null のとき ctx を空配列にする
+        // ═════════════════════════════════════════════════
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: [
+            { tag: 'span', class: 'sec-num', ctx: ['2.'] },
+            ' 中身を空にして「閉じた状態」を表現する',
+          ]}),
+          ui_text({ variant: 'muted', ctx: [
+            'state が null のとき ctx を空配列にする書き方。',
+            '閉じきった瞬間に wrapper の <div> が DOM から消えるタイミングを待たなくても、',
+            '「中身が空か」だけで判定できるのでテストが楽になります。',
+          ]}),
+          { tag: 'div', class: 'demo-card', ctx: [
+            { tag: 'div', style: { display: 'flex', gap: '6px', flexWrap: 'wrap' }, ctx: [
+              ui_button({ ctx: ['file A 選択'], onclick: () => { s.p2_selected = { name: 'A.txt', size: 1234 }; }}),
+              ui_button({ ctx: ['file B 選択'], onclick: () => { s.p2_selected = { name: 'B.png', size: 5678 }; }}),
+              ui_button({ variant: 'ghost', ctx: ['クリア'], onclick: () => { s.p2_selected = null; }}),
+            ]},
+            s.p2_box({
+              visible: !!s.p2_selected,
+              ctx: [{
+                tag: 'div', class: 'preview-panel',
+                // 推奨: null のとき ctx を空配列にする
+                ctx: s.p2_selected ? [
+                  ui_text({ variant: 'muted', ctx: ['プレビュー'] }),
+                  { tag: 'div', style: { fontFamily: 'monospace', fontWeight: 700 },
+                    ctx: [s.p2_selected.name] },
+                  { tag: 'div', style: { fontSize: '12px', opacity: 0.7 },
+                    ctx: [s.p2_selected.size + ' bytes'] },
+                ] : [],
+              }],
+            }),
+          ]},
+          ui_code_pre({ lang: 'javascript', ctx: [
+`s.box({
+  visible: !!s.selected,
+  ctx: [{
+    tag: 'div', class: 'preview-panel',
+    // 推奨: null 時は中身を空配列に
+    ctx: s.selected ? [/* 中身 */] : [],
+  }],
+})`,
+          ]}),
+        ]}),
+
+        // ═════════════════════════════════════════════════
+        // Pattern 3: Sparse animation w/ key
+        // ═════════════════════════════════════════════════
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: [
+            { tag: 'span', class: 'sec-num', ctx: ['3.'] },
+            ' リストの一部の行だけアニメする',
+          ]}),
+          ui_text({ variant: 'muted', ctx: [
+            'ファイル一覧の add/remove のように、行ごとに個別アニメさせたい場合。',
+            'item に animating: \'enter\' フラグを持たせて、立っている行だけ collapse_box で wrap し、',
+            'それ以外は素の row として描画します。',
+            'ここでは「行を追加した時の登場アニメ」だけを扱います (削除時の退場アニメは 4 で扱います)。',
+          ]}),
+
+          // ──────────────────────────────────────────
+          // 配列更新の 2 スタイル比較 (このサンプルは A スタイル)
+          // ──────────────────────────────────────────
+          ui_text({ variant: 'subtitle', style: { fontSize: '1rem', marginTop: '16px' },
+            ctx: ['コードを読む前に: 配列更新の 2 スタイル'] }),
+          ui_text({ variant: 'muted', ctx: [
+            'RicDOM の Proxy は ', { tag: 'code', ctx: ['s.items.push(x)'] }, ' を検知できません',
+            '(配列は Proxy ラップしない設計)。',
+            'なので配列を更新するには次の 2 つのどちらかを選びます:',
+          ]}),
+          { tag: 'table', class: 'compare-table', ctx: [
+            { tag: 'thead', ctx: [
+              { tag: 'tr', ctx: [
+                { tag: 'th', ctx: [''] },
+                { tag: 'th', ctx: ['A: s に配列を置いて再代入'] },
+                { tag: 'th', ctx: ['B: 配列は s の外、s には描画カウンタ'] },
+              ]},
+            ]},
+            { tag: 'tbody', ctx: [
+              { tag: 'tr', ctx: [
+                { tag: 'td', ctx: ['書き方'] },
+                { tag: 'td', ctx: [{ tag: 'code', ctx: ['s.items = [...s.items, x]'] }] },
+                { tag: 'td', ctx: [{ tag: 'code', ctx: ['items.push(x); s.v++;'] }] },
+              ]},
+              { tag: 'tr', ctx: [
+                { tag: 'td', ctx: ['配列の場所'] },
+                { tag: 'td', ctx: ['state の中 (', { tag: 'code', ctx: ['s.items'] }, ')'] },
+                { tag: 'td', ctx: ['state の外 (普通の変数 / closure)'] },
+              ]},
+              { tag: 'tr', ctx: [
+                { tag: 'td', ctx: ['mutation コスト'] },
+                { tag: 'td', class: 'con', ctx: ['O(N) コピー (要素数に比例)'] },
+                { tag: 'td', class: 'pro', ctx: ['O(1) push のみ'] },
+              ]},
+              { tag: 'tr', ctx: [
+                { tag: 'td', ctx: ['sort / splice / arr[i]=x'] },
+                { tag: 'td', class: 'con', ctx: ['毎回 ', { tag: 'code', ctx: ['[...arr]'] }, ' で作り直し'] },
+                { tag: 'td', class: 'pro', ctx: ['普通に書ける'] },
+              ]},
+              { tag: 'tr', ctx: [
+                { tag: 'td', ctx: ['state 一望性'] },
+                { tag: 'td', class: 'pro', ctx: ['✅ s に全部ある (debug しやすい)'] },
+                { tag: 'td', class: 'con', ctx: ['❌ データが s の外に散る'] },
+              ]},
+              { tag: 'tr', ctx: [
+                { tag: 'td', ctx: ['kick 忘れ事故'] },
+                { tag: 'td', class: 'pro', ctx: ['起きない (代入が即トリガ)'] },
+                { tag: 'td', class: 'con', ctx: ['起きる (counter を上げ忘れて UI ずれ)'] },
+              ]},
+              { tag: 'tr', ctx: [
+                { tag: 'td', ctx: ['Time-travel debug'] },
+                { tag: 'td', class: 'pro', ctx: ['自然 (snapshot が immutable)'] },
+                { tag: 'td', class: 'con', ctx: ['配列の前後 snapshot は手動で取る必要'] },
+              ]},
+            ]},
+          ]},
+          { tag: 'div', class: 'style-pick', ctx: [
+            '💡 ', { tag: 'strong', ctx: ['本サンプルは A スタイル'] }, 'です。',
+            '要素数が数百以下で頻繁更新でないなら A、',
+            '数千以上を頻繁に追加削除するなら B を検討してください。',
+            'state がそのまま「真実の source」になる A の方が読み手に優しいので、',
+            '迷ったら A から始めるのがおすすめです。',
+          ]},
+
+          { tag: 'div', class: 'demo-card', ctx: [
+            ui_button({ variant: 'primary', ctx: ['+ 行を追加 (アニメ ON)'], onclick: add_row_p3 }),
+            { tag: 'div', style: { marginTop: '8px', border: '1px solid var(--ric-color-border)', borderRadius: '4px', overflow: 'hidden' },
+              ctx: s.p3_items.map((item) => {
+                const row = { tag: 'div', class: 'list-row', ctx: [
+                  { tag: 'span', class: 'list-row__icon', ctx: ['📄'] },
+                  { tag: 'span', ctx: [item.label] },
+                ]};
+                return wrap_anim_row(s.p3_box, item, row);
+              }),
+            },
+            s.p3_items.length === 0
+              ? ui_text({ variant: 'muted', style: { textAlign: 'center', padding: '16px' },
+                          ctx: ['↑ ボタンで行を追加してください'] })
+              : null,
+          ]},
+          ui_code_pre({ lang: 'javascript', ctx: [
+`// item の形: { id, label, animating?: 'enter' }
+// animating フラグを item の中に直接持たせる方式 (本サンプル)。
+// 外部 source (file 監視等) から items が流れてくる場合は、
+// 「動的に流れてくる data」と「UI 一時フラグ」を分けるために
+// 別辞書 (s.animating = { [id]: 'enter' }) にすることもある。
+
+// 行追加: animating:'enter' を付けて add、200ms 後にフラグだけ消す
+// Proxy は push() では発火しないので、配列ごと再代入する。
+s.items = [...s.items, { id, label, animating: 'enter' }];
+setTimeout(() => {
+  // 該当 item だけ新オブジェクトに差し替えて配列を再代入 (= 再描画トリガ)
+  s.items = s.items.map((it) =>
+    it.id === id ? { ...it, animating: null } : it,
+  );
+}, 200);
+
+// 描画時の wrap: フラグが立っている行だけ collapse_box で包む
+items.map((item) => {
+  const row = { tag: 'div', class: 'list-row', ctx: [item.label] };
+  return item.animating === 'enter'
+    ? s.box({ key: String(item.id), visible: true, ctx: [row] })
+    : row;
+})`,
+          ]}),
+        ]}),
+
+        // ═════════════════════════════════════════════════
+        // Pattern 4: Sparse + CSS keyframe for exit
+        // ═════════════════════════════════════════════════
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: [
+            { tag: 'span', class: 'sec-num', ctx: ['4.'] },
+            ' 削除アニメは CSS animation で別途実装する',
+          ]}),
+          ui_text({ variant: 'muted', ctx: [
+            'collapse_box は「自分が visible:true で開いた行」しか閉じアニメできません。',
+            '前から並んでいた行 (例: ページ表示直後からあった行) を後から visible:false にしても、',
+            '内部に状態が無いので無音で消えてしまいます。',
+            'なので削除時のアニメは CSS animation で別に書く、と役割を分けます。',
+          ]}),
+          { tag: 'div', class: 'demo-card', ctx: [
+            ui_button({ variant: 'primary', ctx: ['+ 行を追加 (アニメ ON)'], onclick: add_row_p4 }),
+            { tag: 'div', style: { marginTop: '8px', border: '1px solid var(--ric-color-border)', borderRadius: '4px', overflow: 'hidden' },
+              ctx: s.p4_items.map((item) => {
+                const row = { tag: 'div', class: 'list-row', ctx: [
+                  { tag: 'span', class: 'list-row__icon', ctx: ['📄'] },
+                  { tag: 'span', ctx: [item.label] },
+                  { tag: 'span', class: 'list-row__del', onclick: () => remove_row_p4(item.id), ctx: ['✕ 削除'] },
+                ]};
+                return wrap_anim_row(s.p4_box, item, row);
+              }),
+            },
+          ]},
+          ui_code_pre({ lang: 'javascript', ctx: [
+`// item の形: { id, label, animating?: 'enter', exiting?: true }
+
+// 削除: 該当 item に exiting:true を立てて CSS keyframe を発火、200ms 後に物理削除
+// Proxy は push() では発火しないので、配列ごと再代入する。
+const remove_row = (id) => {
+  s.items = s.items.map((it) =>
+    it.id === id ? { ...it, exiting: true } : it,
+  );
+  setTimeout(() => {
+    s.items = s.items.filter((it) => it.id !== id);   // 退場アニメ完了で物理削除
+  }, 200);
+};
+
+// 描画 wrap: 退場中は CSS class、登場中は collapse_box、それ以外は素の row
+if (item.exiting) return { ...row, class: row.class + ' list-row--exiting' };
+if (item.animating === 'enter') return s.box({ key: id, visible: true, ctx: [row] });
+return row;`,
+          ]}),
+          ui_code_pre({ lang: 'css', ctx: [
+`.list-row--exiting {
+  animation: list-row-exit 200ms ease-in forwards;
+  pointer-events: none; overflow: hidden;
+}
+@keyframes list-row-exit {
+  from { opacity: 1; max-height: 40px; }
+  to   { opacity: 0; max-height: 0; padding: 0; }
+}`,
+          ]}),
+        ]}),
+
+        // ═════════════════════════════════════════════════
+        // Pattern 5: Pitfalls (markdown)
+        // ═════════════════════════════════════════════════
+        ui_panel({ ctx: [
+          ui_md_pre({ ctx: [MD_PITFALLS] }),
+        ]}),
+
+        // ═════════════════════════════════════════════════
+        // Pattern 6: e2e snippets (markdown)
+        // ═════════════════════════════════════════════════
+        ui_panel({ ctx: [
+          ui_md_pre({ ctx: [MD_E2E] }),
+        ]}),
+
+      ],
+    });
+  },
+});
+</script>
+</body>
+</html>

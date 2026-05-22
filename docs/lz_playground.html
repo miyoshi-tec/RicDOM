@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LZ String Playground — RicDOM</title>
+<script src="RicDOM.min.js"></script>
+<script src="RicUI.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+  #app { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+  .stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-family: 'SF Mono', Consolas, monospace; font-size: 13px; }
+  .stat-row.total { border-top: 1px solid var(--ric-color-border); padding-top: 8px; margin-top: 4px; font-weight: 700; }
+  .stat-label { opacity: 0.75; }
+  .stat-value { font-variant-numeric: tabular-nums; }
+  .ratio-good { color: #16a34a; }
+  .ratio-bad  { color: #dc2626; }
+  /* 横向き棒グラフ (= 元のサイズと圧縮後を視覚比較) */
+  .bar-chart { margin-top: 12px; }
+  .bar-row { display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; font-size: 12px; }
+  .bar-row-label { opacity: 0.8; font-family: 'SF Mono', Consolas, monospace; }
+  .bar-track { position: relative; height: 18px; background: var(--ric-color-bg-hover, rgba(0,0,0,0.05)); border-radius: 3px; overflow: hidden; }
+  .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width 200ms ease; }
+  .bar-fill.orig { background: #94a3b8; }
+  .bar-fill.lz   { background: #16a34a; }
+  .bar-fill.over { background: #dc2626; }
+  .bar-caption { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; font-family: 'SF Mono', Consolas, monospace; font-variant-numeric: tabular-nums; color: var(--ric-color-fg); pointer-events: none; }
+  textarea.lz-input {
+    width: 100%; min-height: 200px; max-height: 320px; resize: vertical;
+    font-family: 'SF Mono', Consolas, monospace; font-size: 12px; line-height: 1.5;
+    padding: 8px; border: 1px solid var(--ric-color-border); border-radius: 6px;
+    background: var(--ric-color-bg-elevated); color: var(--ric-color-fg);
+  }
+  .toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .empty-hint { padding: 32px 16px; text-align: center; color: var(--ric-color-fg-muted); font-size: 13px; }
+  .nav-back { font-size: 12px; opacity: 0.7; text-decoration: none; color: inherit; }
+  .nav-back:hover { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+'use strict';
+
+// localStorage からテーマ設定を復元 (samples と共通)
+try {
+  const _s = JSON.parse(localStorage.getItem('ric-settings') || 'null');
+  if (_s) window._ric_settings = _s;
+} catch {}
+
+// ════════════════════════════════════════════════════════════════
+// LZSS ブラウザ移植版
+// ════════════════════════════════════════════════════════════════
+// scripts/lz.js を 1:1 でブラウザに移植したもの。Node の `Buffer` を `atob`/`btoa`
+// 経由に置き換えただけで、アルゴリズム自体は完全に同一。生成される自己展開 wrapper
+// は CLI (`ricdom-lz`) の出力と byte-perfect で一致する (= round-trip 互換)。
+//
+// なぜここに inline するか:
+//   - playground は単一 HTML で完結させたい (samples と同じ哲学)
+//   - scripts/lz.js は Node 専用 (require / Buffer) なのでそのままは載らない
+//   - 移植コストは ~120 行と小さい
+// ════════════════════════════════════════════════════════════════
+
+const LZ = (() => {
+
+  const WINDOW            = 4096;
+  const MIN_MATCH         = 6;
+  const MAX_MATCH         = 255;
+  const MAX_CHAIN_PROBES  = 64;
+
+  // marker char を選ぶ (= ソース内で一度も登場しない printable ASCII)。
+  // 全 printable が使われていれば、頻度最少の printable を未使用 binary byte に
+  // 置換してから marker に流用する。
+  const find_marker = (src) => {
+    const used = new Uint8Array(128);
+    for (let i = 0; i < src.length; i++) {
+      const c = src.charCodeAt(i);
+      if (c < 128) used[c] = 1;
+    }
+    for (let c = 0x21; c <= 0x7E; c++) {
+      if (!used[c]) return { marker_code: c, substitution: null };
+    }
+    const freq = new Array(128).fill(0);
+    for (let i = 0; i < src.length; i++) {
+      const c = src.charCodeAt(i);
+      if (c >= 0x21 && c <= 0x7E) freq[c]++;
+    }
+    let escape_code = -1;
+    for (let c = 0x01; c <= 0x1F; c++) {
+      if (c === 0x09 || c === 0x0A || c === 0x0B || c === 0x0C || c === 0x0D) continue;
+      if (!used[c]) { escape_code = c; break; }
+    }
+    if (escape_code < 0) throw new Error('No available escape byte');
+    let min_c = 0x21, min_freq = freq[0x21];
+    for (let c = 0x22; c <= 0x7E; c++) {
+      if (freq[c] < min_freq) { min_c = c; min_freq = freq[c]; }
+    }
+    return { marker_code: min_c, substitution: { from_code: min_c, to_code: escape_code } };
+  };
+
+  // 参照 (offset, length) を base64 4 char に変換 (Node の Buffer を btoa に置換)。
+  const encode_ref = (offset, length) => btoa(String.fromCharCode(
+    (offset >>> 8) & 0xFF,
+    offset & 0xFF,
+    length & 0xFF,
+  ));
+
+  // LZSS 本体 (scripts/lz.js と同一)。
+  const compress = (src, marker_code) => {
+    const N = src.length;
+    const MARKER = String.fromCharCode(marker_code);
+    let out = '';
+    if (N === 0) return out;
+
+    const HSIZE = 1 << 12;
+    const HMASK = HSIZE - 1;
+    const head  = new Int32Array(HSIZE).fill(-1);
+    const chain = new Int32Array(N).fill(-1);
+    const hash3 = (a, b, c) => ((a * 31 + b) * 31 + c) & HMASK;
+
+    let i = 0;
+    while (i < N) {
+      let best_len = 0;
+      let best_off = 0;
+      if (i + 2 < N) {
+        const h = hash3(src.charCodeAt(i), src.charCodeAt(i + 1), src.charCodeAt(i + 2));
+        let j = head[h];
+        let probes = 0;
+        while (j >= 0 && j > i - WINDOW && probes < MAX_CHAIN_PROBES) {
+          probes++;
+          let len = 0;
+          const max = Math.min(MAX_MATCH, N - i, i - j);
+          while (len < max && src.charCodeAt(j + len) === src.charCodeAt(i + len)) len++;
+          if (len > best_len) { best_len = len; best_off = i - j; }
+          if (best_len >= MAX_MATCH) break;
+          j = chain[j];
+        }
+      }
+      if (best_len >= MIN_MATCH) {
+        out += MARKER + encode_ref(best_off, best_len);
+        for (let k = 0; k < best_len; k++) {
+          if (i + k + 2 < N) {
+            const h2 = hash3(src.charCodeAt(i + k), src.charCodeAt(i + k + 1), src.charCodeAt(i + k + 2));
+            chain[i + k] = head[h2];
+            head[h2] = i + k;
+          }
+        }
+        i += best_len;
+      } else {
+        out += src[i];
+        if (i + 2 < N) {
+          const h2 = hash3(src.charCodeAt(i), src.charCodeAt(i + 1), src.charCodeAt(i + 2));
+          chain[i] = head[h2];
+          head[h2] = i;
+        }
+        i++;
+      }
+    }
+    return out;
+  };
+
+  // template literal 内に圧縮済み文字列を埋め込む際の escape。CR は ECMAScript の
+  // source 正規化で LF に化けるので絶対に escape する。
+  const escape_for_template = (s) => {
+    let out = '';
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      if      (c === 0x5C) out += '\\\\';
+      else if (c === 0x60) out += '\\`';
+      else if (c === 0x0D) out += '\\r';
+      else if (c === 0x24 && s.charCodeAt(i + 1) === 0x7B) out += '\\$';
+      else out += s[i];
+    }
+    return out;
+  };
+
+  const escape_regex_char = (c) => /[.*+?^${}()|[\]\\\/]/.test(c) ? '\\' + c : c;
+
+  // 自己展開 wrapper の組み立て。v0.3.19 で IIFE 化済 (複数 .lz file 同時 load 対応)。
+  const build_wrapper = (compressed, marker_code, substitution) => {
+    const escaped = escape_for_template(compressed);
+    const M = escape_regex_char(String.fromCharCode(marker_code));
+    let body;
+    if (substitution) {
+      const escape_lit = '"\\x' + substitution.to_code.toString(16).padStart(2, '0') + '"';
+      const rare_lit = JSON.stringify(String.fromCharCode(substitution.from_code));
+      body = 'let C=`' + escaped + '`,s="",r,G=n=>r.charCodeAt(n);' +
+        'C.replace(/' + M + '(....)|./gs,(m,R)=>{' +
+        'if(R){r=atob(R);for(let l=G(2),b=s.length-G(0)*256-G(1);l--;)s+=s[b++]}' +
+        'else if(m==' + escape_lit + ')s+=' + rare_lit + ';' +
+        'else s+=m});eval(s)';
+    } else {
+      body = 'let C=`' + escaped + '`,s="",r,G=n=>r.charCodeAt(n);' +
+        'C.replace(/' + M + '(....)|./gs,(m,R)=>{' +
+        'if(R){r=atob(R);for(let l=G(2),b=s.length-G(0)*256-G(1);l--;)s+=s[b++]}' +
+        'else s+=m});eval(s)';
+    }
+    return '(()=>{' + body + '})()';
+  };
+
+  // 公開 API。source string → { wrapper, compressed_length }。
+  const lz_compress = (source) => {
+    const { marker_code, substitution } = find_marker(source);
+    let src = source;
+    if (substitution) {
+      src = src.split(String.fromCharCode(substitution.from_code))
+               .join(String.fromCharCode(substitution.to_code));
+    }
+    const compressed = compress(src, marker_code);
+    const wrapper = build_wrapper(compressed, marker_code, substitution);
+    return {
+      wrapper,
+      compressed_length: compressed.length,
+      marker_code,
+      had_substitution: !!substitution,
+    };
+  };
+
+  return { lz_compress };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// UI
+// ════════════════════════════════════════════════════════════════
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_toast,
+  ui_panel, ui_text, ui_button,
+} = RicUI;
+
+// バイト数のフォーマット (`1,234 B` / `12.3 KB`)
+const fmt_bytes = (n) => {
+  if (n === null || n === undefined) return '—';
+  if (n < 1024) return n.toLocaleString() + ' B';
+  return (n / 1024).toFixed(1) + ' KB (' + n.toLocaleString() + ' B)';
+};
+const fmt_ratio = (small, big) => {
+  if (!big) return '';
+  const pct = (1 - small / big) * 100;
+  return (pct >= 0 ? '−' : '+') + Math.abs(pct).toFixed(1) + '%';
+};
+
+// 圧縮率の要約文
+const make_recommendation = (orig, lz_total) => {
+  const lz_pct = (1 - lz_total / orig) * 100;
+  if (lz_pct >= 0) {
+    return `LZ で ${lz_pct.toFixed(1)}% 削減できました (自己展開 wrapper 込み)。`;
+  }
+  return `入力が小さすぎる / 繰り返しが少ないため、wrapper 込みでは ${(-lz_pct).toFixed(1)}% 増えました。`;
+};
+
+create_RicDOM('#app', {
+  // 入力 (元のソース文字列)
+  input: '',
+  // 圧縮結果 ({ wrapper, compressed_length, ... }) or null
+  result: null,
+  // 「計算中…」フラグ。大きい入力で button を disable する。
+  computing: false,
+  // 直近のプリセット名 (download filename suggestion)
+  preset_name: '',
+
+  page:  create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  toast: create_ui_toast(),
+
+  render(s) {
+    s.toast();  // portal 登録
+
+    // ── 圧縮実行 ──
+    // input を読んで result を更新する。重い処理 (大きいソース) を
+    // 入れたときに UI が固まらないよう、setTimeout で 1 tick yield してから計算する。
+    const compute = async () => {
+      if (!s.input) { s.result = null; return; }
+      s.computing = true;
+      // 1 tick yield (= computing 表示を render に出してから本計算に入る)
+      await new Promise((r) => setTimeout(r, 0));
+      try {
+        s.result = LZ.lz_compress(s.input);
+      } catch (err) {
+        s.toast.show('圧縮エラー: ' + err.message, { type: 'error' });
+        s.result = null;
+      } finally {
+        s.computing = false;
+      }
+    };
+
+    // ── プリセット読み込み (RicDOM.min.js / RicUI.min.js) ──
+    const load_preset = async (filename) => {
+      try {
+        const r = await fetch(filename);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const text = await r.text();
+        s.input = text;
+        s.preset_name = filename;
+        await compute();
+        s.toast.show(`${filename} を読み込みました`, { type: 'success' });
+      } catch (err) {
+        s.toast.show(`${filename} の読み込み失敗: ` + err.message, { type: 'error' });
+      }
+    };
+
+    // ── ファイル picker ──
+    const open_file = () => {
+      const input_el = document.createElement('input');
+      input_el.type = 'file';
+      input_el.accept = '.js,.css,.txt,text/*,application/javascript';
+      input_el.onchange = async (ev) => {
+        const f = ev.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          s.input  = reader.result;
+          s.preset_name = f.name;
+          await compute();
+          s.toast.show(`${f.name} を読み込みました`, { type: 'success' });
+        };
+        reader.readAsText(f);
+      };
+      input_el.click();
+    };
+
+    // ── ダウンロード / コピー ──
+    const download_wrapper = () => {
+      if (!s.result) return;
+      const blob = new Blob([s.result.wrapper], { type: 'application/javascript' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (s.preset_name || 'output').replace(/\.min\.js$/, '').replace(/\.js$/, '') + '.lz.min.js';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      s.toast.show(`${a.download} を保存しました`, { type: 'success' });
+    };
+    const copy_wrapper = async () => {
+      if (!s.result) return;
+      try {
+        await navigator.clipboard.writeText(s.result.wrapper);
+        s.toast.show('wrapper をクリップボードにコピーしました', { type: 'success' });
+      } catch (err) {
+        s.toast.show('コピー失敗: ' + err.message, { type: 'error' });
+      }
+    };
+    const clear_all = () => {
+      s.input = '';
+      s.result = null;
+      s.preset_name = '';
+    };
+
+    // ── サイズ統計の組み立て ──
+    const orig_size = s.input.length;
+    const payload_size = s.result ? s.result.compressed_length : 0;
+    const wrapper_size = s.result ? s.result.wrapper.length : 0;
+    const overhead = wrapper_size - payload_size;
+
+    return s.page({
+      ctx: [
+        // ── ヘッダー ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['LZ String Playground'] }),
+          ui_text({ variant: 'muted', ctx: [
+            '「印字可能文字列」を「印字可能文字列」のまま LZSS で圧縮するツールです。',
+            'バイナリ化されないので、HTML / JS / CSS / JSON 等のテキストにそのまま埋め込めます。',
+          ]}),
+          ui_text({ variant: 'muted', ctx: [
+            'JavaScript ソースに使えば、自己展開 wrapper 付きの .lz.min.js を生成できます (このサイトの RicDOM.lz.min.js / RicUI.lz.min.js もこのツールで作っています)。',
+          ]}),
+          { tag: 'div', style: { marginTop: '8px' }, ctx: [
+            { tag: 'a', href: 'index.html', class: 'nav-back', ctx: ['← RicDOM トップに戻る'] },
+          ]},
+        ]}),
+
+        // ── 入力 ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: ['1. 文字列を入れる'] }),
+          { tag: 'div', class: 'toolbar', ctx: [
+            ui_button({ ctx: ['📂 ファイルを開く'], onclick: open_file }),
+            ui_button({ variant: 'ghost', ctx: ['📋 RicDOM.min.js'],
+                        onclick: () => load_preset('RicDOM.min.js') }),
+            ui_button({ variant: 'ghost', ctx: ['📋 RicUI.min.js'],
+                        onclick: () => load_preset('RicUI.min.js') }),
+            { tag: 'span', style: { flex: 1 } },
+            ui_button({ variant: 'ghost', ctx: ['Clear'], onclick: clear_all }),
+          ]},
+          { tag: 'textarea', class: 'lz-input',
+            placeholder: 'ここに圧縮したい文字列を貼り付けてください (またはファイルを開く / プリセットを選択)',
+            value: s.input,
+            oninput: (ev) => {
+              s.input = ev.target.value;
+              s.preset_name = '';
+              compute();
+            },
+          },
+        ]}),
+
+        // ── 結果 ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: ['2. 圧縮結果'] }),
+          s.computing
+            ? { tag: 'div', class: 'empty-hint', ctx: ['計算中…'] }
+            : !s.result
+              ? { tag: 'div', class: 'empty-hint', ctx: ['↑ に文字列を入れると圧縮結果が表示されます'] }
+              : { tag: 'div', ctx: [
+                  // 横向き棒グラフ (元のサイズと圧縮後を視覚比較)
+                  // 「元のサイズ」を 100% としてそれぞれの相対長を出す。
+                  // wrapper > orig になる corner case (極小入力) では bar が 100% を超えるので clamp。
+                  (() => {
+                    const ratio_orig    = 1;
+                    const ratio_payload = orig_size ? payload_size / orig_size : 0;
+                    const ratio_wrapper = orig_size ? wrapper_size / orig_size : 0;
+                    const pct = (r) => (Math.min(r, 1.2) * 100).toFixed(1) + '%';
+                    return { tag: 'div', class: 'bar-chart', ctx: [
+                      { tag: 'div', class: 'bar-row', ctx: [
+                        { tag: 'span', class: 'bar-row-label', ctx: ['元'] },
+                        { tag: 'div', class: 'bar-track', ctx: [
+                          { tag: 'div', class: 'bar-fill orig', style: { width: pct(ratio_orig) } },
+                          { tag: 'div', class: 'bar-caption', ctx: [fmt_bytes(orig_size)] },
+                        ]},
+                      ]},
+                      { tag: 'div', class: 'bar-row', ctx: [
+                        { tag: 'span', class: 'bar-row-label', ctx: ['LZ payload'] },
+                        { tag: 'div', class: 'bar-track', ctx: [
+                          { tag: 'div', class: 'bar-fill lz', style: { width: pct(ratio_payload) } },
+                          { tag: 'div', class: 'bar-caption', ctx: [fmt_bytes(payload_size), ' (', fmt_ratio(payload_size, orig_size), ')'] },
+                        ]},
+                      ]},
+                      { tag: 'div', class: 'bar-row', ctx: [
+                        { tag: 'span', class: 'bar-row-label', ctx: ['+wrapper'] },
+                        { tag: 'div', class: 'bar-track', ctx: [
+                          { tag: 'div', class: ('bar-fill ' + (wrapper_size < orig_size ? 'lz' : 'over')),
+                            style: { width: pct(ratio_wrapper) } },
+                          { tag: 'div', class: 'bar-caption', ctx: [fmt_bytes(wrapper_size), ' (', fmt_ratio(wrapper_size, orig_size), ')'] },
+                        ]},
+                      ]},
+                    ]};
+                  })(),
+                  // 圧縮率の要約
+                  { tag: 'div', style: {
+                      marginTop: '12px', padding: '10px 12px',
+                      background: 'var(--ric-color-bg-hover, rgba(0,0,0,0.04))',
+                      borderLeft: '3px solid var(--ric-color-accent)',
+                      borderRadius: '4px', fontSize: '13px', lineHeight: '1.6',
+                    },
+                    ctx: ['💡 ', make_recommendation(orig_size, wrapper_size)],
+                  },
+                  s.result.had_substitution
+                    ? ui_text({ variant: 'muted', style: { marginTop: '8px', fontSize: '12px' }, ctx: [
+                        '⚠️ 入力に全 printable ASCII が含まれていたため、',
+                        'escape byte 置換版の wrapper を生成しました (+5 byte 程度の overhead)。',
+                      ]})
+                    : null,
+                ]},
+        ]}),
+
+        // ── アクション ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: ['3. 出力'] }),
+          { tag: 'div', class: 'toolbar', ctx: [
+            ui_button({ variant: 'primary', ctx: ['💾 自己展開 .js をダウンロード'],
+                        disabled: !s.result || s.computing,
+                        onclick: download_wrapper }),
+            ui_button({ ctx: ['📋 wrapper をコピー'],
+                        disabled: !s.result || s.computing,
+                        onclick: copy_wrapper }),
+          ]},
+          ui_text({ variant: 'muted', style: { marginTop: '8px', fontSize: '12px' }, ctx: [
+            '出力された .js は ',
+            { tag: 'code', ctx: ['<script src="…lz.min.js"><\/script>'] },
+            ' で読み込むだけで通常版と同じ動作をします。',
+            'CLI で同等のことをする場合: ',
+            { tag: 'code', ctx: ['npx ricdom-lz input.js -o output.lz.min.js'] },
+            '。',
+          ]}),
+        ]}),
+
+      ],
+    });
+  },
+});
+</script>
+
+</body>
+</html>
