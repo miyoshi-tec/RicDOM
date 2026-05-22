@@ -546,7 +546,63 @@ create_RicDOM('#app', {
 
 ---
 
-## 9. 次のステップ
+## 9. recipe — render 後に DOM を触りたいとき
+
+state 変更後に新しく描画された DOM 要素を取りたい (= focus、scroll、寸法計測など)
+場合は、**2 段の `requestAnimationFrame` を待つ** のが canon です。
+
+```javascript
+handle.show_editor = true;
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  const editor = document.querySelector('.my-editor');
+  editor.querySelector('input').focus();
+  editor.scrollTop = editor.scrollHeight;
+}));
+```
+
+仕組み (詳細は [SPEC.md「Operational facts」](SPEC.md) 参照):
+
+1. `handle.show_editor = true` → scheduler が rAF を予約
+2. **1 つ目の rAF**: do_render が VDOM 構築 + DOM patch を実行
+3. **2 つ目の rAF**: browser の layout/paint commit が確実に完了
+
+1 rAF だけだと「flush 前」に空振りすることがあります。
+**focus / scroll / `getBoundingClientRect` 等は必ず 2 rAF 後** に。
+
+### 画像 decode を待ちたいときは別途
+
+`<img>` の async decode 完了は **2 rAF wait だけでは保証されません**
+(= rAF は layout commit までで、image decode は別 task)。decode 完了が必要なら
+`HTMLImageElement.decode()` の Promise を await してください:
+
+```javascript
+handle.preview_url = new_url;
+requestAnimationFrame(() => requestAnimationFrame(async () => {
+  const img = document.querySelector('.preview img');
+  await img.decode();                           // decode 完了を待つ
+  img.scrollIntoView({ block: 'center' });      // 確実に layout 済み
+}));
+```
+
+RicDOM の責務は **「state → VDOM → DOM commit」までの同期化** で、それ以降の
+async DOM event (= image decode、video load、fetch 完了) は標準 web API に
+直接乗ってください。
+
+### 「after_render フックが欲しい」と思ったら
+
+`handle.after_render(cb)` のような API は **意図的に提供していません**。理由:
+
+- 「DOM 反映直後」は 2 rAF wait で十分捕捉できる (上記)
+- 「async 完了後」は標準 API (`Promise`、`decode()`、`addEventListener`) が解
+- フック API を提供すると「persistent vs one-shot?」「unregister は?」「render
+  が走らなかったら?」と仕様が膨らみ、polysemic になる
+
+state ↔ render の一方向データフロー (= 「state を変える → RicDOM が DOM に
+反映する」) を保つことで、library が小さく predictable に保たれます。
+
+---
+
+## 10. 次のステップ
 
 おつかれさまでした。ここまでで RicDOM の主要な機能を一通り体験しました。
 

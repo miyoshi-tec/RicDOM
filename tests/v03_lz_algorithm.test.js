@@ -17,11 +17,9 @@ const {
   decompress,
   escape_for_template,
   escape_regex_char,
-  build_wrapper,
   build_lz_bundle,
   lz_compress,
   MIN_MATCH,
-  MAX_MATCH,
 } = require('../scripts/lz');
 
 // ─────────────────────────────────────────────────────────────
@@ -209,6 +207,18 @@ describe('escape_for_template', () => {
   test('$ 単体 ($ の後に { が来ない) はエスケープしない', () => {
     assert.equal(escape_for_template('a$b'), 'a$b');
     assert.equal(escape_for_template('$'), '$');
+  });
+
+  test('CR (0x0D) を \\r にエスケープ (= v0.3.18 構造バグの回帰防止)', () => {
+    // CR を raw のまま template literal に入れると ECMAScript の source
+    // 正規化で LF に変換されて payload が破損する。escape は必須。
+    assert.equal(escape_for_template('a\rb'), 'a\\rb');
+    assert.equal(escape_for_template('\r\r'), '\\r\\r');
+  });
+
+  test('LF (0x0A) はそのまま (template literal で正規化されない)', () => {
+    // LF は escape 不要。raw のまま source に書ける、runtime も LF のまま。
+    assert.equal(escape_for_template('a\nb'), 'a\nb');
   });
 
   test('組み合わせ', () => {

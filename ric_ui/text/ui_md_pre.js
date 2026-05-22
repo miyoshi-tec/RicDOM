@@ -32,6 +32,8 @@
 
 'use strict';
 
+const { warn_hljs_missing } = require('../_factory_helpers');
+
 // ── インライン Markdown → VDOM ノード配列 ──────────────────────────
 // 太字・斜体・インラインコード・リンクを解析して VDOM ノードの配列を返す。
 // ネストは「太字の中に斜体」程度まで対応する。
@@ -94,15 +96,22 @@ const _parse_blocks = (src) => {
       // lang 指定ありのときのみ hljs を呼ぶ。指定なしはプレーンテキスト。
       // highlightAuto はリアルタイム入力で重くなるため使わない。
       let code_node;
-      if (lang && typeof window !== 'undefined' && typeof window.hljs !== 'undefined') {
-        try {
-          const result = window.hljs.highlight(raw, { language: lang });
-          code_node = { tag: 'code', class: 'hljs', innerHTML: result.value };
-        } catch (_) {
-          // 未知の言語名などで失敗したらプレーンテキストにフォールバック
+      if (lang && typeof window !== 'undefined') {
+        if (typeof window.hljs === 'undefined') {
+          // lang 指定があるのに hljs が無い = ユーザは highlight 期待していた、初回 warn
+          warn_hljs_missing();
           code_node = { tag: 'code', ctx: [raw] };
+        } else {
+          try {
+            const result = window.hljs.highlight(raw, { language: lang });
+            code_node = { tag: 'code', class: 'hljs', innerHTML: result.value };
+          } catch (_) {
+            // 未知の言語名などで失敗したらプレーンテキストにフォールバック
+            code_node = { tag: 'code', ctx: [raw] };
+          }
         }
       } else {
+        // lang 指定なし or 非 window 環境 (= SSR): silent fallback
         code_node = { tag: 'code', ctx: [raw] };
       }
       blocks.push({
