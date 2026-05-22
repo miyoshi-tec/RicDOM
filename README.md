@@ -147,6 +147,11 @@ global 副作用は decompress 後の `eval` で発火する。consumer の bund
 `let X` がない限り (= 通常の esbuild minify 出力は IIFE 包まれている)、他の
 `.lz.min.js` と並列に load して問題ない。
 
+**ブラウザで試す** — `docs/lz_playground.html` をブラウザで開くと、貼り付け / ファイル
+読み込みで圧縮率を即座に確認できる。LZ vs gzip の比較と「この経路で LZ にする価値が
+あるか」の推奨も表示するので、インストール不要で適用判断が可能。
+公開ページ: <https://miyoshi-tec.github.io/RicDOM/lz_playground.html>
+
 ### Hello World（RicDOM のみ）
 
 ```html
@@ -613,8 +618,10 @@ ui_tweak_panel({
 | `11_theme_override.html` | テーマ上書き・全コンポーネント比較 |
 | `12_md_viewer.html` | Markdown ビューア（`ui_md_pre`） |
 | `13_controlled_dialog_splitter.html` | controlled mode（外部 state で開閉管理）|
+| `14_collapse_box.html` | collapse_box — 入退場アニメーション 6 パターン |
 | `15_ai_chat.html` | AI チャット UI（自動スクロール + textarea + ストリーミング）|
 | `16_svg_editor.html` | SVG ツリーエディタ（rect / circle / path のドラッグ編集）|
+| `17_multi_ricdom.html` | Multi-instance Memo（create_RicDOM をパネル単位に分離）|
 
 ローカルで確認するには、お好みの静的サーバーで `docs/` を配信してください。例:
 

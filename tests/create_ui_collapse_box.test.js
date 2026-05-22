@@ -23,7 +23,12 @@ const setup_jsdom = () => {
   global.document = dom.window.document;
   global.Node     = dom.window.Node;
   global.HTMLElement = dom.window.HTMLElement;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+  // rAF shim: setImmediate を使う (setTimeout(cb, 0) ではない)。
+  // Node.js (v24 で確認) では setTimeout(0) の連鎖が稀に starve する race があり、
+  // _measure → safe_notify → schedule_render → rAF の連鎖で
+  // rAF callback が flush(10ms) 内に発火しない fail が ~30% 起きる。
+  // setImmediate は I/O ループ末尾で確実に発火するため、deterministic に動く。
+  global.requestAnimationFrame = (cb) => setImmediate(cb);
   return dom;
 };
 
@@ -226,6 +231,51 @@ describe('create_ui_collapse_box: ライフサイクル (jsdom)', () => {
     el = target.querySelector('[data-ric-role="collapse-box"]');
     assert.equal(el, null, 'transitionend 後の再 render で DOM が消えている');
   });
+
+  // ──────────────────────────────────────────────────────────────────
+  // 2 段クロージング (v0.3.23〜)
+  // ──────────────────────────────────────────────────────────────────
+  // CSS transition は `height: auto → 0px` を補間しない。
+  // open 中は inline height 無し (= auto) なので、closing 開始時に scrollHeight を
+  // 焼き付けて Npx を経由する 2 段に分けないと、closing の transition が走らず
+  // transitionend も発火しない (= 旧挙動: 0px のまま wrapper が DOM に残留)。
+  // step 1 (height:Npx 焼き付け) の中間状態は jsdom + setImmediate の連鎖が一気に
+  // drain するため安定して観測できない。下のテストで「最終的に height:0px で
+  // --closing → transitionend で unmount」の full 動作を検証する。
+  test('2 段クロージング: 閉じる過程で height=0 まで遷移し transitionend で unmount される', async () => {
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
+      configurable: true, get() { return 200; },
+    });
+
+    const { create_RicDOM } = require('../src/ricdom');
+    const { create_ui_collapse_box } = require('../ric_ui/composite/create_ui_collapse_box');
+
+    const target = document.querySelector('#app');
+    const handle = create_RicDOM(target, {
+      visible: true,
+      box: create_ui_collapse_box(),
+      render: (s) => s.box({ visible: s.visible, ctx: [{ tag: 'span', ctx: ['x'] }] }),
+    });
+
+    await flush();
+    handle.visible = false;
+    // 2 段クロージングの rAF 連鎖 (close render → _th=0 + safe_notify → re-render) は
+    // setImmediate ベースなので 10ms の flush 内で全部 drain する。
+    await flush();
+
+    const el = target.querySelector('[data-ric-role="collapse-box"]');
+    assert.ok(el, '閉じる途中の DOM は残っている (transitionend 待ち)');
+    const styleAttr = el.getAttribute('style') || '';
+    assert.match(styleAttr, /height:\s*0px/,
+      '2 段クロージング完了後は height:0px (transition は Npx → 0px が走る)');
+    assert.match(el.className, /--closing/, '--closing class が当たっている');
+
+    // 手動 transitionend → element 削除
+    el.ontransitionend({ propertyName: 'height', target: el });
+    await flush();
+    assert.equal(target.querySelector('[data-ric-role="collapse-box"]'), null,
+      'transitionend 後に element が unmount される');
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -364,10 +414,6 @@ describe('create_ui_collapse_box: multi-instance (key パラメータ)', () => {
   });
 
   test('closing 中断: visible:true で再 enter すると --entering 状態に戻る', async () => {
-    // 多段 rAF (re-enter render → _measure → 再 render) は jsdom + flush(10ms)
-    // で必ず完走するとは限らないため、ここでは「factory の状態遷移として
-    // closing → entering が起きる」ところまでを保証する。height:N px 復活の
-    // 実 transition 部分は real browser に委ねる。
     Object.defineProperty(window.HTMLElement.prototype, 'scrollHeight', {
       configurable: true, get() { return 200; },
     });
@@ -389,6 +435,8 @@ describe('create_ui_collapse_box: multi-instance (key パラメータ)', () => {
     assert.match(el.className, /--closing/, 'closing 中');
 
     // transitionend が発火する前に visible:true に戻す → 中断: closing → entering
+    // 2 段クロージングで schedule された rAF (_th=0 にする) が、中断後に発火しても
+    // 「st._c が false なので no-op」になる挙動 (= state guard) の regression もここでカバー。
     handle.visible = true;
     await flush();
 
@@ -396,6 +444,11 @@ describe('create_ui_collapse_box: multi-instance (key パラメータ)', () => {
     assert.ok(el, '要素は維持される (unmount されていない)');
     assert.match(el.className, /--entering/, '中断後は --entering に遷移');
     assert.doesNotMatch(el.className, /--closing/, '--closing は外れる');
+    // height:200px に戻っている (= 中断後の _measure が走り、rAF B の遅延 0px 化が
+    // st._c=false で no-op になった結果。もし rAF B が guard を抜けて _th=0 を
+    // 上書きしていたら height:0px が観測される。)
+    assert.match(el.getAttribute('style') || '', /height:\s*200px/,
+      '中断後は entering target (200px) に戻る (rAF B が no-op になった証拠)');
   });
 
   test('1 key の transitionend は他の key の DOM を消さない (closure 独立性)', async () => {

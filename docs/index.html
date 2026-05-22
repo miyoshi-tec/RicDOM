@@ -40,6 +40,7 @@
   .badge--core { background: #dcfce7; color: #166534; }
   .badge--ui   { background: #dbeafe; color: #1e40af; }
   .badge--opt  { background: #fef3c7; color: #92400e; }
+  .badge--lz   { background: #f1f5f9; color: #475569; }
   /* セクション間余白 */
   .section-gap { height: 24px; }
   /* クイックスタート 2カラム */
@@ -107,7 +108,7 @@ const SAMPLES = [
   { no: '11', file: '11_theme_override.html',     title: 'テーマ上書き',       desc: 'create_ui_panel のテーマ / 密度 / disabled' },
   { no: '12', file: '12_md_viewer.html',          title: 'Markdown ビューア',  desc: 'ui_md_pre で Markdown → VDOM 変換' },
   { no: '13', file: '13_controlled_dialog_splitter.html', title: 'Controlled Mode',   desc: 'state 駆動の dialog / splitter + SVG グラフ + コード表示' },
-  // 14 は欠番（旧 "Chat UI" は 15 "AI Chat" に包含されたため）
+  { no: '14', file: '14_collapse_box.html',         title: 'Collapse Box',      desc: 'collapse_box の入退場アニメーション 6 パターン (v0.3.23〜)' },
   { no: '15', file: '15_ai_chat.html',             title: 'AI Chat (live)',    desc: '4 プロバイダ対応、SSE ストリーミング、API キーは state のみ保持' },
   { no: '16', file: '16_svg_editor.html',          title: 'SVG ツリーエディタ', desc: 'SVG ノードを選択・編集・追加、ドラッグで直感的に配置' },
   { no: '17', file: '17_multi_ricdom.html',        title: 'Multi-instance Memo', desc: 'create_RicDOM をパネル単位に分けて再描画スコープを分離' },
@@ -222,12 +223,19 @@ create_RicDOM('#index_page', {
           ui_col({ ctx: [
             ui_row({ ctx: [
               { tag: 'span', class: 'badge badge--core', ctx: ['RicDOM.min.js — 8KB'] },
+              { tag: 'span', class: 'badge badge--lz',   ctx: ['.lz.min.js — 6KB'] },
               ui_text({ ctx: ['コア（必須）'] }),
             ]}),
             ui_row({ ctx: [
               { tag: 'span', class: 'badge badge--ui', ctx: ['RicUI.min.js — 63KB'] },
+              { tag: 'span', class: 'badge badge--lz', ctx: ['.lz.min.js — 36KB'] },
               ui_text({ ctx: ['UI コンポーネント集 + パラメータ調整パネル'] }),
             ]}),
+          ]}),
+          ui_text({ variant: 'muted', style: { fontSize: '12px', marginTop: '4px' }, ctx: [
+            '.lz.min.js は自己展開版（gzip/brotli が走らない配信経路向け）。生成は ',
+            { tag: 'a', href: 'lz_playground.html', ctx: ['LZ String Playground'] },
+            ' から。',
           ]}),
         ]}),
 
@@ -268,6 +276,12 @@ create_RicDOM('#index_page', {
               { tag: 'span', class: 'sample-title', ctx: ['API リファレンス (SPEC)'] },
               { tag: 'span', class: 'sample-desc',
                 ctx: [' — 全コンポーネント / CSS 変数 / Performance & Scale / Proxy 仕様'] },
+            ]},
+            { tag: 'a', class: 'sample-link', href: 'lz_playground.html', ctx: [
+              { tag: 'span', class: 'sample-no', ctx: ['🛠'] },
+              { tag: 'span', class: 'sample-title', ctx: ['LZ String Playground'] },
+              { tag: 'span', class: 'sample-desc',
+                ctx: [' — 自前 JS を LZSS 自己展開 wrapper に変換するブラウザツール'] },
             ]},
             { tag: 'a', class: 'sample-link', href: 'https://github.com/miyoshi-tec/RicDOM', ctx: [
               { tag: 'span', class: 'sample-no', ctx: ['📦'] },

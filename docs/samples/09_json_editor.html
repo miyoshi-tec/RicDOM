@@ -20,7 +20,7 @@
 <script type="text/plain" id="src-demo">
 'use strict';
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, create_ui_dialog, create_ui_toast, ui_button, ui_input, ui_text } = RicUI;
+const { create_ui_page, create_ui_dialog, create_ui_toast, create_ui_collapse_box, ui_button, ui_input, ui_text } = RicUI;
 
 // ── path モデル（このサンプルの中心概念）──
 // 編集対象の位置を「キー / index の配列」で表す。例えば JSON が
@@ -104,6 +104,10 @@ create_RicDOM('#mount-demo', {
   page:  create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
   dlg:   create_ui_dialog(),
   toast: create_ui_toast(),
+  // folder の開閉アニメに使う collapse_box (multi-instance、key = JSON.stringify(path))。
+  // expanded map と同期させて使う: visible は s.expanded[k] で導出、open/closed の
+  // 永続的状態は s.expanded 側で管理 (= ▼/▶ 矢印の描画にも必要なので一元化)。
+  cb:    create_ui_collapse_box({ direction: 'v', duration: 180 }),
   render(s) {
     s.toast(); // ポータル登録
 
@@ -282,23 +286,19 @@ create_RicDOM('#mount-demo', {
           path.length > 0 ? ui_button({ variant: 'ghost', ctx: ['✕'],   onclick: () => delete_row(path) }) : null,
         ].filter(Boolean) };
 
-      // folder の子は「閉じていても」常にレンダリングして DOM に残す。
-      // 閉じているときは grid-template-rows: 0fr で高さ 0 にクリップし、
-      // 開くときは 1fr に遷移させる。これで auto 高さへの滑らかな
-      // 開閉アニメーションが得られる（max-height と違い自然高を知らなくてよい）。
+      // folder の子は collapse_box で wrap し、open/closed のアニメを任せる。
+      // key には JSON.stringify(path) を使う (= path の同一性で安定)。
+      // s.expanded[k] が真のとき visible:true → アニメ付きで開閉。
       if (is_folder) {
         const children = Array.isArray(val)
           ? val.flatMap((v, i) => render_node(v, [...path, i]))
           : Object.entries(val).flatMap(([k, v]) => render_node(v, [...path, k]));
-        const wrap = { tag: 'div',
-          style: {
-            display: 'grid',
-            gridTemplateRows: is_open ? '1fr' : '0fr',
-            transition: 'grid-template-rows var(--ric-duration) var(--ric-easing)',
-          },
-          ctx: [{ tag: 'div', style: { overflow: 'hidden', minHeight: 0 }, ctx: children }],
-        };
-        return [row, wrap];
+        const wrap = s.cb({
+          key: JSON.stringify(path),
+          visible: is_open,
+          ctx: children,
+        });
+        return wrap ? [row, wrap] : [row];
       }
       return [row];
     };
