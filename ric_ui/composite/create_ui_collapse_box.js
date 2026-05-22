@@ -162,10 +162,22 @@ const create_ui_collapse_box = ({
            + (st._c ? ' ric-collapse-box--closing'  : ''),
       'data-ric-cb':   _attr_value(key),
       'data-ric-role': 'collapse-box',
+      // 論理的な可視性 (v0.3.22〜): closing 中は "false"、それ以外 (entering / open) は "true"。
+      // 完全に閉じた状態 (= DOM 上に要素が無い) は selector の存在チェック側で判別する。
+      // e2e test で「閉じ終わり vs アニメ中」を attribute selector で切り分ける用途。
+      'data-ric-visible': st._c ? 'false' : 'true',
       style,
       ontransitionend: _on_end,
       ctx,
     };
+  };
+
+  // 指定 key (省略時 '_default') が entering / closing アニメーション中かを返す
+  // (v0.3.22〜)。e2e test 等で「アニメ完了後に座標を取得したい」場面で使う。
+  // 完全に open / closed (= 静止状態) なら false。
+  inst.is_animating = (key = '_default') => {
+    const st = _states.get(key);
+    return !!(st && (st._e || st._c));
   };
 
   return inst;

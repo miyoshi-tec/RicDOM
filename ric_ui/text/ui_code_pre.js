@@ -27,10 +27,17 @@
 
 'use strict';
 
+const { warn_hljs_missing } = require('../_factory_helpers');
+
 // window.hljs でシンタックスハイライトを試みる。
 // 成功時は hljs が生成した HTML 文字列を返す。失敗時は null。
+// hljs 未読込時は initial 1 度だけ warn (= _factory_helpers の共有 flag 経由)。
 const _try_highlight = (raw, lang) => {
-  if (typeof window === 'undefined' || typeof window.hljs === 'undefined') return null;
+  if (typeof window === 'undefined') return null;          // SSR / Node 環境
+  if (typeof window.hljs === 'undefined') {
+    warn_hljs_missing();                                   // dev hint (一度だけ)
+    return null;
+  }
   try {
     const result = lang === 'auto'
       ? window.hljs.highlightAuto(raw)

@@ -1001,6 +1001,18 @@ collapse_box (key) につき JS が走るのはアニメの開始 / 終了の 2 
 state GC: closing 完了 / 即 closed corner case で内部 Map から該当 key の
 エントリが自動削除される。長時間動作する list アプリで Map が膨らまない。
 
+DOM 属性 (v0.3.22〜):
+- `data-ric-cb` = `<factory_id>-<URL-safe key>`、内部 querySelector 用
+- `data-ric-role` = `'collapse-box'`
+- `data-ric-visible` = `'true'` (entering / open) | `'false'` (closing)。
+  e2e test で「閉じ終わり vs アニメ中」を attribute selector で切り分ける用途。
+  完全に閉じた状態は要素自体が DOM から消えるので `count(0)` で判別する。
+
+メソッド:
+- `inst.is_animating(key?)` (v0.3.22〜): 指定 key が `entering` / `closing` 中なら
+  `true`、静止状態 (= 完全に open / closed) なら `false`。e2e test で
+  アニメ完了を待ってから座標取得したい場面で使う。key 省略時は `'_default'`。
+
 DOM の `data-ric-cb` 属性に factory id と key を encodeURIComponent した
 複合値が入る (例: `'12-path%2Fto%2Ffile'`)。`data-ric-role="collapse-box"`
 も付与される (CSS / E2E test の selector に使える)。

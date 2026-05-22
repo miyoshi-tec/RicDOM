@@ -78,3 +78,68 @@ describe('table', () => {
     assert.equal(t.ctx[1].ctx[0].ctx[0].ctx[0].tag, 'strong');
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// hljs 未読み込み時の warn (v0.3.22〜、Rancha dev 報告)
+// ─────────────────────────────────────────────────────────────
+// `lang` 指定ありで window.hljs が未定義のとき、初回 1 度だけ console.warn を出す。
+// silent fallback だと「なぜハイライトされない?」が分からない、を改善。
+describe('hljs 未読み込み時の warn (v0.3.22〜)', () => {
+  const { _reset_hljs_warning } = require('../ric_ui/_factory_helpers');
+  const { JSDOM } = require('jsdom');
+
+  const setup = () => {
+    const dom = new JSDOM('<html><body></body></html>');
+    global.window = dom.window;
+    delete dom.window.hljs;          // hljs が未読み込みであることを保証
+    _reset_hljs_warning();
+    const warns = [];
+    const orig = console.warn;
+    console.warn = (...args) => { warns.push(args.join(' ')); };
+    return { warns, teardown: () => { console.warn = orig; delete global.window; } };
+  };
+
+  test('lang 指定ありで hljs 未定義 → 1 度だけ warn', () => {
+    const { warns, teardown } = setup();
+    ui_md_pre({ ctx: ['```js\nconst x = 1;\n```'] });
+    teardown();
+    assert.equal(warns.length, 1, 'warn が 1 回出る');
+    assert.match(warns[0], /hljs/, 'メッセージに hljs が含まれる');
+  });
+
+  test('複数回呼んでも warn は 1 回のみ (spam 防止)', () => {
+    const { warns, teardown } = setup();
+    ui_md_pre({ ctx: ['```js\nA\n```'] });
+    ui_md_pre({ ctx: ['```py\nB\n```'] });
+    ui_md_pre({ ctx: ['```rs\nC\n```'] });
+    teardown();
+    assert.equal(warns.length, 1, '計 1 回だけ');
+  });
+
+  test('lang 指定なし (fenced だが言語ヒント無し) なら warn しない', () => {
+    const { warns, teardown } = setup();
+    ui_md_pre({ ctx: ['```\nplain\n```'] });
+    teardown();
+    assert.equal(warns.length, 0, 'hljs を使う意図が無いので warn 不要');
+  });
+
+  test('Node 環境 (= window が無い) では warn しない', () => {
+    _reset_hljs_warning();
+    delete global.window;
+    const warns = [];
+    const orig = console.warn;
+    console.warn = (...args) => { warns.push(args.join(' ')); };
+    ui_md_pre({ ctx: ['```js\nx\n```'] });
+    console.warn = orig;
+    assert.equal(warns.length, 0, 'SSR / Node では発火しない');
+  });
+
+  test('ui_code_pre 経由でも同じ flag を共有 (合計 1 回)', () => {
+    const { ui_code_pre } = require('../ric_ui/text/ui_code_pre');
+    const { warns, teardown } = setup();
+    ui_md_pre({ ctx: ['```js\nA\n```'] });
+    ui_code_pre({ ctx: ['B'], lang: 'js' });
+    teardown();
+    assert.equal(warns.length, 1, '両 component を使っても warn は 1 回 (共有 flag)');
+  });
+});

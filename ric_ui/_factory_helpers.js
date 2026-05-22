@@ -47,4 +47,31 @@ const safe_notify = (inst, factory_name) => {
 // ric_ui/index.js でも export しない方針なので別 module から require する形)。
 const _reset_safe_notify_warnings = () => { _warned.clear(); };
 
-module.exports = { safe_notify, _reset_safe_notify_warnings };
+// ──────────────────────────────────────────────
+// hljs (highlight.js) の未読み込み警告 (v0.3.22〜)
+// ──────────────────────────────────────────────
+// ui_code_pre / ui_md_pre は window.hljs があれば syntax highlight、
+// 無ければプレーンテキストにフォールバックする。後者は silent だったため
+// 「なぜハイライトされない?」が分かりにくかった (Rancha dev 報告)。
+// 初回 1 度だけ warn を出して dev に気付かせる。
+// SSR / Node 環境 (= window 自体が無い) では発火しない。
+// 両ファイルから同じ helper を呼ぶことで「複数 component 使用時も計 1 回」を保証。
+let _hljs_warned = false;
+const warn_hljs_missing = () => {
+  if (_hljs_warned) return;
+  if (typeof console === 'undefined' || typeof console.warn !== 'function') return;
+  _hljs_warned = true;
+  console.warn(
+    '[RicUI] ui_code_pre / ui_md_pre: window.hljs が見つかりません。' +
+    'シンタックスハイライト無しのプレーンテキスト表示にフォールバックしています。' +
+    '有効化するには <script src="highlight.min.js"> 等で hljs を window グローバルに読み込んでください。',
+  );
+};
+
+// test 用 reset
+const _reset_hljs_warning = () => { _hljs_warned = false; };
+
+module.exports = {
+  safe_notify, _reset_safe_notify_warnings,
+  warn_hljs_missing, _reset_hljs_warning,
+};
