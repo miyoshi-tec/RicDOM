@@ -1,11 +1,11 @@
-// RicUI.lz.min.js (LZSS 自己展開版) regression test (v0.3.17〜)
+// RicUI.lz.min.js / RicDOM.lz.min.js (LZSS 自己展開版) regression test (v0.3.18〜)
 //
-// 設計上の契約: 「`RicUI.lz.min.js` を <script> で読み込んだ後の window.RicUI は、
-// `RicUI.min.js` を読み込んだ場合と完全に同じ export を提供する」。
+// 設計上の契約: 「`*.lz.min.js` を <script> で読み込んだ後の window.RicUI /
+// window.RicDOM は、対応する `*.min.js` を読み込んだ場合と完全に同じ export を提供する」。
 //
-// LZ 版は IoT・組み込み等 gzip が走らない配信環境向けに、本体を ~47% 縮めた
-// 自己展開バンドル。decompressor は内部の base64-encoded LZSS reference を atob
-// で展開して (0,eval) で実行する。consumer 視点では透明。
+// LZ 版は IoT・組み込み等 gzip が走らない配信環境向けに、本体を RicUI で
+// ~43% / RicDOM で ~28% 縮めた自己展開バンドル。decompressor は内部の base64-encoded
+// LZSS reference を atob で展開して eval で実行する。consumer 視点では透明。
 
 'use strict';
 
@@ -86,7 +86,7 @@ describe('RicUI.lz.min.js: 通常版と同じ export を提供する', () => {
     const size_lz     = fs.statSync(path.join(ROOT, 'RicUI.lz.min.js')).size;
     assert.ok(size_lz < size_normal,
       `LZ 版 (${size_lz}B) は通常版 (${size_normal}B) より小さくあるべき`);
-    // 想定範囲: 通常版の 70% 未満 (47% 程度を期待)
+    // 想定範囲: 通常版の 70% 未満 (実測 ~57% 程度。回帰しても 70% で警告)
     assert.ok(size_lz < size_normal * 0.7,
       `LZ 版の圧縮率が想定より悪い (${(size_lz / size_normal * 100).toFixed(1)}%)`);
   });

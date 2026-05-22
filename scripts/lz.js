@@ -11,7 +11,9 @@
 //      (展開時に escape byte → 元 printable に戻す)。
 //   2. LZSS: 各位置で過去 WINDOW byte 内の最長一致 (≥ MIN_MATCH) を hash table で
 //      探索、`marker(1) + base64(4)` = 5 byte 参照に置換。
-//   3. base64 の 3 byte = offset(2B big-endian) + length(1B)、最大 offset=65535、length=255。
+//   3. base64 の 3 byte = offset(2B big-endian) + length(1B)。
+//      encoding 上限は offset=65535 / length=255 だが、実運用の WINDOW=4096 で
+//      offset は実質 12-bit、length は 8-bit 全域使用。
 //
 // なぜ base64 か:
 //   raw binary バイトを JS string literal に埋め込むと、
@@ -23,9 +25,10 @@
 
 'use strict';
 
-const WINDOW    = 4096;
-const MIN_MATCH = 6;      // 5 byte 参照を上回る一致長 (= 利益最低 1 byte)
-const MAX_MATCH = 255;    // length は 1 byte
+const WINDOW            = 4096;
+const MIN_MATCH         = 6;    // 5 byte 参照を上回る一致長 (= 利益最低 1 byte)
+const MAX_MATCH         = 255;  // length は 1 byte
+const MAX_CHAIN_PROBES  = 64;   // hash chain 探索の打ち切り (= compile 速度と圧縮率の trade-off)
 
 // ──────────────────────────────────────────────
 // marker char を選ぶ
@@ -72,6 +75,9 @@ const find_marker = (src) => {
 // ──────────────────────────────────────────────
 // 注意: src に marker_code が含まれていてはならない (= caller が find_marker と
 // substitution で事前に保証する)。compress 自体は assert しない。
+
+// 参照 1 件 (= 3 byte: offset_hi / offset_lo / length) を base64 4 char に変換。
+// 3 → 4 は base64 の padding 不要な唯一の境界、参照 1 件 = 5 source char に固定される。
 const encode_ref = (offset, length) => Buffer.from([
   (offset >>> 8) & 0xFF,
   offset & 0xFF,
@@ -99,7 +105,7 @@ const compress = (src, marker_code) => {
       const h = hash3(src.charCodeAt(i), src.charCodeAt(i + 1), src.charCodeAt(i + 2));
       let j = head[h];
       let probes = 0;
-      while (j >= 0 && j > i - WINDOW && probes < 64) {
+      while (j >= 0 && j > i - WINDOW && probes < MAX_CHAIN_PROBES) {
         probes++;
         let len = 0;
         const max = Math.min(MAX_MATCH, N - i, i - j);
@@ -161,11 +167,11 @@ const decompress = (compressed, marker_code, substitution) => {
 // ──────────────────────────────────────────────
 // 圧縮済みデータには base64 chars (safe ASCII) と marker と 元 src の literal char
 // が混在。テンプレートリテラル構文と衝突する char を escape する:
-//   \  → \\
-//   `  → \`
-//   ${ → \${  (sequence の場合のみ)
-//   \r → \r   (CR は ECMAScript の source 正規化で LF に変換されるため、絶対に escape)
-// LF (\n) はテンプレートリテラル内で raw のまま保持される (正規化されない) のでそのまま。
+//   \   (0x5C) → \\
+//   `   (0x60) → \`
+//   ${  (sequence)  → \${
+//   CR  (0x0D) → \r  (CR は ECMAScript の source 正規化で LF に変換されるため、絶対に escape)
+// LF (\n、0x0A) はテンプレートリテラル内で raw のまま保持される (正規化されない) のでそのまま。
 const escape_for_template = (s) => {
   let out = '';
   for (let i = 0; i < s.length; i++) {
@@ -275,10 +281,11 @@ module.exports = {
   lz_compress,
   build_lz_bundle,
 
-  // 低レベル API (内部使用 + テスト)
+  // 低レベル API (テストが直接触る)
+  // 注: encode_ref は private 実装詳細 (= build_lz_bundle の round-trip 経由で
+  // 間接的に検証される)。MAX_CHAIN_PROBES も internal tuning なので非公開。
   WINDOW, MIN_MATCH, MAX_MATCH,
   find_marker,
-  encode_ref,
   compress,
   decompress,
   escape_for_template,
