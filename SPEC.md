@@ -353,6 +353,33 @@ CSS テンプレート（`ric_ui/css_templates.js`）か、各要素の直近に
 - **ノード再利用**: 同一 serial key → DOM ノードを再利用（input フォーカス・IME 状態を保持）
 - **is_json_equal**: 高速な深い等値比較（関数は参照比較）
 
+### controlled input の prop 再適用 (v0.3.24〜)
+
+`value` / `checked` / `selected` / `scrollTop` / `scrollLeft` は **VDOM の prev=next が
+equal でも毎 render で DOM に再代入** される (`FORCE_REAPPLY_DOM_KEYS`)。理由はユーザーが
+DOM を直接操作 (checkbox クリック、input 入力、スクロール) して DOM 側が state と乖離
+しうるため。state が「真実の source」として常に DOM に再同期される。
+
+これにより以下のパターンが期待通りに動く:
+
+```javascript
+render(s) {
+  // user が click で checked=false に drift しても、state が true なら次の
+  // render で DOM が true に強制復帰する (React / Preact と同じ canon)
+  return { tag: 'input', type: 'checkbox', checked: s.checked };
+}
+```
+
+**注意点**:
+
+- `innerHTML` / `textContent` / `innerText` は **対象外**。これらを毎回再代入すると
+  child DOM が全破棄再生成されて性能が壊滅するため。contenteditable + state-controlled
+  text の場合は user 側で dummy data attribute (`data-rev=${rev++}`) を入れて diff を
+  強制発火させる回避策を使う。
+- 構造短絡 (= VDOM tree が prev=next で完全に同じ) の場合も、subtree を walk して
+  FORCE_REAPPLY 対象 prop だけは再適用する。<div ref="mount"> の外部マウントパターンは
+  `ctx: []` のままなら従来通り保護される (構造変更は走らない)。
+
 ### レンダースケジューラ
 
 - `requestAnimationFrame` ベースのバッチング

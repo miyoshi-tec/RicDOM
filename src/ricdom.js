@@ -214,6 +214,20 @@ const DOM_PROPERTY_KEYS = new Set([
   'scrollTop', 'scrollLeft',
 ]);
 
+// VDOM 上で prev=next が equal でも、毎 render で DOM に再代入するキー。
+// 理由: これらはユーザー操作で DOM 側が独自に drift するため、VDOM の equality に
+// 頼ると「state は checked=true を主張しているのに DOM は false」のような乖離が起きる。
+// React / Preact 等の主要 VDOM ライブラリも controlled input は force-set する canon。
+//
+// innerHTML / textContent / innerText / disabled を含めなかった理由:
+//   - innerHTML 等は毎 render で再代入すると全 child DOM 破棄再生成 = 性能 disaster
+//   - disabled はユーザー操作で drift しない (JS 必須)
+//   - contenteditable + state-controlled text の corner case は SPEC.md で注意喚起
+const FORCE_REAPPLY_DOM_KEYS = new Set([
+  'value', 'checked', 'selected',
+  'scrollTop', 'scrollLeft',
+]);
+
 // イベントハンドラのプレフィックス
 const is_event_handler_key = (key) => /^on[a-z]/.test(key);
 
@@ -435,6 +449,11 @@ const patch_attributes = (prev_normalized, next_normalized, el) => {
       // 参照は毎回新しい。同一参照が渡ってきた場合でも、最新クロージャに
       // 差し替わることを保証するため一律上書きする（性能影響は無視できる小ささ）。
       el[key] = (typeof val === 'function') ? val : null;
+    } else if (FORCE_REAPPLY_DOM_KEYS.has(key)) {
+      // user 操作で DOM が drift しうる prop は、prev=next でも毎回 DOM に再代入する。
+      // (例: checkbox を user がクリックして checked=false にした後、state は true のまま
+      // 再 render してもこの代入が無いと DOM が false のまま残る。)
+      el[key] = val;
     } else if (!is_json_equal(prev_extra[key], val)) {
       if (DOM_PROPERTY_KEYS.has(key)) {
         el[key] = val;
@@ -476,13 +495,49 @@ const normalize_children = (raw_children) => {
   return result;
 };
 
+// VDOM 構造短絡時の FORCE_REAPPLY 専用 walker (v0.3.24〜)。
+// VDOM 自体は prev=next なので構造 patch は不要だが、user 操作で DOM が drift した
+// FORCE_REAPPLY_DOM_KEYS (= value / checked / selected / scrollTop / scrollLeft)
+// だけは VDOM の値で上書き直す。
+// normalized_children は normalize_children() 通過済みなので invisible は除外済み
+// だが、各 element は normalize_ric_node() を通っていない raw 形 (= ctx 等が raw)。
+const _apply_force_reapply_to_subtree = (normalized_children, parent_el) => {
+  for (let i = 0; i < normalized_children.length; i++) {
+    const child = normalized_children[i];
+    // テキスト・null 等は dom_index に対応する DOM ノードがあるが force-reapply 対象は
+    // 持たない (= text node に value/checked 等は無い)。
+    if (typeof child !== 'object' || child === null) continue;
+    const dom_el = parent_el.childNodes[i];
+    if (!dom_el || dom_el.nodeType !== Node.ELEMENT_NODE) continue;
+    // 該当する FORCE_REAPPLY prop だけを直接代入する。
+    for (const key of FORCE_REAPPLY_DOM_KEYS) {
+      if (key in child) dom_el[key] = child[key];
+    }
+    // 子孫も走査する (ctx は raw な配列 / 単一値 / undefined のいずれか)。
+    if (child.ctx != null) {
+      const ctx_array = Array.isArray(child.ctx) ? child.ctx : [child.ctx];
+      _apply_force_reapply_to_subtree(normalize_children(ctx_array), dom_el);
+    }
+  }
+};
+
 // 子要素リストの差分を DOM に反映する（前回・今回の正規化済み JSON を受け取る）
 const patch_children = (prev_raw_children, next_raw_children, parent_el) => {
   const prev_children = normalize_children(prev_raw_children);
   const next_children = normalize_children(next_raw_children);
 
-  // 変化がなければ何もしない
-  if (is_json_equal(prev_children, next_children)) return;
+  // 変化がなければ DOM 構造の patch はスキップ。ただし FORCE_REAPPLY_DOM_KEYS だけは
+  // user 操作で DOM が drift しているかもしれないので、subtree を walk して再適用する
+  // (v0.3.24〜、TrendGuard 報告)。
+  //   - 構造短絡を維持する理由: parent が <div ref="mount"> のような空 ctx を返して、
+  //     child instance が外部から DOM を mount するパターンを守るため (= 末尾削除ループが
+  //     externally-managed な child を巻き込まない)。
+  //   - FORCE_REAPPLY 専用 walk のコスト: 該当 prop を持たない node なら for-of が短いだけ
+  //     で実害なし。再帰的に ctx を辿るが normalize 済み tree なのでフラット。
+  if (is_json_equal(prev_children, next_children)) {
+    _apply_force_reapply_to_subtree(next_children, parent_el);
+    return;
+  }
 
   // prev・next 両方から重複タグを収集し、シリアルキーリストを生成する
   // 重複タグがある場合でも innerHTML リセットはせず、シリアルキーで位置マッチングする
