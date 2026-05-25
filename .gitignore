@@ -4,6 +4,12 @@ node_modules/
 # 下書き・旧仕様書・旧サンプル（ローカル参照用）
 _drafts/
 
+# consumer 向け通知文ドラフト (= ローカル参照用、リポジトリには含めない)
+# 過去は手動で stage しないことで除外していたが、事故防止のため明示的に ignore
+_announce_*.md
+_request_to_*.md
+_response_to_*.md
+
 # ビルド成果物（npm run build で再生成可能）
 # ルート直下の min.js は除外、docs/ 内は GitHub Pages 用に含める
 /*.min.js
