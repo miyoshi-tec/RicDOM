@@ -114,9 +114,10 @@ const normalize_ric_node = (raw_node) => {
   // style を正規化する
   const normalized_style = normalize_style(raw_node.style ?? {});
 
-  // その他の属性を収集する（tag/id/class/style/ctx/ref を除く）
+  // その他の属性を収集する（tag/id/class/style/ctx/ref/key を除く）
+  // key は v0.3.25〜 リスト reconciliation 用の論理 ID。DOM 属性としては出さない。
   const exclude_keys = new Set([
-    'tag', 'id', 'class', 'style', 'ctx', 'ref',
+    'tag', 'id', 'class', 'style', 'ctx', 'ref', 'key',
   ]);
   const extra_attrs = {};
   for (const key of Object.keys(raw_node)) {
@@ -124,6 +125,10 @@ const normalize_ric_node = (raw_node) => {
       extra_attrs[key] = raw_node[key];
     }
   }
+
+  // key: リスト reconciliation 用の論理 ID。null は「key 無し」を意味する。
+  // 文字列 / 数値 / Symbol 等、=== 比較できるものなら何でも OK。
+  const key = (raw_node.key !== undefined && raw_node.key !== null) ? raw_node.key : null;
 
   return {
     node_type: 'element',
@@ -133,6 +138,7 @@ const normalize_ric_node = (raw_node) => {
     style:  normalized_style,
     ctx:    ctx_array,
     ref:    raw_node.ref ?? null,
+    key,
     ...extra_attrs,
   };
 };
@@ -234,7 +240,8 @@ const is_event_handler_key = (key) => /^on[a-z]/.test(key);
 // VDOM ノードの「構造を表すキー」集合。
 // これらは normalize 処理が個別に処理するため、属性・プロパティ・イベントの
 // 一般ループでは無視する（apply / patch 両方のパスで共通利用）。
-const STRUCTURAL_NODE_KEYS = new Set(['node_type','tag','id','class','style','ctx','ref']);
+// 'key' は v0.3.25〜 リスト reconciliation 用の論理 ID で、DOM 属性には出さない。
+const STRUCTURAL_NODE_KEYS = new Set(['node_type','tag','id','class','style','ctx','ref','key']);
 
 // ノードに属性・プロパティ・イベントハンドラを適用する
 const apply_attributes_to_element = (el, normalized_node) => {
@@ -522,6 +529,15 @@ const _apply_force_reapply_to_subtree = (normalized_children, parent_el) => {
 };
 
 // 子要素リストの差分を DOM に反映する（前回・今回の正規化済み JSON を受け取る）
+// 子要素リストに 1 つでも `key` 属性が付いていれば true。
+// 付いていれば key-based reconciliation を使う (v0.3.25〜)。
+const _children_have_any_key = (raw_children) => {
+  for (const c of raw_children) {
+    if (c && typeof c === 'object' && !Array.isArray(c) && c.key != null) return true;
+  }
+  return false;
+};
+
 const patch_children = (prev_raw_children, next_raw_children, parent_el) => {
   const prev_children = normalize_children(prev_raw_children);
   const next_children = normalize_children(next_raw_children);
@@ -539,6 +555,14 @@ const patch_children = (prev_raw_children, next_raw_children, parent_el) => {
     return;
   }
 
+  // v0.3.25〜: 子要素のどれかに `key` が付いていれば key-based reconciliation を使う。
+  // (= リスト並べ替え / 中央挿入 / 削除に強い。React / Preact と同じ canon。)
+  // key が無い従来のコードは引き続き position-based (= 後方互換)。
+  if (_children_have_any_key(prev_raw_children) || _children_have_any_key(next_raw_children)) {
+    patch_children_by_key(prev_children, next_children, parent_el);
+    return;
+  }
+
   // prev・next 両方から重複タグを収集し、シリアルキーリストを生成する
   // 重複タグがある場合でも innerHTML リセットはせず、シリアルキーで位置マッチングする
   // 理由: innerHTML = '' は input のフォーカス・IME 変換状態・スクロール位置を破壊するため
@@ -550,6 +574,100 @@ const patch_children = (prev_raw_children, next_raw_children, parent_el) => {
   const next_serial_keys = build_serial_key_list(next_children, dup_tags);
 
   patch_children_by_position(prev_children, next_children, parent_el, prev_serial_keys, next_serial_keys);
+};
+
+// key 属性ベースの差分更新 (v0.3.25〜)
+//
+// key 付き子要素は「論理エンティティ」として prev/next を Map で対応付けし、
+// DOM を必要なら insertBefore で並び替える。
+// key 無しの兄弟は「prev 側の同 tag の先頭から順に消費」する (= position-based のサブセット)。
+//
+// この path に入る条件: prev_raw_children か next_raw_children のどれかに `key` がある。
+// 全て key 無しなら従来の patch_children_by_position に dispatch されるので、ここには来ない。
+const patch_children_by_key = (prev_children, next_children, parent_el) => {
+  // 1) prev を keyed Map と unkeyed queue に振り分け
+  const prev_doms      = Array.from(parent_el.childNodes);
+  const prev_keyed_map = new Map();   // key → { norm, dom }
+  const prev_unkeyed   = [];           // [{ norm, dom }, ...] FIFO
+  for (let i = 0; i < prev_children.length; i++) {
+    const norm = normalize_ric_node(prev_children[i]);
+    const dom  = prev_doms[i];
+    if (norm.node_type === 'element' && norm.key !== null) {
+      prev_keyed_map.set(norm.key, { norm, dom });
+    } else {
+      prev_unkeyed.push({ norm, dom });
+    }
+  }
+
+  // 2) next を順に処理して、DOM を target order に組み直す
+  let cursor = parent_el.firstChild;   // 「ここに挿入する」位置 (= 次に処理するべき DOM ノード)
+  for (let i = 0; i < next_children.length; i++) {
+    const next_raw  = next_children[i];
+    const next_norm = normalize_ric_node(next_raw);
+    let target_dom = null;
+    let prev_norm  = null;
+
+    if (next_norm.node_type === 'element' && next_norm.key !== null) {
+      // keyed: prev_keyed_map から同 key を探して再利用
+      const entry = prev_keyed_map.get(next_norm.key);
+      if (entry) {
+        target_dom = entry.dom;
+        prev_norm  = entry.norm;
+        prev_keyed_map.delete(next_norm.key);
+      }
+    } else {
+      // unkeyed: prev_unkeyed の先頭から取り、tag 一致 (or text 同士) なら再利用
+      if (prev_unkeyed.length > 0) {
+        const entry = prev_unkeyed[0];
+        const same_type =
+          entry.norm.node_type === next_norm.node_type &&
+          (next_norm.node_type === 'text' || entry.norm.tag === next_norm.tag);
+        if (same_type) {
+          target_dom = entry.dom;
+          prev_norm  = entry.norm;
+          prev_unkeyed.shift();
+        }
+      }
+    }
+
+    // マッチしなければ新規作成
+    if (!target_dom) {
+      target_dom = build_dom_node(next_raw, parent_el.namespaceURI);
+      if (!target_dom) continue;
+    }
+
+    // DOM 位置調整: cursor と一致するなら cursor を進めるだけ、違うなら insertBefore で移動
+    if (cursor === target_dom) {
+      cursor = cursor.nextSibling;
+    } else {
+      parent_el.insertBefore(target_dom, cursor);
+      // cursor はそのまま (target_dom が cursor の前に挿入されたので、次に処理する DOM は cursor)
+    }
+
+    // 既存 DOM 再利用なら attribute / child を patch
+    if (prev_norm) {
+      if (next_norm.node_type === 'text') {
+        if (target_dom.nodeType === Node.TEXT_NODE && target_dom.textContent !== next_norm.text) {
+          target_dom.textContent = next_norm.text;
+        }
+      } else if (next_norm.node_type === 'element') {
+        patch_attributes(prev_norm, next_norm, target_dom);
+        patch_children(prev_norm.ctx ?? [], next_norm.ctx ?? [], target_dom);
+      }
+    }
+  }
+
+  // 3) 余った prev DOM (= 不要になったもの) を全部削除
+  for (const entry of prev_keyed_map.values()) {
+    if (entry.dom && entry.dom.parentNode === parent_el) {
+      parent_el.removeChild(entry.dom);
+    }
+  }
+  for (const entry of prev_unkeyed) {
+    if (entry.dom && entry.dom.parentNode === parent_el) {
+      parent_el.removeChild(entry.dom);
+    }
+  }
 };
 
 // 位置ベースの差分更新
@@ -810,6 +928,11 @@ const create_RicDOM = (target, raw_state = {}) => {
             target[prop] = value;
             // ignore への代入は再描画しない（トップレベルと同じルール）
             if (prop === 'ignore') return true;
+            // v0.3.25〜: child proxy 経由の代入 (例: s.popups[sym] = create_ui_popup()) でも、
+            // 値が factory 等の object/function なら __notify を自動付与する。
+            // (TrendGuard 報告: 動的に factory を state に追加したケースで __notify が
+            // 刺さらず、内部イベントから safe_notify しても再描画が走らなかった bug 修正)
+            _inject_notify(value);
             subscribers.forEach(schedule => schedule());
             return true;
           },
@@ -1019,12 +1142,14 @@ const create_RicDOM = (target, raw_state = {}) => {
 
   // state へのアクセスは共有Proxy を通しつつ、
   // refs はインスタンス固有にする
-  // destroy / force_render は内部実装として存在するが、
-  // 公開 API からは外す（必要なら _internal 経由でアクセス可能）
+  // destroy は内部実装として存在するが、_internal 経由でのみアクセス可能。
+  // render_now は v0.3.25〜 正規 API として公開 (handle.render_now())。
+  // _internal.force_render は後方互換のため残置。
   const instance_handle = new Proxy(shared_proxy, {
     get(_, key) {
-      if (key === 'refs')      return refs_map;
-      if (key === '_internal') return { destroy: instance_destroy, force_render: instance_force_render };
+      if (key === 'refs')       return refs_map;
+      if (key === 'render_now') return instance_force_render;
+      if (key === '_internal')  return { destroy: instance_destroy, force_render: instance_force_render };
       return shared_proxy[key]; // それ以外は共有Proxy に委譲
     },
     set(_, key, value) {

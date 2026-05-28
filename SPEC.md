@@ -12,8 +12,10 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 | API | 用途 |
 |---|---|
 | `create_RicDOM(target, state_with_render)` | インスタンス生成・マウント |
-| `handle.refs: Map<string, Element>` | `ref: 'name'` 付き要素の DOM 参照 |
+| `handle.refs: Map<string, Element>` | `ref: 'name'` 付き要素の DOM 参照 (再描画ごとに rebuild、unmount された ref は自動削除) |
 | `handle.render = fn` | render 関数の per-instance 差し替え |
+| `handle.render_now()` | 同期的に即時再描画 (v0.3.25〜、要約: rAF を待たずに do_render する) |
+| VDOM ノードの `key` | リスト reconciliation 用の論理 ID (v0.3.25〜、§DOM 差分アルゴリズム 参照) |
 | `RicDOM.version` | バージョン文字列 |
 
 ### RicUI（`window.RicUI` / `require('../ric_ui')`）
@@ -348,10 +350,52 @@ CSS テンプレート（`ric_ui/css_templates.js`）か、各要素の直近に
 
 ### DOM 差分アルゴリズム
 
-- **Serial Key マッチング**: 重複タグにインデックスを付与（`div@0`, `div@1`）
+- **key 属性ベース reconciliation** (v0.3.25〜、後述): 子要素のどれかに `key` があれば論理 ID マッチング
+- **Serial Key マッチング** (key 無しのときの fallback): 重複タグにインデックスを付与（`div@0`, `div@1`）
 - **Position-based パッチング**: キー属性なし、位置ベースで比較
-- **ノード再利用**: 同一 serial key → DOM ノードを再利用（input フォーカス・IME 状態を保持）
+- **ノード再利用**: 同一 key (or serial key) → DOM ノードを再利用（input フォーカス・IME 状態を保持）
 - **is_json_equal**: 高速な深い等値比較（関数は参照比較）
+
+### key 属性によるリスト reconciliation (v0.3.25〜)
+
+子要素 (兄弟 list) のどれかに `key` 属性が付いていれば、`patch_children` は
+**key-based reconciliation** を使う:
+
+```javascript
+render(s) {
+  return { tag: 'ul', ctx: s.items.map((it) => (
+    { tag: 'li', key: it.id, ctx: [it.label] }   // key で論理 ID を明示
+  ))};
+}
+```
+
+挙動:
+
+- **同じ key** を持つ prev/next 要素は「同じ論理エンティティ」として DOM ノードを再利用
+- 並べ替え (sort) は `insertBefore` で DOM を物理的に移動する (= identity 維持)
+- 中央への挿入は既存要素を破棄せず、新規要素だけ create する
+- 削除は該当 DOM だけ remove する (残りの要素が前のエンティティを引き継がない)
+- `key` 無しの兄弟は「同 tag の prev 先頭から順に消費」する fallback
+
+React / Preact / Vue の `key` prop と同じ canon。リスト並べ替え / 中央挿入 / 削除で
+input の focus / value / selection が **隣接エンティティに混ざらない** ことが保証される。
+
+**何故必要か**:
+
+key 無しの position-based では、prev `[A, B, C]` から next `[B, C]` への削除で、
+DOM[0] (= A の DOM) が next[0] (= B) として再利用される。次に DOM[0] の input の
+value は state.B のものに再適用されるが、focus / scroll / IME 変換中の `<input>` は
+A のものが残留する。key 付きなら A の DOM ごと remove されて、B / C の DOM は維持される。
+
+**注意**:
+
+- key の値は `===` 比較できるものなら何でも OK (string / number / Symbol)。
+- 兄弟内で **key は unique であるべき**。重複 key は後勝ち (= 最初の prev エントリだけ
+  マッチして、残りは新規扱い) になる。React 同様、warn は出さないが意図しない再生成が起きる。
+- VDOM 上の `key` と `create_ui_collapse_box({ key })` の `key` パラメータは **別物**。
+  前者はリスト reconciliation 用、後者は collapse_box 内部の per-instance state map 用。
+
+### controlled input の prop 再適用 (v0.3.24〜)
 
 ### controlled input の prop 再適用 (v0.3.24〜)
 
