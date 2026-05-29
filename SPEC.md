@@ -818,6 +818,31 @@ s.dlg({
   親が `open` を `false` にすると閉じアニメーションが再生され、完了後にポータルから除去される。
 - ESC キーは uncontrolled / controlled 両モードで有効。
 
+**`on_close(reason)` — close 発生源の区別（v0.3.26〜）**:
+
+controlled mode の `on_close` は close の発生源を `reason` 引数で受け取る:
+
+| reason | 発生源 |
+|---|---|
+| `'overlay'` | overlay（外側）クリック |
+| `'close-button'` | ✕ ボタン |
+| `'escape'` | ESC キー |
+| `'api'` | `inst.close()` の programmatic 呼び出し |
+
+これにより「overlay 誤クリックでの誤クローズだけ防ぐ」等を consumer 側で表現できる:
+
+```javascript
+on_close: (reason) => {
+  if (reason === 'overlay') return;   // 外側クリックは無視（誤操作防止）
+  s.page.show_dlg = false;            // ✕ / ESC / api は閉じる
+}
+```
+
+library 側は reason を渡すだけで、「どの reason で閉じるか」の policy は持たない
+（「明示的 > 暗黙的」canon）。既存の `on_close: () => {...}` は引数を無視するだけで
+従来通り動く（完全後方互換）。uncontrolled mode は `on_close` を経由しないため
+reason は関係しない。
+
 **自前 trigger + programmatic open/close（v0.3.14〜）**:
 
 `trigger_ctx` を省略 (or 明示的に `null`) して `s.dlg({ title, ctx, actions })` と
