@@ -48,6 +48,7 @@ try {
     { no: '15', file: '15_ai_chat.html',           title: 'AI Chat (live)' },
     { no: '16', file: '16_svg_editor.html',        title: 'SVG ツリーエディタ' },
     { no: '17', file: '17_multi_ricdom.html',      title: 'Multi-instance Memo' },
+    { no: '18', file: '18_key_reconciliation.html',title: 'Key Reconciliation' },
   ];
 
   // ── 現在のページ検出 ──

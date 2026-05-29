@@ -622,6 +622,7 @@ ui_tweak_panel({
 | `15_ai_chat.html` | AI チャット UI（自動スクロール + textarea + ストリーミング）|
 | `16_svg_editor.html` | SVG ツリーエディタ（rect / circle / path のドラッグ編集）|
 | `17_multi_ricdom.html` | Multi-instance Memo（create_RicDOM をパネル単位に分離）|
+| `18_key_reconciliation.html` | Key Reconciliation — `key` 属性で並べ替え時に focus / value が混ざらない（v0.3.25〜）|
 
 ローカルで確認するには、お好みの静的サーバーで `docs/` を配信してください。例:
 
