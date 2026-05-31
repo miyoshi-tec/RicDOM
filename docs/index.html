@@ -112,6 +112,7 @@ const SAMPLES = [
   { no: '15', file: '15_ai_chat.html',             title: 'AI Chat (live)',    desc: '4 プロバイダ対応、SSE ストリーミング、API キーは state のみ保持' },
   { no: '16', file: '16_svg_editor.html',          title: 'SVG ツリーエディタ', desc: 'SVG ノードを選択・編集・追加、ドラッグで直感的に配置' },
   { no: '17', file: '17_multi_ricdom.html',        title: 'Multi-instance Memo', desc: 'create_RicDOM をパネル単位に分けて再描画スコープを分離' },
+  { no: '18', file: '18_key_reconciliation.html',  title: 'Key Reconciliation',  desc: 'key 属性でリスト並べ替え時に input focus / value が混ざらない (v0.3.25〜)' },
 ];
 
 // ── メインレンダー ──
@@ -125,7 +126,7 @@ create_RicDOM('#index_page', {
         ui_text({ variant: 'title', ctx: ['RicDOM'],
           style: { fontSize: '2.5rem', textAlign: 'center' },
         }),
-        ui_text({ ctx: ['JSON で書く、9KB のリアルタイムコントロール DOM ライブラリ'],
+        ui_text({ ctx: ['JSON で書く、10KB のリアルタイムコントロール DOM ライブラリ'],
           style: { textAlign: 'center', fontSize: '1.1rem', opacity: '0.7' },
         }),
         ui_text({ ctx: ['Electron アプリ・社内ツール・パラメータ調整 UI 向け。大規模 SPA には向きません。'],
@@ -222,7 +223,7 @@ create_RicDOM('#index_page', {
           ui_text({ variant: 'title', ctx: ['バンドル構成'], style: { fontSize: '1.3rem' } }),
           ui_col({ ctx: [
             ui_row({ ctx: [
-              { tag: 'span', class: 'badge badge--core', ctx: ['RicDOM.min.js — 9KB'] },
+              { tag: 'span', class: 'badge badge--core', ctx: ['RicDOM.min.js — 10KB'] },
               { tag: 'span', class: 'badge badge--lz',   ctx: ['.lz.min.js — 6KB'] },
               ui_text({ ctx: ['コア（必須）'] }),
             ]}),

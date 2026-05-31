@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Key Reconciliation — RicDOM</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+  <style>
+    body { margin: 0; min-height: 100vh; }
+    /* 2 カラム比較レイアウト */
+    .cmp-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      margin: 8px 0 16px;
+    }
+    @media (max-width: 800px) {
+      .cmp-grid { grid-template-columns: 1fr; }
+    }
+    .cmp-col {
+      border: 1px solid var(--ric-color-border); border-radius: 8px;
+      padding: 12px; background: var(--ric-color-bg-elevated);
+    }
+    .cmp-col h4 {
+      margin: 0 0 8px; font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .cmp-col--bad h4   { color: #dc2626; }
+    .cmp-col--good h4  { color: #16a34a; }
+    .cmp-tag {
+      font-size: 11px; padding: 2px 6px; border-radius: 4px;
+      background: var(--ric-color-bg-hover, rgba(0,0,0,0.05));
+      color: var(--ric-color-fg-muted); font-weight: 500;
+    }
+    /* 行 — FLIP アニメで position 変化を可視化する */
+    .row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-bottom: 1px solid var(--ric-color-border);
+      font-family: 'SF Mono', Consolas, monospace; font-size: 13px;
+      transition: background 120ms;
+      will-change: transform;
+    }
+    /* container は overflow:hidden で FLIP 中の row が外にはみ出ても切る */
+    .cmp-col > div { overflow: hidden; }
+    .row:last-child { border-bottom: none; }
+    .row__id {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 22px; border-radius: 4px;
+      color: white; font-weight: 700; font-size: 12px;
+    }
+    .row__input {
+      flex: 1; min-width: 60px;
+      padding: 4px 8px; font-size: 13px;
+      border: 1px solid var(--ric-color-border); border-radius: 4px;
+      background: var(--ric-color-bg);
+    }
+    .row__input:focus {
+      outline: 2px solid #2563eb; outline-offset: -2px;
+    }
+    /* 共通ツールバー */
+    .toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    /* 手順ボックス */
+    .steps {
+      background: var(--ric-color-bg-hover, rgba(0,0,0,0.04));
+      border-left: 3px solid var(--ric-color-accent);
+      padding: 10px 12px; border-radius: 4px; margin: 8px 0;
+      font-size: 13px; line-height: 1.7;
+    }
+    .steps ol { margin: 4px 0 0 20px; padding: 0; }
+    .steps li { margin: 2px 0; }
+    /* 概念図 */
+    .concept {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      font-family: 'SF Mono', Consolas, monospace; font-size: 12px;
+      margin: 12px 0;
+    }
+    .concept-block { padding: 10px; border-radius: 6px; }
+    .concept-block--bad  { background: rgba(220, 38, 38, 0.08); border: 1px solid rgba(220, 38, 38, 0.3); }
+    .concept-block--good { background: rgba(22, 163, 74, 0.08); border: 1px solid rgba(22, 163, 74, 0.3); }
+    .concept-block h5 { margin: 0 0 6px; font-size: 12px; font-weight: 700; font-family: -apple-system, sans-serif; }
+    .arrow { color: var(--ric-color-fg-muted); }
+  </style>
+</head>
+<body>
+
+<div id="nav_bar" data-sample="18"></div>
+<div id="app"></div>
+
+<script type="text/plain" id="md-explain">
+## なぜ key が要るのか — 内部で何が起きているか
+
+### key 無し: 位置ベースの DOM 再利用
+
+子要素 (兄弟リスト) を **位置 (index)** で対応付けます。
+prev[0] と next[0]、prev[1] と next[1] が「同じ要素」とみなされ、DOM が再利用されます。
+
+```
+prev: [ <li>(A)  <li>(B)  <li>(C) ]
+       ↓ シャッフル
+next: [ <li>(C)  <li>(A)  <li>(B) ]
+
+       位置 0 の DOM ← C の状態を patch
+       位置 1 の DOM ← A の状態を patch
+       位置 2 の DOM ← B の状態を patch
+```
+
+結果として、A の `<input>` に focus していても、A の DOM が「C の中身」に書き換えられて
+focus が外れます。ユーザーが入力中だった文字列も、state の値 (= C の `value`) で
+上書きされます (v0.3.24〜 の `FORCE_REAPPLY_DOM_KEYS` がそうさせる)。
+
+### key あり: 論理 ID ベースの DOM 再利用
+
+`key` 属性 (`{ tag: 'li', key: row.id }`) を付けると、prev と next を **key** で対応付けます。
+同じ key を持つ要素は「同じ論理エンティティ」とみなされ、DOM が **物理的に移動** します
+(`insertBefore`)。
+
+```
+prev: [ <li key=A>  <li key=B>  <li key=C> ]
+       ↓ シャッフル
+next: [ <li key=C>  <li key=A>  <li key=B> ]
+
+       key=A の DOM → 位置 1 に移動 (insertBefore)
+       key=B の DOM → 位置 2 に移動
+       key=C の DOM → 位置 0 に移動
+```
+
+A の `<input>` に focus していれば、A の DOM がそのまま位置 1 に移動するだけ。
+focus も入力中の文字列も維持されます。React / Preact / Vue と同じ canon。
+
+### いつ使うか
+
+- **要素が並べ替わる可能性がある** リスト (ソート、ドラッグ並べ替え、フィルタ変更)
+- **中央に挿入される可能性がある** リスト (チャット、通知、検索結果)
+- **削除される可能性がある** リスト (削除ボタン、フィルタ)
+- **input / textarea / checkbox** を含む行 (focus と入力中の値を維持したい)
+
+### いつ要らないか
+
+- 固定構造 (header / nav / footer など、位置が変わらない)
+- 末尾追加 / 末尾削除だけのリスト (位置ベースでも問題が出にくい)
+
+「迷ったら付けておく」のが安全。`key` は DOM 属性として出ないので、余計な HTML 重量は発生しません。
+</script>
+
+<script src="_nav_bar.js"></script>
+<script>
+'use strict';
+
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_toast,
+  ui_panel, ui_text, ui_button, ui_code_pre, ui_md_pre,
+} = RicUI;
+
+const MD_EXPLAIN = document.getElementById('md-explain').textContent.trim();
+
+// 色は ID に対して安定 (= 同じ ID は同じ色)
+const _palette = ['#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#db2777'];
+const id_to_color = (id) => _palette[(id * 13) % _palette.length];
+
+// ────────────────────────────────────────────────────
+// 比較用の row VDOM (key 無し / key あり 両対応、引数で切り替え)
+// ────────────────────────────────────────────────────
+const build_row = (item, use_key, on_input) => {
+  const row = {
+    tag: 'div', class: 'row',
+    ctx: [
+      { tag: 'span', class: 'row__id',
+        style: { background: id_to_color(item.id) },
+        ctx: ['#' + item.id] },
+      { tag: 'input', class: 'row__input', type: 'text',
+        value: item.label,
+        placeholder: '行 ' + item.id + ' に何か入力してみる',
+        oninput: (e) => on_input(item.id, e.target.value),
+      },
+    ],
+  };
+  if (use_key) row.key = String(item.id);
+  return row;
+};
+
+create_RicDOM('#app', {
+  // 共有 items (= 両方の比較カラムが同じデータを描画)
+  items: [
+    { id: 1, label: '' },
+    { id: 2, label: '' },
+    { id: 3, label: '' },
+    { id: 4, label: '' },
+    { id: 5, label: '' },
+  ],
+  _next_id: 6,
+
+  page:  create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  toast: create_ui_toast(),
+
+  render(s) {
+    s.toast();   // portal
+
+    // ── FLIP アニメ: 操作前後の row 位置を記録し、差分を transform で animate ──
+    // 鍵となる挙動: key 無し列は DOM が位置に張り付くので **差分 0 → アニメ無し**。
+    // key あり列は DOM が論理エンティティに付いて移動するので **差分あり → スライドする**。
+    // 「見た目の最終状態」は両列とも同じ (state-driven) だが、その途中過程で差が出る。
+    const with_flip = (fn) => {
+      const containers = document.querySelectorAll('.cmp-col > div');
+      const before_pos = new Map();
+      containers.forEach((c) => {
+        for (const child of c.children) {
+          before_pos.set(child, child.getBoundingClientRect());
+        }
+      });
+      fn();
+      // 2 rAF 後に DOM 反映が確定 (= RicDOM の 1 rAF + 念のため 1 rAF)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        before_pos.forEach((rect, el) => {
+          if (!el.isConnected) return;
+          const now = el.getBoundingClientRect();
+          const dy = rect.top - now.top;
+          if (Math.abs(dy) > 0.5) {
+            el.animate(
+              [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
+              { duration: 400, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+            );
+          }
+        });
+      }));
+    };
+
+    // ── 操作 (両カラムに同じ effect、すべて FLIP で wrap) ──
+    const shuffle = () => with_flip(() => {
+      const next = [...s.items];
+      for (let i = next.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [next[i], next[j]] = [next[j], next[i]];
+      }
+      s.items = next;
+    });
+    const reverse = () => with_flip(() => {
+      s.items = [...s.items].reverse();
+    });
+    const insert_middle = () => with_flip(() => {
+      const id = s._next_id;
+      s._next_id = id + 1;
+      const mid = Math.floor(s.items.length / 2);
+      s.items = [...s.items.slice(0, mid), { id, label: '' }, ...s.items.slice(mid)];
+      s.toast.show(`#${id} を中央 (位置 ${mid}) に挿入`, { duration: 2000 });
+    });
+    const remove_middle = () => with_flip(() => {
+      if (s.items.length === 0) return;
+      const mid = Math.floor(s.items.length / 2);
+      const removed = s.items[mid];
+      s.items = [...s.items.slice(0, mid), ...s.items.slice(mid + 1)];
+      s.toast.show(`#${removed.id} を中央 (位置 ${mid}) から削除`, { duration: 2000 });
+    });
+    const reset = () => with_flip(() => {
+      s.items = [
+        { id: 1, label: '' }, { id: 2, label: '' }, { id: 3, label: '' },
+        { id: 4, label: '' }, { id: 5, label: '' },
+      ];
+      s._next_id = 6;
+    });
+
+    // input の値変更を items に反映 (state ↔ DOM の同期)
+    const on_input = (id, value) => {
+      s.items = s.items.map((it) => it.id === id ? { ...it, label: value } : it);
+    };
+
+    return s.page({
+      style: { padding: '20px', maxWidth: '880px', margin: '0 auto' },
+      ctx: [
+
+        // ── ヘッダー ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['key 属性でリスト操作を安定させる'] }),
+          ui_text({ variant: 'muted', ctx: [
+            'v0.3.25 で追加された VDOM の ',
+            { tag: 'code', ctx: ['key'] },
+            ' 属性の効果を、「key 無し」と「key あり」の同一データの 2 リストを並べて比較できるサンプル。',
+            'React / Preact / Vue の ', { tag: 'code', ctx: ['key'] }, ' prop と同じ canon。',
+          ]}),
+        ]}),
+
+        // ── 手順 ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: ['遊び方'] }),
+          { tag: 'div', class: 'steps', ctx: [
+            'まず ', { tag: 'b', ctx: ['🔀 シャッフル'] }, ' を押してみてください:',
+            { tag: 'ol', ctx: [
+              { tag: 'li', ctx: [
+                { tag: 'span', style: { color: '#dc2626' }, ctx: ['左 (key 無し):'] },
+                ' 行は ', { tag: 'b', ctx: ['動かない'] },
+                ' — 中身 (色と #N) だけがその場で書き換わる。',
+                ' DOM 自体は位置に張り付いて、エンティティが入れ替わるだけ。',
+              ]},
+              { tag: 'li', ctx: [
+                { tag: 'span', style: { color: '#16a34a' }, ctx: ['右 (key あり):'] },
+                ' 行が ', { tag: 'b', ctx: ['物理的にスライドして並び替わる'] },
+                ' — DOM が論理エンティティと一緒に動く (FLIP アニメで可視化)。',
+              ]},
+              { tag: 'li', ctx: [
+                'さらに体感したい場合: 両カラムの ', { tag: 'b', ctx: ['#1'] },
+                ' の入力欄に文字を入れてからシャッフル。',
+                { tag: 'span', style: { color: '#dc2626' }, ctx: ['左'] },
+                ' は文字が消えて新しい行の value に上書きされる (state-driven、v0.3.24〜)。',
+                { tag: 'span', style: { color: '#16a34a' }, ctx: ['右'] },
+                ' は文字が #1 と一緒に移動して残る (focus も維持)。',
+              ]},
+              { tag: 'li', ctx: ['他の操作 (中央挿入 / 中央削除 / 逆順 / リセット) も同様にアニメで違いがわかります。'] },
+            ]},
+          ]},
+        ]}),
+
+        // ── 共通操作 ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: ['操作 (両カラムに同時適用)'] }),
+          { tag: 'div', class: 'toolbar', ctx: [
+            ui_button({ variant: 'primary', ctx: ['🔀 シャッフル'],     onclick: shuffle }),
+            ui_button({ ctx: ['🔁 逆順'],                              onclick: reverse }),
+            ui_button({ ctx: ['➕ 中央に挿入'],                          onclick: insert_middle }),
+            ui_button({ ctx: ['➖ 中央を削除'],                          onclick: remove_middle }),
+            { tag: 'span', style: { flex: 1 } },
+            ui_button({ variant: 'ghost', ctx: ['🔄 リセット'],          onclick: reset }),
+          ]},
+          { tag: 'div', class: 'cmp-grid', style: { marginTop: '12px' }, ctx: [
+
+            // ── 左: key 無し ──
+            { tag: 'div', class: 'cmp-col cmp-col--bad', ctx: [
+              { tag: 'h4', ctx: [
+                '❌ key 無し ',
+                { tag: 'span', class: 'cmp-tag', ctx: ['従来 (position-based)'] },
+              ]},
+              { tag: 'div', ctx: s.items.map((it) => build_row(it, false, on_input)) },
+            ]},
+
+            // ── 右: key あり ──
+            { tag: 'div', class: 'cmp-col cmp-col--good', ctx: [
+              { tag: 'h4', ctx: [
+                '✅ key あり ',
+                { tag: 'span', class: 'cmp-tag', ctx: ['v0.3.25〜 (logical id)'] },
+              ]},
+              { tag: 'div', ctx: s.items.map((it) => build_row(it, true, on_input)) },
+            ]},
+          ]},
+        ]}),
+
+        // ── コード差分 ──
+        ui_panel({ ctx: [
+          ui_text({ variant: 'subtitle', ctx: ['コード差分はたった 1 行'] }),
+          ui_code_pre({ lang: 'javascript', ctx: [
+`// ❌ key 無し (従来 / 後方互換)
+items.map((item) => ({
+  tag: 'div', class: 'row',
+  ctx: [/* ... */],
+}))
+
+// ✅ key あり (v0.3.25〜)
+items.map((item) => ({
+  tag: 'div', class: 'row',
+  key: String(item.id),      // ← これだけ
+  ctx: [/* ... */],
+}))`,
+          ]}),
+          ui_text({ variant: 'muted', style: { fontSize: '12px', marginTop: '8px' }, ctx: [
+            'key の値は ', { tag: 'code', ctx: ['==='] },
+            ' 比較できるものなら何でも OK (string / number / Symbol)。',
+            '兄弟内で unique にしてください (重複は React 同様 warn なしで意図しない再生成が起きます)。',
+            'key は DOM 属性として出力されないので、HTML の重量は増えません。',
+          ]}),
+        ]}),
+
+        // ── 仕組みの解説 ──
+        ui_panel({ ctx: [
+          ui_md_pre({ ctx: [MD_EXPLAIN] }),
+        ]}),
+
+      ],
+    });
+  },
+});
+</script>
+</body>
+</html>

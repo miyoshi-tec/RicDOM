@@ -31,6 +31,13 @@
 //                    未 open での呼出は no-op (v0.3.14〜冪等化)
 //   inst.is_open() — uncontrolled で現在表示中かを返す (controlled では常に false)
 //
+// controlled mode の on_close は close の「発生源」を reason 引数で受け取る (v0.3.26〜):
+//   on_close(reason) で reason は 'overlay' | 'close-button' | 'escape' | 'api'。
+//   overlay 誤クリックでの誤クローズを防ぎたい等の用途:
+//     on_close: (reason) => { if (reason === 'overlay') return; s.open = false; }
+//   既存の on_close: () => {...} は引数を無視するだけで従来通り動く (完全後方互換)。
+//   uncontrolled mode は on_close を経由しないため reason は関係しない。
+//
 // 内部状態（短縮名 → 原名）:
 //   _o  — open        開閉状態（uncontrolled 用）
 //   _c  — closing     閉じるアニメーション中フラグ
@@ -69,19 +76,22 @@ const create_ui_dialog = () => {
   //   バグがあった (.open() 内の `if (_c) return` ガードに引っかかる)。
   //   未 open での .close() は意味が無い + 状態を壊すだけなので、早期 return で
   //   保護する。controlled mode では引き続き on_close を呼ぶ (親が状態管理)。
-  const _request_close = () => {
+  // reason: 'overlay' | 'close-button' | 'escape' | 'api' (v0.3.26〜)
+  //   controlled mode で on_close に渡され、consumer が発生源で分岐できる。
+  //   default 'api' は inst.close() の programmatic 呼び出し用。
+  const _request_close = (reason = 'api') => {
     if (inst._c) return;                     // 閉じアニメーション中
     if (!inst._cd && !inst._o) return;       // uncontrolled で未 open → 冪等 no-op
     if (inst._cd) {
-      inst._oc?.();                          // controlled: 親に通知（状態は変更しない）
+      inst._oc?.(reason);                    // controlled: 親に通知（状態は変更しない）
     } else {
-      _do_close();                           // uncontrolled: 既存動作
+      _do_close();                           // uncontrolled: 既存動作（on_close 不使用）
     }
   };
 
   // ESC キーハンドラ（ファクトリ作成時に 1 回だけ定義）
   const _esc_handler = (e) => {
-    if (e.key === 'Escape') _request_close();
+    if (e.key === 'Escape') _request_close('escape');
   };
 
   // inst(props) → VDOM（uncontrolled: trigger ボタン / controlled: null）
@@ -134,7 +144,9 @@ const create_ui_dialog = () => {
           class: 'ric-dialog__overlay' + (inst._c ? ' ric-dialog__overlay--out' : ''),
           'data-ric-role': 'dialog-overlay',
           style: { position: 'fixed', inset: 0, zIndex: 500 },
-          onclick: _request_close },
+          // reason 付きで呼ぶためアロー関数でラップ (直接渡すと click event が
+          // 第 1 引数になり reason を汚染する)
+          onclick: () => _request_close('overlay') },
         // ダイアログ本体（DOM 順でバックドロップの後 → 自然に前面）
         { tag: 'div',
           class: 'ric-dialog' + (inst._c ? ' ric-dialog--out' : ''),
@@ -152,7 +164,7 @@ const create_ui_dialog = () => {
               { tag: 'span', class: 'ric-dialog__title', 'data-ric-role': 'dialog-title', ctx: [title] },
               { tag: 'button', class: 'ric-dialog__close',
                 'data-ric-role': 'dialog-close',
-                onclick: _request_close,
+                onclick: () => _request_close('close-button'),
                 ctx: ['✕'] },
             ]},
             ctx.length    ? { tag: 'div', class: 'ric-dialog__body',   'data-ric-role': 'dialog-body',   ctx }     : null,

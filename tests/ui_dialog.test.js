@@ -268,6 +268,80 @@ describe('create_ui_dialog: controlled on_close', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// controlled: on_close(reason) — close 発生源の区別 (v0.3.26〜)
+// ─────────────────────────────────────────────────────────────
+describe('create_ui_dialog: on_close(reason) (v0.3.26〜)', () => {
+
+  it('overlay click は reason="overlay"', () => {
+    const inst = create_ui_dialog();
+    let reason;
+    inst({ open: true, title: 'Test', on_close: (r) => { reason = r; } });
+    const items = drain_portal();
+    items[0].onclick(); // overlay
+    assert.equal(reason, 'overlay');
+  });
+
+  it('✕ ボタン click は reason="close-button"', () => {
+    const inst = create_ui_dialog();
+    let reason;
+    inst({ open: true, title: 'Test', on_close: (r) => { reason = r; } });
+    const items = drain_portal();
+    const close_btn = find_by_class(items[1], 'ric-dialog__close')[0];
+    close_btn.onclick();
+    assert.equal(reason, 'close-button');
+  });
+
+  it('ESC キーは reason="escape"', () => {
+    setup_jsdom();
+    const inst = create_ui_dialog();
+    let reason;
+    inst({ open: true, title: 'Test', on_close: (r) => { reason = r; } });
+    drain_portal();
+    const ev = new KeyboardEvent('keydown', { key: 'Escape' });
+    document.dispatchEvent(ev);
+    assert.equal(reason, 'escape');
+  });
+
+  it('inst.close() は reason="api"（programmatic）', () => {
+    const inst = create_ui_dialog();
+    let reason;
+    inst({ open: true, title: 'Test', on_close: (r) => { reason = r; } });
+    drain_portal();
+    inst.close();
+    assert.equal(reason, 'api');
+  });
+
+  it('reason で overlay だけ無視できる（TG ユースケース）', () => {
+    const inst = create_ui_dialog();
+    let closed = false;
+    const on_close = (reason) => {
+      if (reason === 'overlay') return;   // 外側クリックは無視
+      closed = true;
+    };
+    // overlay click → 無視
+    inst({ open: true, title: 'Test', on_close });
+    let items = drain_portal();
+    items[0].onclick();
+    assert.equal(closed, false, 'overlay click では閉じない');
+
+    // ✕ click → 閉じる
+    inst({ open: true, title: 'Test', on_close });
+    items = drain_portal();
+    find_by_class(items[1], 'ric-dialog__close')[0].onclick();
+    assert.equal(closed, true, '✕ click では閉じる');
+  });
+
+  it('後方互換: 引数なし on_close は従来通り呼ばれる', () => {
+    const inst = create_ui_dialog();
+    let called = false;
+    inst({ open: true, title: 'Test', on_close: () => { called = true; } });
+    const items = drain_portal();
+    items[0].onclick(); // overlay
+    assert.equal(called, true, '引数を無視する on_close も発火する');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
 // controlled: hybrid 禁止
 // ─────────────────────────────────────────────────────────────
 describe('create_ui_dialog: hybrid 禁止', () => {
