@@ -767,8 +767,30 @@ s.menu({ icon: '≡', ctx: [...] })
 s.cfg({ icon: '⚙', ghost: true, ctx: [...] })
 ```
 
-内部状態: `_o`(open), `_c`(closing), `_d`(dir), `_er`(expand_right), `_p`(pos)
-メソッド: `inst.close()` — 即座に閉じる（アニメーションなし。排他制御から呼ばれる）
+内部状態: `_o`(open), `_c`(closing), `_d`(dir), `_er`(expand_right), `_p`(pos), `_m`(measuring, v0.3.27〜), `_eb`(esc_bound, v0.3.27〜)
+メソッド: `inst.close()` — 即座に閉じる（アニメーションなし。排他制御から呼ばれる）。
+v0.3.27〜 は `safe_notify` を発火する（dialog.close() と挙動を揃え、multi-instance での portal 残留を防ぐ）。
+
+**開き方向 (above/below) の決定 (v0.3.27〜)**:
+
+ポップアップを開く際、本体が trigger の下に収まるかで `above` / `below` を決める。
+v0.3.26 までは `ctx.length × 38px` で高さを見積もっていたが、`ctx` をラッパー要素で
+包むと「論理項目数」と「トップレベルノード数」がズレて方向判定が破綻した。
+
+v0.3.27〜 は **実 DOM を測る 2 段階方式**:
+
+1. trigger クリックで、暫定方向のまま `visibility: hidden` で本体を描画する（`_m = true`）
+2. 次の `requestAnimationFrame` で本体の `offsetHeight` を実測し、方向を確定して可視化（`_m = false`）
+
+1 フレーム遅延するが、ポップアップは元々 CSS open アニメーションを持つため体感はほぼ無い。
+`ctx` をどんな構造で包んでも正しく方向が決まる（マジックナンバー 38px を撤廃）。
+`requestAnimationFrame` / `document` が無い環境（SSR 等）では暫定方向のまま即表示に
+フォールバックする。
+
+**ESC キー (v0.3.27〜)**:
+
+ポップアップが開いている間だけ `document` に `keydown` を bind し、ESC で
+アニメーション付きクローズする（`create_ui_dialog` と同型）。閉じると unbind。
 
 #### create_ui_tooltip()
 

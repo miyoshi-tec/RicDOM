@@ -165,3 +165,138 @@ describe('create_ui_popup: 排他制御', () => {
     assert.equal(a._o, true,  'a は open になる');
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// 開き方向の実測 (v0.3.27〜)
+// ─────────────────────────────────────────────────────────────
+describe('create_ui_popup: 開き方向の実 DOM 実測 (v0.3.27〜)', () => {
+
+  // jsdom + rAF shim + offsetHeight モックで「実測フェーズ」を再現する。
+  const setup = (trigger_rect, body_height, innerHeight = 800) => {
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM('<!DOCTYPE html><html><body><button id="t"></button></body></html>');
+    global.window   = dom.window;
+    global.document = dom.window.document;
+    global.getComputedStyle = dom.window.getComputedStyle;
+    global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+    Object.defineProperty(dom.window, 'innerHeight', { configurable: true, value: innerHeight });
+    // trigger の rect をモック
+    const btn = document.getElementById('t');
+    btn.getBoundingClientRect = () => trigger_rect;
+    // popup body の offsetHeight をモック (querySelector で拾われる本体に効かせる)
+    Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetHeight', {
+      configurable: true, get() { return body_height; },
+    });
+    return { dom, btn };
+  };
+  const flush = (ms = 10) => new Promise((r) => setTimeout(r, ms));
+
+  it('実測で本体が下に収まらなければ above に補正される', async () => {
+    // trigger は画面下部 (bottom=780/800)、下の空きは 20px しかない。
+    // ctx は 1 個のラッパー (= 旧実装なら 1*38+8=46px と過小評価 → below 誤判定)。
+    // 実測 body = 300px なら above に開くべき。
+    const { btn } = setup({ top: 760, bottom: 780, left: 100, right: 140, width: 40 }, 300);
+    const p = create_ui_popup();
+    p.__notify = () => {};
+    const root = p({ icon: '⋯', ctx: [{ tag: 'div', ctx: ['wrapper with 4 items'] }] });
+    drain_portal();
+    const trigger = find_by_class(root, 'ric-popup__trigger')[0];
+
+    trigger.onclick({ currentTarget: btn });
+    // 開いた直後は measuring 中 (visibility:hidden)
+    assert.equal(p._m, true, 'onclick 直後は実測フェーズ');
+
+    await flush();   // rAF で実測 → 方向確定
+
+    assert.equal(p._m, false, '実測完了で measuring 解除');
+    assert.equal(p._d, 'above', '下に収まらないので above に補正される');
+  });
+
+  it('実測で本体が下に収まれば below のまま', async () => {
+    // trigger は画面上部、下に十分な空き。body 100px。
+    const { btn } = setup({ top: 50, bottom: 70, left: 100, right: 140, width: 40 }, 100);
+    const p = create_ui_popup();
+    p.__notify = () => {};
+    const root = p({ icon: '⋯', ctx: [{ tag: 'div', ctx: ['x'] }] });
+    drain_portal();
+    const trigger = find_by_class(root, 'ric-popup__trigger')[0];
+
+    trigger.onclick({ currentTarget: btn });
+    await flush();
+
+    assert.equal(p._d, 'below', '下に収まるので below');
+    assert.equal(p._m, false);
+  });
+
+  it('measuring 中は body に visibility:hidden が付く', () => {
+    const { btn } = setup({ top: 50, bottom: 70, left: 100, right: 140, width: 40 }, 100);
+    const p = create_ui_popup();
+    p.__notify = () => {};
+    let root = p({ icon: '⋯', ctx: [{ tag: 'div', ctx: ['x'] }] });
+    drain_portal();
+    find_by_class(root, 'ric-popup__trigger')[0].onclick({ currentTarget: btn });
+    // measuring 中の render を 1 回観測
+    root = p({ icon: '⋯', ctx: [{ tag: 'div', ctx: ['x'] }] });
+    const items = drain_portal();
+    const body = items[1];
+    assert.equal(body.style.visibility, 'hidden', 'measuring 中は hidden');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// ESC で閉じる (v0.3.27〜)
+// ─────────────────────────────────────────────────────────────
+describe('create_ui_popup: ESC キー (v0.3.27〜)', () => {
+
+  const setup_jsdom = () => {
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+    global.window   = dom.window;
+    global.document = dom.window.document;
+    global.KeyboardEvent = dom.window.KeyboardEvent;
+    return dom;
+  };
+
+  it('開いている間に ESC で閉じアニメーションが始まる', () => {
+    setup_jsdom();
+    const p = create_ui_popup();
+    let notified = 0;
+    p.__notify = () => { notified++; };
+    p._o = true;
+    p({ icon: '≡', ctx: [{ tag: 'div', ctx: ['x'] }] });   // ESC ハンドラ bind
+    drain_portal();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    assert.equal(p._c, true, 'ESC で closing 開始');
+    assert.ok(notified > 0, 'ESC で再描画が走る');
+  });
+
+  it('閉じている時の ESC は無視される', () => {
+    setup_jsdom();
+    const p = create_ui_popup();
+    p.__notify = () => {};
+    p({ icon: '≡', ctx: [] });   // _o=false なので bind されない
+    drain_portal();
+    // ESC を投げても何も起きない (例外も出ない)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    assert.equal(p._c, false);
+    assert.equal(p._o, false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// close() が __notify を発火する (v0.3.27〜)
+// ─────────────────────────────────────────────────────────────
+describe('create_ui_popup: close() の __notify (v0.3.27〜)', () => {
+
+  it('close() で safe_notify が発火する (dialog と挙動を揃える)', () => {
+    const p = create_ui_popup();
+    let notified = 0;
+    p.__notify = () => { notified++; };
+    p._o = true;
+    p.close();
+    assert.equal(p._o, false);
+    assert.equal(p._c, false);
+    assert.equal(notified, 1, 'close() で再描画が 1 回スケジュールされる');
+  });
+});

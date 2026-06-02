@@ -26,6 +26,19 @@
 //   _d  — dir           ポップアップ展開方向 ('below'|'above')
 //   _p  — pos           位置情報オブジェクト
 //   _er — expand_right  左右配置フラグ
+//   _m  — measuring     実測フェーズ中（v0.3.27〜。下記参照）
+//   _eb — esc_bound     ESC ハンドラの bind 状態（v0.3.27〜）
+//   _pid— popup_id      DOM 上の本体を一意特定するための id（v0.3.27〜）
+//
+// 開き方向 (above/below) の決定 (v0.3.27〜):
+//   旧実装は `ctx.length * 38px` で高さを見積もっていたが、ctx をラッパー要素で
+//   包むと「論理項目数」と「トップレベルノード数」がズレて方向判定が破綻した
+//   (TrendGuard 報告)。v0.3.27 では実 DOM を測る 2 段階方式に変更:
+//     1) trigger onclick で暫定方向のまま visibility:hidden で開く (_m=true)
+//     2) 次の rAF で本体の offsetHeight を実測し、方向を確定して可視化 (_m=false)
+//   1 フレーム遅延するが、popup は元々 CSS open アニメを持つため体感はほぼ無い。
+//   rAF / document が無い環境 (SSR 等) では暫定方向のまま即表示にフォールバックする
+//   (= 旧挙動、popup が hidden のまま固まらないための保護)。
 
 'use strict';
 
@@ -36,7 +49,12 @@ const {
 } = require('./_popup_utils');
 const { safe_notify } = require('../_factory_helpers');
 
+// popup 本体の DOM を一意特定するためのモジュールレベルカウンタ。
+let _next_popup_id = 0;
+
 const create_ui_popup = () => {
+
+  const _pid = ++_next_popup_id;
 
   // アニメーション終了時の後片付け
   const _on_anim_end = () => {
@@ -53,12 +71,53 @@ const create_ui_popup = () => {
     safe_notify(inst, 'create_ui_popup');
   };
 
+  // ESC キーハンドラ（ファクトリ作成時に 1 回だけ定義）
+  // dialog と同型: 開いている間だけ document に bind し、ESC でアニメ付きクローズ。
+  const _esc_handler = (e) => {
+    if (e.key === 'Escape' && inst._o && !inst._c) _do_close();
+  };
+
+  // 位置情報 _p を方向 (dir) から計算する。
+  // rect: trigger の getBoundingClientRect、cb: containing block。
+  // 実測フェーズの前後どちらでも同じ計算を使えるよう helper に切り出した (v0.3.27〜)。
+  const _compute_pos = (rect, cb, dir, is_label, trigger_el) => {
+    if (is_label) {
+      // ラベルモード：ボタン幅を最小幅として、コンテンツに合わせて広がる
+      return {
+        top:    dir === 'below' ? rect.bottom - cb.top + 2  : undefined,
+        bottom: dir === 'above' ? cb.bottom - rect.top + 2  : undefined,
+        left:   rect.left - cb.left,
+        minWidth: rect.width,
+      };
+    }
+    // アイコンモード：左右スマート配置
+    const ref = _get_expand_ref(trigger_el);
+    inst._er = rect.left < (ref.left + ref.right) / 2;
+    return {
+      top:    dir === 'below' ? rect.bottom - cb.top + 4  : undefined,
+      bottom: dir === 'above' ? cb.bottom - rect.top + 4  : undefined,
+      left:   inst._er ? rect.left - cb.left : undefined,
+      right:  inst._er ? undefined : cb.right - rect.right,
+    };
+  };
 
   // inst(props) → VDOM
   const inst = ({ label, icon, ghost = false, ctx = [], theme, density, font_size } = {}) => {
     // label / icon どちらもなければデフォルトアイコン
     const is_label = !!label && !icon;
     const trigger_text = icon ?? (label ? undefined : '≡');
+
+    // ── ESC キー bind / unbind（開いている間だけ）──
+    if (typeof document !== 'undefined') {
+      if (inst._o && !inst._eb) {
+        document.addEventListener('keydown', _esc_handler);
+        inst._eb = true;
+      }
+      if (!inst._o && inst._eb) {
+        document.removeEventListener('keydown', _esc_handler);
+        inst._eb = false;
+      }
+    }
 
     if (inst._o) {
       const portal_items = [
@@ -68,11 +127,14 @@ const create_ui_popup = () => {
           style: { position: 'fixed', inset: 0, zIndex: 401 },
           onclick: _do_close },
         // ポップアップ本体
+        // 実測フェーズ中 (_m) は visibility:hidden で 1 フレーム描画し、offsetHeight を
+        // 測ってから可視化する (方向確定のため。下記 onclick の rAF を参照)。
         { tag: 'div',
           class: 'ric-popup__body ric-popup__body--' + inst._d
                + (inst._c ? ' ric-popup__body--out' : ''),
           'data-ric-role': 'popup-body',
-          style: _pos_style(inst._p),
+          'data-ric-popup-id': _pid,
+          style: inst._m ? { ..._pos_style(inst._p), visibility: 'hidden' } : _pos_style(inst._p),
           onclick: _do_close,
           onanimationend: _on_anim_end,
           ctx: ctx,
@@ -96,34 +158,41 @@ const create_ui_popup = () => {
             if (inst._c) return;
             if (inst._o) {
               _do_close();
-            } else {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const cb   = _get_portal_cb(e.currentTarget);
-              inst._d    = make_popup_dir(e.currentTarget, ctx.length * 38 + 8);
-              _close_others(inst);
+              return;
+            }
+            const trigger_el = e.currentTarget;
+            const rect = trigger_el.getBoundingClientRect();
+            const cb   = _get_portal_cb(trigger_el);
+            _close_others(inst);
 
-              if (is_label) {
-                // ラベルモード：ボタン幅を最小幅として、コンテンツに合わせて広がる
-                inst._p = {
-                  top:    inst._d === 'below' ? rect.bottom - cb.top + 2  : undefined,
-                  bottom: inst._d === 'above' ? cb.bottom - rect.top + 2  : undefined,
-                  left:   rect.left - cb.left,
-                  minWidth: rect.width,
-                };
-              } else {
-                // アイコンモード：左右スマート配置
-                const ref = _get_expand_ref(e.currentTarget);
-                inst._er = rect.left < (ref.left + ref.right) / 2;
-                inst._p = {
-                  top:    inst._d === 'below' ? rect.bottom - cb.top + 4  : undefined,
-                  bottom: inst._d === 'above' ? cb.bottom - rect.top + 4  : undefined,
-                  left:   inst._er ? rect.left - cb.left : undefined,
-                  right:  inst._er ? undefined : cb.right - rect.right,
-                };
-              }
+            // 暫定方向: ctx.length 見積りで一旦決める (実測前のプレースホルダ)。
+            inst._d = make_popup_dir(trigger_el, ctx.length * 38 + 8);
+            inst._p = _compute_pos(rect, cb, inst._d, is_label, trigger_el);
 
-              inst._o = true;
-              safe_notify(inst, 'create_ui_popup');
+            // rAF + document があれば実測フェーズに入る (visibility:hidden で開く)。
+            // 無ければ暫定方向のまま即表示 (SSR 等のフォールバック = 旧挙動)。
+            const can_measure = typeof requestAnimationFrame !== 'undefined'
+                             && typeof document !== 'undefined';
+            inst._m = can_measure;
+            inst._o = true;
+            safe_notify(inst, 'create_ui_popup');
+
+            if (can_measure) {
+              requestAnimationFrame(() => {
+                // 開いている最中でなければ何もしない (連打で閉じた等)
+                if (!inst._o || inst._c) { inst._m = false; return; }
+                const body = document.querySelector(`[data-ric-popup-id="${_pid}"]`);
+                if (!body) { inst._m = false; safe_notify(inst, 'create_ui_popup'); return; }
+                // 実測した本体高さで方向を再判定
+                const measured_h = body.offsetHeight;
+                const new_dir = make_popup_dir(trigger_el, measured_h);
+                if (new_dir !== inst._d) {
+                  inst._d = new_dir;
+                  inst._p = _compute_pos(rect, cb, new_dir, is_label, trigger_el);
+                }
+                inst._m = false;   // 可視化
+                safe_notify(inst, 'create_ui_popup');
+              });
             }
           },
           ctx: is_label
@@ -140,11 +209,21 @@ const create_ui_popup = () => {
   inst._d  = 'below'; // dir
   inst._er = true;    // expand_right
   inst._p  = {};      // pos
+  inst._m  = false;   // measuring（実測フェーズ中、v0.3.27〜）
+  inst._eb = false;   // esc_bound（v0.3.27〜）
 
-  // 外部・排他制御から閉じるための API（即座・アニメなし）
+  // 外部・排他制御から閉じるための API（即座・アニメなし）。
+  // v0.3.27〜: safe_notify を発火するようにした。理由:
+  //   - dialog.close() と挙動を揃える (従来 popup だけ notify せず非対称だった)
+  //   - multi-instance で別インスタンスの popup を閉じたとき、その popup の portal が
+  //     残留する bug を解消 (閉じた側の __notify で再描画されて portal が除去される)
+  //   排他制御 (_close_others) からの呼び出しでも、open する側の notify と rAF で
+  //   バッチされるので二重描画にはならない。
   inst.close = () => {
     inst._o = false;
     inst._c = false;
+    inst._m = false;
+    safe_notify(inst, 'create_ui_popup');
   };
 
   // 排他制御リストに登録（モジュールレベル）
