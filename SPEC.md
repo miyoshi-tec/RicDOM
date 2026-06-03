@@ -1503,7 +1503,7 @@ s.tw = create_ui_tweak_panel({
 
 ## 5. Performance & Scale
 
-RicDOM は「state 全体の再評価 + VDOM 差分 patch」モデルで、8KB のコアに収めるため局所 reactive（partial re-render）は持たない。本節では規模が大きくなった時の対処パターンと、現状で測定されている性能レンジを記録する。
+RicDOM は「state 全体の再評価 + VDOM 差分 patch」モデルで、10KB のコアに収めるため局所 reactive（partial re-render）は持たない。本節では規模が大きくなった時の対処パターンと、現状で測定されている性能レンジを記録する。
 
 ### 計測の推奨パターン
 
@@ -1663,7 +1663,7 @@ create_RicDOM('#parent', {
 現時点では **用意していない**。理由:
 
 - 上記のパターンで大半のユースケースをカバーできる
-- コアを 8KB に保つため、optimization API はユーザーランド / RicUI 側で書く方針
+- コアを 10KB に保つため、optimization API はユーザーランド / RicUI 側で書く方針
 - 計測データが示す通り、実アプリで render 評価自体がボトルネックになるケースは稀（1.23ms / SVG 100+ ノード規模）
 
 需要が積み上がってきたら改めて設計する。

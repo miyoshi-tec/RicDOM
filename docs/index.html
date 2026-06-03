@@ -111,9 +111,9 @@
   </noscript>
   <header>
     <h1>RicDOM</h1>
-    <p><strong>JSON で書く、10KB のリアルタイムコントロール DOM ライブラリ</strong></p>
+    <p><strong>JSON で書く、お手軽 リアルタイムコントロール DOM ライブラリ</strong></p>
     <p>
-      Electron アプリ・社内ツール・パラメータ調整 UI 向けの軽量 JavaScript ライブラリ。
+      Electron アプリ・社内ツール・パラメータ調整 UI 向けの JavaScript ライブラリ。
       <code>{ tag: 'div', ctx: [...] }</code> 形式の JSON で UI を宣言し、
       Proxy ベースの自動再描画で動かします。
       <strong>Virtual DOM 無し</strong>、<strong>ビルド不要</strong>、
@@ -263,10 +263,10 @@ create_RicDOM('#index_page', {
         ui_text({ variant: 'title', ctx: ['RicDOM'],
           style: { fontSize: '2.5rem', textAlign: 'center' },
         }),
-        ui_text({ ctx: ['JSON で書く、10KB のリアルタイムコントロール DOM ライブラリ'],
+        ui_text({ ctx: ['JSON で書く、お手軽 リアルタイムコントロール DOM ライブラリ'],
           style: { textAlign: 'center', fontSize: '1.1rem', opacity: '0.7' },
         }),
-        ui_text({ ctx: ['Electron アプリ・社内ツール・パラメータ調整 UI 向け。大規模 SPA には向きません。'],
+        ui_text({ ctx: ['Electron アプリ・社内ツール・パラメータ調整 UI 向け。'],
           style: { textAlign: 'center', fontSize: '0.95rem', opacity: '0.75' },
         }),
         ui_text({ variant: 'muted', ctx: ['RicDOM = コア / RicUI = UI部品 + 調整パネル'],
@@ -336,7 +336,7 @@ create_RicDOM('#index_page', {
           // 💪 体（快適・軽やか）
           ui_text({ variant: 'label', ctx: ['💪 体（快適・軽やか）'] }),
           ui_col({ style: { paddingLeft: '1.5em' }, ctx: [
-            ui_text({ ctx: ['軽量 8KB — ロードが速い、ページが軽い'] }),
+            ui_text({ ctx: ['軽量 — ロードが速い、ページが軽い'] }),
             ui_text({ ctx: ['学習コスト低 — 覚えるのは create_RicDOM だけ'] }),
             ui_text({ ctx: ['ビルド不要 — webpack / Vite の設定地獄なし'] }),
             ui_text({ ctx: ['JSX 無し — トランスパイルなし、素の JavaScript で書ける'] }),
