@@ -3,7 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RicDOM — JSON で書くリアルタイムコントロール DOM</title>
+<title>RicDOM — JSON で書くリアルタイムコントロール DOM ライブラリ (JavaScript / Electron / ブラウザ)</title>
+
+<!-- SEO: page summary -->
+<meta name="description" content="RicDOM は JSON ツリーで UI を宣言する 10KB の軽量 DOM ライブラリ。ビルド不要、Virtual DOM 無し、Proxy 自動追跡。Electron アプリ・社内ツール・パラメータ調整 UI・データ可視化ツール向け。React / Vue より小さく、JSX もコンパイルも不要で <script> タグ 1 つで動きます。">
+<meta name="keywords" content="RicDOM, JavaScript ライブラリ, JSON UI, リアクティブ, Proxy, Electron, 軽量, ビルド不要, Virtual DOM なし, JSON DOM, declarative UI, lightweight, no-build">
+<meta name="author" content="miyoshi-tec">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://miyoshi-tec.github.io/RicDOM/">
+
+<!-- Open Graph (Facebook / LinkedIn / Discord 等) -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://miyoshi-tec.github.io/RicDOM/">
+<meta property="og:title" content="RicDOM — JSON で書くリアルタイムコントロール DOM">
+<meta property="og:description" content="ビルド不要・10KB・Virtual DOM 無し。JSON で UI を書けて Proxy で自動再描画。Electron / 社内ツール / パラメータ調整 UI 向け。">
+<meta property="og:site_name" content="RicDOM">
+<meta property="og:locale" content="ja_JP">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RicDOM — JSON で書くリアルタイムコントロール DOM">
+<meta name="twitter:description" content="ビルド不要・10KB・Virtual DOM 無し。JSON で UI を書けて Proxy で自動再描画。">
+
+<!-- 構造化データ: Rich result 候補 -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "RicDOM",
+  "codeRepository": "https://github.com/miyoshi-tec/RicDOM",
+  "programmingLanguage": "JavaScript",
+  "runtimePlatform": "Browser, Electron",
+  "license": "https://github.com/miyoshi-tec/RicDOM/blob/main/LICENSE",
+  "author": {
+    "@type": "Organization",
+    "name": "miyoshi-tec"
+  },
+  "description": "JSON ツリーで UI を宣言する軽量 DOM ライブラリ。ビルド不要、Virtual DOM 無し、Proxy 自動追跡で 10KB。Electron アプリ・社内ツール・パラメータ調整 UI 向け。",
+  "url": "https://miyoshi-tec.github.io/RicDOM/",
+  "keywords": "JavaScript, JSON, UI, declarative, reactive, Proxy, lightweight, no-build, Electron"
+}
+</script>
+
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 <style>
@@ -55,7 +96,103 @@
 </style>
 </head>
 <body>
-<div id="index_page"></div>
+<!--
+  #index_page の中身は RicDOM の最初の render で innerHTML='' で消されて
+  再構築されます。なので JS が動くユーザーには下の静的コンテンツは見えません。
+  目的: JS が遅い / 無効 / クローラーの初回 fetch でも、ページの内容が
+  「最低限の意味」として読めるようにする (progressive enhancement)。
+-->
+<div id="index_page">
+  <noscript>
+    <p style="color:#dc2626; padding:12px; background:#fef2f2; border-radius:4px;">
+      RicDOM のデモは JavaScript を有効にすると動作します。
+      ライブラリ自体の概要は下記をご覧ください。
+    </p>
+  </noscript>
+  <header>
+    <h1>RicDOM</h1>
+    <p><strong>JSON で書く、10KB のリアルタイムコントロール DOM ライブラリ</strong></p>
+    <p>
+      Electron アプリ・社内ツール・パラメータ調整 UI 向けの軽量 JavaScript ライブラリ。
+      <code>{ tag: 'div', ctx: [...] }</code> 形式の JSON で UI を宣言し、
+      Proxy ベースの自動再描画で動かします。
+      <strong>Virtual DOM 無し</strong>、<strong>ビルド不要</strong>、
+      <code>&lt;script&gt;</code> タグ 1 つで動きます。
+    </p>
+  </header>
+  <section>
+    <h2>主な特徴</h2>
+    <ul>
+      <li><strong>JSON 記述</strong> — UI を plain JavaScript object で定義</li>
+      <li><strong>Virtual DOM なし</strong> — JSON 差分から実 DOM を直接パッチ。input フォーカス・IME 変換を壊さない</li>
+      <li><strong>Proxy 自動追跡</strong> — <code>s.count = 5</code> で自動再描画</li>
+      <li><strong>極小バンドル</strong> — RicDOM コア 10KB / RicUI 64KB (minified)</li>
+      <li><strong>テーマ × 密度</strong> — CSS 変数で 5 テーマ × 3 密度</li>
+      <li><strong>Electron / ブラウザ両対応</strong></li>
+    </ul>
+  </section>
+  <section>
+    <h2>ハマるアプリ</h2>
+    <p>
+      Electron アプリ、社内業務ツール、プロトタイプ、データ可視化ツール、
+      パラメータ調整 UI、リアルタイムダッシュボード、IoT デバイスの設定 UI。
+    </p>
+    <h3>苦手なアプリ</h3>
+    <p>大規模 SPA、SEO 必須のマーケティングサイト。</p>
+  </section>
+  <section>
+    <h2>クイックスタート</h2>
+    <pre><code>&lt;script src="RicDOM.min.js"&gt;&lt;/script&gt;
+&lt;div id="app"&gt;&lt;/div&gt;
+&lt;script&gt;
+const { create_RicDOM } = RicDOM;
+create_RicDOM('#app', {
+  count: 0,
+  render: (s) =&gt; ({
+    tag: 'button',
+    ctx: [`Count: ${s.count}`],
+    onclick: () =&gt; { s.count++; }
+  })
+});
+&lt;/script&gt;</code></pre>
+  </section>
+  <section>
+    <h2>関連リソース</h2>
+    <ul>
+      <li><a href="https://github.com/miyoshi-tec/RicDOM">GitHub リポジトリ</a></li>
+      <li><a href="https://github.com/miyoshi-tec/RicDOM/blob/main/SPEC.md">SPEC.md (技術仕様)</a></li>
+      <li><a href="https://github.com/miyoshi-tec/RicDOM/blob/main/TUTORIAL.md">TUTORIAL.md (チュートリアル)</a></li>
+      <li><a href="lz_playground.html">LZ String Playground (圧縮ツール)</a></li>
+    </ul>
+  </section>
+  <section>
+    <h2>サンプル一覧</h2>
+    <ul>
+      <li><a href="samples/00_hello.html">00 — Hello World</a></li>
+      <li><a href="samples/01_forms.html">01 — フォーム (bind_input / ui_checkbox / ui_radiobutton)</a></li>
+      <li><a href="samples/02_controls.html">02 — コントロール (ui_button / popup)</a></li>
+      <li><a href="samples/03_popup.html">03 — ポップアップ / ツールチップ</a></li>
+      <li><a href="samples/04_accordion_dialog.html">04 — ダイアログ &amp; トースト</a></li>
+      <li><a href="samples/05_toast_accordion.html">05 — アコーディオン</a></li>
+      <li><a href="samples/06_splitter.html">06 — スプリッター</a></li>
+      <li><a href="samples/07_tweak_splitter.html">07 — Tweak Panel + スプリッター</a></li>
+      <li><a href="samples/08_tweak_menu.html">08 — Tweak Panel + メニュー</a></li>
+      <li><a href="samples/09_json_editor.html">09 — JSON エディタ</a></li>
+      <li><a href="samples/10_theme_studio.html">10 — Theme Studio</a></li>
+      <li><a href="samples/11_theme_override.html">11 — テーマ上書き</a></li>
+      <li><a href="samples/12_md_viewer.html">12 — Markdown ビューア</a></li>
+      <li><a href="samples/13_controlled_dialog_splitter.html">13 — Controlled Mode</a></li>
+      <li><a href="samples/14_collapse_box.html">14 — Collapse Box (入退場アニメ)</a></li>
+      <li><a href="samples/15_ai_chat.html">15 — AI Chat (live)</a></li>
+      <li><a href="samples/16_svg_editor.html">16 — SVG ツリーエディタ</a></li>
+      <li><a href="samples/17_multi_ricdom.html">17 — Multi-instance Memo</a></li>
+      <li><a href="samples/18_key_reconciliation.html">18 — Key Reconciliation (リスト並べ替え)</a></li>
+    </ul>
+  </section>
+  <footer>
+    <p><small>RicDOM — author: miyoshi-tec / 非商用 MIT</small></p>
+  </footer>
+</div>
 <script src="RicDOM.min.js"></script>
 <script src="RicUI.min.js"></script>
 <script>

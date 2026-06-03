@@ -1,0 +1,7 @@
+# RicDOM — robots.txt
+# 全クローラーに対して全公開ページを許可
+User-agent: *
+Allow: /
+
+# sitemap の場所を明示
+Sitemap: https://miyoshi-tec.github.io/RicDOM/sitemap.xml
