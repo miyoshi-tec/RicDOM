@@ -3,6 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ui_md_pre で Markdown を VDOM に変換、コードハイライト対応。">
+  <meta name="author" content="miyoshi-tec">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://miyoshi-tec.github.io/RicDOM/samples/12_md_viewer.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://miyoshi-tec.github.io/RicDOM/samples/12_md_viewer.html">
+  <meta property="og:title" content="Markdown ビューア — RicDOM">
+  <meta property="og:description" content="ui_md_pre で Markdown を VDOM に変換、コードハイライト対応。">
+  <meta property="og:site_name" content="RicDOM">
+  <meta property="og:locale" content="ja_JP">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Markdown ビューア — RicDOM">
+  <meta name="twitter:description" content="ui_md_pre で Markdown を VDOM に変換、コードハイライト対応。">
   <title>Markdown Viewer — RicUI</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
@@ -17,7 +30,21 @@
   <script src="../RicUI.min.js"></script>
 </head>
 <body>
-<div id="nav_bar" data-sample="12"></div>
+<div id="nav_bar" data-sample="12">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>Markdown ビューア — RicDOM</h1>
+      <p>ui_md_pre で Markdown を VDOM に変換、コードハイライト対応。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/12_md_viewer.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
 <p class="page-intro">
   <code>ui_md_pre</code> で Markdown を VDOM に変換します。外部ライブラリ不要で、
   ヘルプ画面やチュートリアル表示に使えます。「分割方向」ラジオで、ソース／プレビューの
