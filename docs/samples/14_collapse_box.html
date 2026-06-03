@@ -101,7 +101,21 @@
 </head>
 <body>
 
-<div id="nav_bar" data-sample="14"></div>
+<div id="nav_bar" data-sample="14">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>Collapse Box — RicDOM</h1>
+      <p>collapse_box の入退場アニメーション、6 パターン。配列状態とフラグの扱い canon。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/14_collapse_box.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
 <div id="app"></div>
 
 <!-- ════════════════════════════════════════════════════════════

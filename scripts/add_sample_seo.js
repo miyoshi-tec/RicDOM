@@ -32,9 +32,33 @@ const ENTRIES = {
   '18_key_reconciliation.html':        { title: 'Key Reconciliation — RicDOM',                 desc: 'key 属性でリスト並べ替え時に input focus / value が混ざらない、FLIP アニメで可視化。' },
 };
 
+// 静的 SEO fallback を生成する。
+// <div id="nav_bar" data-sample="XX"> の中に挿入され、_nav_bar.js (RicDOM) が
+// 最初の render で innerHTML='' により上書きするので、JS ユーザーには見えない。
+// Googlebot の初回 HTML fetch / JS 無効環境では、ページの内容が「最低限の意味」として読める。
+const build_fallback = (file, title, desc) => {
+  const repo_url = `https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/${file}`;
+  return `
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>${title}</h1>
+      <p>${desc}</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="${repo_url}">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->`;
+};
+
 const samples_dir = path.join(__dirname, '..', 'docs', 'samples');
 
-let updated = 0, skipped = 0;
+let head_updated = 0, head_skipped = 0;
+let body_updated = 0, body_skipped = 0, body_no_navbar = 0;
+
 for (const [file, { title, desc }] of Object.entries(ENTRIES)) {
   const fp = path.join(samples_dir, file);
   if (!fs.existsSync(fp)) {
@@ -43,13 +67,12 @@ for (const [file, { title, desc }] of Object.entries(ENTRIES)) {
   }
   let content = fs.readFileSync(fp, 'utf8');
 
+  // ── head: meta description / OG / Twitter / canonical ──
   if (content.includes('meta name="description"')) {
-    skipped++;
-    continue;
-  }
-
-  const url = REPO_BASE + file;
-  const seo_block =
+    head_skipped++;
+  } else {
+    const url = REPO_BASE + file;
+    const seo_block =
 `  <meta name="description" content="${desc}">
   <meta name="author" content="miyoshi-tec">
   <meta name="robots" content="index, follow">
@@ -64,17 +87,39 @@ for (const [file, { title, desc }] of Object.entries(ENTRIES)) {
   <meta name="twitter:title" content="${title}">
   <meta name="twitter:description" content="${desc}">`;
 
-  // viewport meta の直後に挿入 (どのサンプルも共通でここを持っている)
-  const new_content = content.replace(
-    /(<meta name="viewport"[^>]*>)/,
-    `$1\n${seo_block}`,
-  );
-  if (new_content === content) {
-    console.warn(`!! ${file}: viewport meta not found, skip`);
-    continue;
+    const new_content = content.replace(
+      /(<meta name="viewport"[^>]*>)/,
+      `$1\n${seo_block}`,
+    );
+    if (new_content === content) {
+      console.warn(`!! ${file}: viewport meta not found, skip head`);
+    } else {
+      content = new_content;
+      head_updated++;
+    }
   }
-  fs.writeFileSync(fp, new_content);
-  updated++;
+
+  // ── body: <div id="nav_bar" ...> の中に静的 fallback を入れる ──
+  // 既に "▼ 静的 SEO fallback" マーカーがあれば skip (冪等)
+  if (content.includes('▼ 静的 SEO fallback')) {
+    body_skipped++;
+  } else {
+    // 空の <div id="nav_bar" ...></div> を fallback 入り版に置換
+    const new_content = content.replace(
+      /(<div id="nav_bar"[^>]*)><\/div>/,
+      (_match, open) => `${open}>${build_fallback(file, title, desc)}\n  </div>`,
+    );
+    if (new_content === content) {
+      console.warn(`!! ${file}: empty <div id="nav_bar"></div> not found, skip body`);
+      body_no_navbar++;
+    } else {
+      content = new_content;
+      body_updated++;
+    }
+  }
+
+  fs.writeFileSync(fp, content);
 }
 
-console.log(`[seo] updated ${updated}, skipped (already had description) ${skipped}`);
+console.log(`[seo head] updated ${head_updated}, skipped (already had description) ${head_skipped}`);
+console.log(`[seo body] updated ${body_updated}, skipped (already had fallback) ${body_skipped}, no nav_bar ${body_no_navbar}`);

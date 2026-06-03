@@ -30,7 +30,21 @@
   <script src="../RicUI.min.js"></script>
 </head>
 <body>
-<div id="nav_bar" data-sample="12"></div>
+<div id="nav_bar" data-sample="12">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>Markdown ビューア — RicDOM</h1>
+      <p>ui_md_pre で Markdown を VDOM に変換、コードハイライト対応。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/12_md_viewer.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
 <p class="page-intro">
   <code>ui_md_pre</code> で Markdown を VDOM に変換します。外部ライブラリ不要で、
   ヘルプ画面やチュートリアル表示に使えます。「分割方向」ラジオで、ソース／プレビューの

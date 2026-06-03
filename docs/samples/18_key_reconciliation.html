@@ -97,7 +97,21 @@
 </head>
 <body>
 
-<div id="nav_bar" data-sample="18"></div>
+<div id="nav_bar" data-sample="18">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>Key Reconciliation — RicDOM</h1>
+      <p>key 属性でリスト並べ替え時に input focus / value が混ざらない、FLIP アニメで可視化。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/18_key_reconciliation.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
 <div id="app"></div>
 
 <script type="text/plain" id="md-explain">

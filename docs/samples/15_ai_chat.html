@@ -31,7 +31,21 @@
   <script src="../RicUI.min.js"></script>
 </head>
 <body>
-<div id="nav_bar" data-sample="15"></div>
+<div id="nav_bar" data-sample="15">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>AI Chat — RicDOM</h1>
+      <p>AI チャット UI、4 プロバイダ対応、SSE ストリーミング、API キーは state のみ保持。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/15_ai_chat.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
 <p class="page-intro">
   <strong>実 AI と話せるチャット</strong>デモ。Claude / ChatGPT / Gemini / Grok のいずれかの
   API キーを入力すると、その場でストリーミング応答が返ってきます。

@@ -119,7 +119,21 @@
 <body>
 
   <!-- ナビ -->
-  <div id="nav_bar" data-sample="03"></div>
+  <div id="nav_bar" data-sample="03">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>ポップアップ — RicDOM</h1>
+      <p>create_ui_popup と create_ui_tooltip のデモ。開き方向の自動判定と排他制御。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/03_popup.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
 
   <!-- イントロ -->
   <p class="page-intro">

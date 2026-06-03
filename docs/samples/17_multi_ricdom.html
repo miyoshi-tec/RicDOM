@@ -96,7 +96,21 @@
   <script src="../RicUI.min.js"></script>
 </head>
 <body>
-<div id="nav_bar" data-sample="17"></div>
+<div id="nav_bar" data-sample="17">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>Multi-instance Memo — RicDOM</h1>
+      <p>複数の create_RicDOM インスタンスをパネル単位に配置して再描画スコープを分離。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/17_multi_ricdom.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
 <p class="page-intro">
   <strong>multi-instance パターン</strong> — render 関数を分割するのではなく、
   <code>create_RicDOM</code> をパネル単位に分けて再描画スコープを物理的に分離します。
