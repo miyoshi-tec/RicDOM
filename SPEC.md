@@ -767,7 +767,7 @@ s.menu({ icon: '≡', ctx: [...] })
 s.cfg({ icon: '⚙', ghost: true, ctx: [...] })
 ```
 
-内部状態: `_o`(open), `_c`(closing), `_d`(dir), `_er`(expand_right), `_p`(pos), `_m`(measuring, v0.3.27〜), `_eb`(esc_bound, v0.3.27〜)
+内部状態: `_o`(open), `_c`(closing), `_d`(dir), `_p`(pos), `_m`(measuring, v0.3.27〜), `_eb`(esc_bound, v0.3.27〜)
 メソッド: `inst.close()` — 即座に閉じる（アニメーションなし。排他制御から呼ばれる）。
 v0.3.27〜 は `safe_notify` を発火する（dialog.close() と挙動を揃え、multi-instance での portal 残留を防ぐ）。
 

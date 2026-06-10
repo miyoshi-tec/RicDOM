@@ -326,9 +326,12 @@ const build_dom_node = (raw_node, inherited_namespace = null) => {
     el.dataset.ricRef = normalized.ref;
   }
 
-  // 子要素を再帰的に構築する
-  for (const child of normalized.ctx) {
-    if (is_invisible_value(child)) continue;
+  // 子要素を再帰的に構築する。
+  // normalize_children でネスト配列を展開してから回す (patch 経路と同じ規則)。
+  // これが無いと `ctx: [items.map(...)]` のような配列入り ctx が、初期 build で
+  // 「配列を element として normalize → 数字 key を setAttribute → DOMException」
+  // になって落ちる (patch 経路だけ展開できても初期描画で死ぬ)。
+  for (const child of normalize_children(normalized.ctx)) {
     const child_el = build_dom_node(child, current_namespace);
     if (child_el) el.appendChild(child_el);
   }
@@ -528,16 +531,20 @@ const _apply_force_reapply_to_subtree = (normalized_children, parent_el) => {
   }
 };
 
-// 子要素リストの差分を DOM に反映する（前回・今回の正規化済み JSON を受け取る）
 // 子要素リストに 1 つでも `key` 属性が付いていれば true。
 // 付いていれば key-based reconciliation を使う (v0.3.25〜)。
-const _children_have_any_key = (raw_children) => {
-  for (const c of raw_children) {
+// 引数は normalize_children() 通過済みのリストであること (= ネスト配列は展開済み)。
+// raw のまま渡すと `ctx: [items.map(...)]` のようなネスト配列内の key を見落とす。
+const _children_have_any_key = (children) => {
+  for (const c of children) {
     if (c && typeof c === 'object' && !Array.isArray(c) && c.key != null) return true;
   }
   return false;
 };
 
+// 子要素リストの差分を DOM に反映する。
+// raw な children を受け取り、内部で normalize_children() してから
+// key-based / position-based のどちらかの reconciliation に dispatch する。
 const patch_children = (prev_raw_children, next_raw_children, parent_el) => {
   const prev_children = normalize_children(prev_raw_children);
   const next_children = normalize_children(next_raw_children);
@@ -558,7 +565,9 @@ const patch_children = (prev_raw_children, next_raw_children, parent_el) => {
   // v0.3.25〜: 子要素のどれかに `key` が付いていれば key-based reconciliation を使う。
   // (= リスト並べ替え / 中央挿入 / 削除に強い。React / Preact と同じ canon。)
   // key が無い従来のコードは引き続き position-based (= 後方互換)。
-  if (_children_have_any_key(prev_raw_children) || _children_have_any_key(next_raw_children)) {
+  // 検査は normalize 済みリストに対して行う (raw だと `ctx: [items.map(...)]` の
+  // ようなネスト配列内の key を見落とすため)。
+  if (_children_have_any_key(prev_children) || _children_have_any_key(next_children)) {
     patch_children_by_key(prev_children, next_children, parent_el);
     return;
   }

@@ -25,7 +25,6 @@
 //   _c  — closing       閉じるアニメーション中
 //   _d  — dir           ポップアップ展開方向 ('below'|'above')
 //   _p  — pos           位置情報オブジェクト
-//   _er — expand_right  左右配置フラグ
 //   _m  — measuring     実測フェーズ中（v0.3.27〜。下記参照）
 //   _eb — esc_bound     ESC ハンドラの bind 状態（v0.3.27〜）
 //   _pid— popup_id      DOM 上の本体を一意特定するための id（v0.3.27〜）
@@ -90,14 +89,14 @@ const create_ui_popup = () => {
         minWidth: rect.width,
       };
     }
-    // アイコンモード：左右スマート配置
+    // アイコンモード：trigger が論理コンテナの左半分にあれば右方向へ展開
     const ref = _get_expand_ref(trigger_el);
-    inst._er = rect.left < (ref.left + ref.right) / 2;
+    const expand_right = rect.left < (ref.left + ref.right) / 2;
     return {
       top:    dir === 'below' ? rect.bottom - cb.top + 4  : undefined,
       bottom: dir === 'above' ? cb.bottom - rect.top + 4  : undefined,
-      left:   inst._er ? rect.left - cb.left : undefined,
-      right:  inst._er ? undefined : cb.right - rect.right,
+      left:   expand_right ? rect.left - cb.left : undefined,
+      right:  expand_right ? undefined : cb.right - rect.right,
     };
   };
 
@@ -207,7 +206,6 @@ const create_ui_popup = () => {
   inst._o  = false;   // open
   inst._c  = false;   // closing
   inst._d  = 'below'; // dir
-  inst._er = true;    // expand_right
   inst._p  = {};      // pos
   inst._m  = false;   // measuring（実測フェーズ中、v0.3.27〜）
   inst._eb = false;   // esc_bound（v0.3.27〜）
