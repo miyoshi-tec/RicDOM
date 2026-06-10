@@ -34,12 +34,9 @@ describe('child proxy 経由の代入で __notify が自動付与される (v0.3
   test('s.dict[key] = factory() で factory.__notify が刺さる', async () => {
     const { create_RicDOM } = require('../src/ricdom');
 
-    // 自前 factory (= create_ui_* と同等の構造)
-    const make_fake_factory = () => {
-      const fn = () => null;
-      // __notify が刺さっていれば呼べる
-      return fn;
-    };
+    // create_ui_* の代役: __notify 注入は「関数 or オブジェクト」なら何にでも
+    // 行われるので、最小の関数で十分 (実 factory を import すると test が重くなる)
+    const make_fake_factory = () => () => null;
 
     const handle = create_RicDOM('#app', {
       // child object (= depth-2 wrap される)

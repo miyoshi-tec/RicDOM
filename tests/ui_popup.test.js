@@ -178,7 +178,9 @@ describe('create_ui_popup: 開き方向の実 DOM 実測 (v0.3.27〜)', () => {
     global.window   = dom.window;
     global.document = dom.window.document;
     global.getComputedStyle = dom.window.getComputedStyle;
-    global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+    // rAF shim は setImmediate (setTimeout(0) は Node の timer phase 跨ぎで
+    // 稀に starve する。collapse_box テストで確立した canon に合わせる)
+    global.requestAnimationFrame = (cb) => setImmediate(cb);
     Object.defineProperty(dom.window, 'innerHeight', { configurable: true, value: innerHeight });
     // trigger の rect をモック
     const btn = document.getElementById('t');

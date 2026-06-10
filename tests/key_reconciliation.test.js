@@ -205,4 +205,34 @@ describe('key 属性: 論理エンティティと DOM ノードの対応付け',
     assert.equal(ps_after[0], p_keyed, 'keyed=X が先頭に移動 (DOM identity 維持)');
     assert.equal(ps_after[1], p_plain, 'unkeyed plain は末尾 (DOM identity 維持)');
   });
+
+  test('ネスト配列 (ctx: [items.map(...)]) でも key reconciliation が効く', async () => {
+    // normalize_children が配列を 1 段展開するので、`ctx: [...items.map()]` と
+    // `ctx: [items.map()]` は等価のはず。だが v0.3.25 当初は key 検査を raw children
+    // に対して行っていたため、後者で key が見落とされて position-based に落ちていた。
+    // また初期 build 経路もネスト配列を展開しておらず DOMException で落ちていた。
+    // 両方の regression をここでカバーする。
+    const { create_RicDOM } = require('../src/ricdom');
+    const handle = create_RicDOM('#app', {
+      items: [{ id: 'A' }, { id: 'B' }],
+      render: (s) => ({ tag: 'ul', ctx: [
+        s.items.map((it) => ({ tag: 'li', key: it.id, ctx: [it.id] })),   // ← 非 spread
+      ]}),
+    });
+    await flush();
+
+    // 初期 build がネスト配列で例外を出さず 2 つの li を生成する
+    const before = document.querySelectorAll('li');
+    assert.equal(before.length, 2, 'ネスト配列でも初期 build が成功する');
+    const li_A = before[0];
+    const li_B = before[1];
+
+    // 並べ替え → key で DOM identity が維持される
+    handle.items = [{ id: 'B' }, { id: 'A' }];
+    await flush();
+
+    const after = document.querySelectorAll('li');
+    assert.equal(after[0], li_B, 'B の DOM が先頭に移動 (ネスト配列でも key が効く)');
+    assert.equal(after[1], li_A, 'A の DOM が末尾に移動');
+  });
 });

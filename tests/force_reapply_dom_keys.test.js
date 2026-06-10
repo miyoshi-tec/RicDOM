@@ -147,13 +147,12 @@ describe('FORCE_REAPPLY_DOM_KEYS: ユーザー操作で drift した DOM を sta
       '再 render で state.top=100 が DOM に再適用される');
   });
 
-  test('disabled: drift しない prop は equality check のままで OK (性能劣化なし)', async () => {
+  test('disabled: FORCE_REAPPLY 対象外の prop も再 render を跨いで壊れない', async () => {
+    // disabled は FORCE_REAPPLY_DOM_KEYS に入っていない (user 操作で drift しないため
+    // equality check で skip される)。setter 回数を spy すると jsdom の prototype 改変が
+    // 他テストへ漏れるため、ここでは「何度再 render しても値が維持される」ことだけ確認する。
     const { create_RicDOM } = require('../src/ricdom');
 
-    let set_count = 0;
-    // disabled setter を spy したいが jsdom の prototype を直接弄ると他テストに
-    // 影響するので、ここでは「同じ disabled で何度再 render しても warn 等が
-    // 出ないこと」だけ確認する。
     const handle = create_RicDOM('#app', {
       tick: 0,
       render: (s) => {
@@ -171,6 +170,5 @@ describe('FORCE_REAPPLY_DOM_KEYS: ユーザー操作で drift した DOM を sta
       await flush();
     }
     assert.equal(b.disabled, true, 'disabled は equality check で skip されても問題なし');
-    void set_count;
   });
 });
