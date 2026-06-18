@@ -245,7 +245,7 @@ ${_P}.ric-icon {
 }
 @keyframes ric-spin { to { transform: rotate(360deg); } }
 ${_P}.ric-icon--spin {
-  animation: ric-spin 0.8s linear infinite;
+  animation: ric-spin 1.4s linear infinite;
 }`,
 
   'ric-button': () => `

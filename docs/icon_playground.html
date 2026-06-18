@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="RicDOM のアイコンピッカー。同梱アイコン + Lucide (ISC) をブラウズして、使いたい分だけ ui_icon 用の JSON descriptor をコピーできるブラウザ内ツール。">
+<meta name="author" content="miyoshi-tec">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://miyoshi-tec.github.io/RicDOM/icon_playground.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://miyoshi-tec.github.io/RicDOM/icon_playground.html">
+<meta property="og:title" content="Icon Picker — RicDOM">
+<meta property="og:description" content="同梱アイコン + Lucide をブラウズして、使う分だけ ui_icon 用 descriptor をコピー。">
+<meta property="og:site_name" content="RicDOM">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Icon Picker — RicDOM">
+<meta name="twitter:description" content="同梱アイコン + Lucide をブラウズして使う分だけコピー。">
+<title>Icon Picker — RicDOM</title>
+<script src="RicDOM.min.js"></script>
+<script src="RicUI.min.js"></script>
+<script src="icons/svg_to_descriptor.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+  #app { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+  .icon-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    border: 1px solid var(--ric-color-border); border-radius: 8px; padding: 14px 4px;
+    cursor: pointer; transition: background 0.1s, border-color 0.1s;
+  }
+  .icon-cell:hover { border-color: var(--ric-color-accent); }
+  .icon-cell--sel { background: color-mix(in srgb, var(--ric-color-accent) 14%, transparent);
+                    border-color: var(--ric-color-accent); }
+  .icon-cell .nm { font-size: 10px; opacity: 0.65; word-break: break-all; text-align: center; line-height: 1.3; }
+  .out-area {
+    width: 100%; min-height: 120px; max-height: 260px; resize: vertical;
+    font-family: 'SF Mono', Consolas, monospace; font-size: 12px; line-height: 1.5;
+    padding: 8px; border: 1px solid var(--ric-color-border); border-radius: 6px;
+    background: var(--ric-color-bg-elevated); color: var(--ric-color-fg); white-space: pre;
+  }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tab { cursor: pointer; }
+  .hint { font-size: 12px; opacity: 0.7; }
+  .nav-back { font-size: 12px; opacity: 0.7; text-decoration: none; color: inherit; }
+  .nav-back:hover { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+
+// localStorage からテーマ復元 (samples と共通)
+try {
+  const _s = JSON.parse(localStorage.getItem('ric-settings') || 'null');
+  if (_s) window._ric_settings = _s;
+} catch {}
+
+const { create_RicDOM } = RicDOM;
+const {
+  create_ui_page, create_ui_toast,
+  ui_panel, ui_text, ui_button, ui_icon, bind_range,
+} = RicUI;
+
+// Lucide CDN (jsDelivr は CORS 許可) — 個別 SVG を取得
+const LUCIDE_SVG = (name) => `https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/${name}.svg`;
+// Lucide のアイコン名一覧 (tags.json から名前だけ抜く)
+const LUCIDE_LIST = 'https://cdn.jsdelivr.net/npm/lucide-static@latest/tags.json';
+
+const LUCIDE_NOTICE =
+`// アイコン: Lucide (ISC License) https://lucide.dev/
+// Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as
+// part of Feather (MIT). All other copyright (c) for Lucide are held by
+// Lucide Contributors 2022. Licensed under the ISC License.`;
+
+create_RicDOM('#app', {
+  tab: 'local',                 // 'local' | 'lucide'
+  size: 24,                     // プレビューサイズ
+  selected: {},                 // name → { d: descriptor, src: 'local'|'lucide' } (両タブ共通)
+  local_icons: null,            // 同梱 icons.json
+  lucide_names: null,           // Lucide 名一覧
+  lucide_cache: {},             // name → descriptor (取得済み)
+  lucide_loading: false,
+  query: '',                    // 検索語
+
+  page:  create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+  toast: create_ui_toast(),
+
+  render(s) {
+    s.toast();
+
+    // ── 同梱アイコンの遅延ロード ──
+    if (s.local_icons === null) {
+      s.local_icons = {};      // 多重 fetch 防止
+      fetch('icons/icons.json').then(r => r.json()).then(data => {
+        s.local_icons = data.icons;
+      }).catch(() => { s.toast.show('同梱アイコンの読込に失敗', { type: 'error' }); });
+    }
+
+    // ── 選択トグル ── (descriptor と src を 1 エントリにまとめて持つ)
+    const toggle = (name, descriptor, src) => {
+      if (s.selected[name]) {
+        const sel = { ...s.selected }; delete sel[name]; s.selected = sel;
+      } else {
+        s.selected = { ...s.selected, [name]: { d: descriptor, src } };
+      }
+    };
+
+    // ── Lucide: 一覧ロード ──
+    const load_lucide_list = () => {
+      if (s.lucide_names || s.lucide_loading) return;
+      s.lucide_loading = true;
+      fetch(LUCIDE_LIST).then(r => r.json()).then(tags => {
+        s.lucide_names = Object.keys(tags).sort();
+        s.lucide_loading = false;
+      }).catch(() => {
+        s.lucide_loading = false;
+        s.toast.show('Lucide 一覧の取得に失敗 (ネット接続を確認)', { type: 'error' });
+      });
+    };
+
+    // ── Lucide: 個別 SVG を取得して descriptor 化 (キャッシュ) ──
+    const ensure_lucide = (name) => {
+      if (s.lucide_cache[name]) return;
+      fetch(LUCIDE_SVG(name)).then(r => r.text()).then(svg => {
+        try {
+          s.lucide_cache = { ...s.lucide_cache, [name]: svg_to_descriptor(svg) };
+        } catch (e) { /* skip broken */ }
+      }).catch(() => {});
+    };
+
+    // ── 出力テキスト生成 ──
+    const build_output = () => {
+      const names = Object.keys(s.selected).sort();
+      if (names.length === 0) return '// アイコンを選ぶと、ここに ICONS が出ます';
+      const usesLucide = names.some(n => s.selected[n].src === 'lucide');
+      const lines = [];
+      if (usesLucide) lines.push(LUCIDE_NOTICE, '');
+      lines.push('const ICONS = {');
+      for (const n of names) {
+        const key = /^[a-zA-Z_$][\w$]*$/.test(n) ? n : JSON.stringify(n);
+        const note = s.selected[n].src === 'lucide' ? `  // lucide: ${n}` : '';
+        lines.push(`  ${key}: ${JSON.stringify(s.selected[n].d)},${note}`);
+      }
+      lines.push('};');
+      return lines.join('\n');
+    };
+
+    // ── アイコンセル ──
+    const cell = (name, descriptor, src) => ({
+      tag: 'div',
+      class: 'icon-cell' + (s.selected[name] ? ' icon-cell--sel' : ''),
+      onclick: () => descriptor && toggle(name, descriptor, src),
+      ctx: [
+        descriptor
+          ? ui_icon(descriptor, { size: s.size, label: name })
+          : { tag: 'div', style: { width: s.size + 'px', height: s.size + 'px' } },
+        { tag: 'span', class: 'nm', ctx: [name] },
+      ],
+    });
+
+    // ── 検索フィルタ ── (名前・クエリとも小文字化して部分一致)
+    const q = s.query.trim().toLowerCase();
+    const match = (name) => !q || name.toLowerCase().includes(q);
+
+    // ── グリッド (タブ別) ──
+    let grid;
+    if (s.tab === 'local') {
+      const names = Object.keys(s.local_icons || {}).filter(match);
+      grid = names.length
+        ? { tag: 'div', class: 'icon-grid', ctx: names.map(n => cell(n, s.local_icons[n], 'local')) }
+        : ui_text({ variant: 'muted', ctx: ['同梱アイコンを読み込み中…'] });
+    } else {
+      load_lucide_list();
+      if (!s.lucide_names) {
+        grid = ui_text({ variant: 'muted', ctx: [s.lucide_loading ? 'Lucide 一覧を取得中…' : 'Lucide に接続中…'] });
+      } else {
+        const names = s.lucide_names.filter(match).slice(0, 300);  // 描画上限
+        names.forEach(ensure_lucide);  // 表示分の SVG を取得
+        grid = { tag: 'div', class: 'icon-grid', ctx: names.map(n => cell(n, s.lucide_cache[n], 'lucide')) };
+      }
+    }
+
+    const tab_btn = (id, label) => ui_button({
+      variant: s.tab === id ? 'primary' : 'default',
+      ctx: [label], onclick: () => { s.tab = id; },
+    });
+
+    return s.page({
+      style: { padding: '20px', maxWidth: '1000px', margin: '0 auto' },
+      ctx: [
+        ui_panel({ ctx: [
+          ui_text({ variant: 'title', ctx: ['RicDOM Icon Picker'] }),
+          ui_text({ variant: 'muted', ctx: [
+            '使いたいアイコンをクリックして選び、下の ', { tag: 'code', ctx: ['const ICONS'] },
+            ' を「使う分だけ」自分の app にコピーします。色は ', { tag: 'code', ctx: ['currentColor'] },
+            ' 追従、', { tag: 'code', ctx: ['ui_icon(ICONS.xxx, { size, label })'] }, ' で使えます。',
+          ]}),
+          { tag: 'div', style: { marginTop: '6px' }, ctx: [
+            { tag: 'a', href: 'index.html', class: 'nav-back', ctx: ['← RicDOM トップに戻る'] },
+          ]},
+        ]}),
+
+        ui_panel({ ctx: [
+          { tag: 'div', class: 'toolbar', ctx: [
+            tab_btn('local', '同梱 (オフライン)'),
+            tab_btn('lucide', 'Lucide (ネット / ISC)'),
+            { tag: 'span', style: { flex: 1 } },
+            ui_text({ variant: 'label', ctx: ['サイズ ' + s.size + 'px'] }),
+            bind_range(s, 'size', { min: 16, max: 48, step: 2 }),
+          ]},
+          { tag: 'input', class: 'out-area', style: { minHeight: 'auto', height: 'auto', whiteSpace: 'normal' },
+            placeholder: 'アイコン名で検索 (例: chevron, file, settings)',
+            value: s.query,
+            oninput: (e) => { s.query = e.target.value; },
+          },
+          s.tab === 'lucide'
+            ? ui_text({ variant: 'muted', class: 'hint', ctx: [
+                'Lucide (ISC) を CDN から取得しています。出力には自動で ISC 表記が付きます。検索で絞り込み (最大 300 件表示)。',
+              ]})
+            : null,
+        ]}),
+
+        ui_panel({ ctx: [grid ]}),
+
+        ui_panel({ ctx: [
+          { tag: 'div', class: 'toolbar', ctx: [
+            ui_text({ variant: 'subtitle', ctx: ['選択中 ' + Object.keys(s.selected).length + ' 個'] }),
+            { tag: 'span', style: { flex: 1 } },
+            ui_button({ ctx: ['📋 コピー'], variant: 'primary',
+              disabled: Object.keys(s.selected).length === 0,
+              onclick: async () => {
+                try { await navigator.clipboard.writeText(build_output());
+                  s.toast.show('コピーしました', { type: 'success' });
+                } catch (e) { s.toast.show('コピー失敗: ' + e.message, { type: 'error' }); }
+              } }),
+            ui_button({ ctx: ['クリア'],
+              disabled: Object.keys(s.selected).length === 0,
+              onclick: () => { s.selected = {}; } }),
+          ]},
+          { tag: 'div', class: 'out-area', style: { marginTop: '8px' }, ctx: [build_output()] },
+        ]}),
+      ],
+    });
+  },
+});
+</script>
+</body>
+</html>

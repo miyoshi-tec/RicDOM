@@ -8,9 +8,9 @@
 // descriptor:
 //   { v?, s?, p }
 //     v = viewBox (既定 '0 0 24 24')
-//     s = stroke-width。あれば stroke モード (fill:none, stroke:currentColor)。
-//         無ければ fill モード (fill:currentColor)。
-//         Lucide 等の線画は s:2、Heroicons solid 等の塗りは s 無し。
+//     s = stroke-width。stroke がデフォルト:
+//         省略 → stroke 2 / 数値 → その太さ / null → fill モード (塗りつぶし)。
+//         Lucide 等の線画は s 省略 (=2)、塗りつぶしは s:null。
 //     p = path の d 文字列、または複数 path の文字列配列
 //
 // opts:
@@ -42,9 +42,17 @@ const ui_icon = (descriptor = {}, opts = {}) => {
   const { v = '0 0 24 24', s, p } = descriptor;
   const paths = Array.isArray(p) ? p : (p != null ? [p] : []);
 
-  // stroke 幅は strokeWidth (opts) を優先、無ければ descriptor.s。
-  // どちらかがあれば stroke モード、無ければ fill モード。
-  const sw = strokeWidth != null ? strokeWidth : s;
+  // stroke がデフォルト (大多数のアイコンは線画)。fill モードは s:null を
+  // 明示したときだけ (塗りつぶしアイコン、status dot 等)。
+  //   s 省略   → stroke 2  (build_icons.js は既定 2 を省略保存するため、これが最頻)
+  //   s:数値   → その太さの stroke
+  //   s:null   → fill モード
+  //   strokeWidth (opts) → stroke 幅を上書き (s より優先、stroke を強制)
+  let sw;
+  if (strokeWidth != null)  sw = strokeWidth;   // opts 上書き → stroke 強制
+  else if (s === null)      sw = null;          // 明示 fill
+  else if (s == null)       sw = 2;             // 省略 → 既定 stroke 2
+  else                      sw = s;             // 明示 stroke 幅
   const is_stroke = sw != null;
 
   const size_val = typeof size === 'number' ? size + 'px' : size;

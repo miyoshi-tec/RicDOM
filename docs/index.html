@@ -163,6 +163,7 @@ create_RicDOM('#app', {
       <li><a href="https://github.com/miyoshi-tec/RicDOM/blob/main/SPEC.md">SPEC.md (技術仕様)</a></li>
       <li><a href="https://github.com/miyoshi-tec/RicDOM/blob/main/TUTORIAL.md">TUTORIAL.md (チュートリアル)</a></li>
       <li><a href="lz_playground.html">LZ String Playground (圧縮ツール)</a></li>
+      <li><a href="icon_playground.html">Icon Picker (アイコン選択ツール)</a></li>
     </ul>
   </section>
   <section>
@@ -420,6 +421,12 @@ create_RicDOM('#index_page', {
               { tag: 'span', class: 'sample-title', ctx: ['LZ String Playground'] },
               { tag: 'span', class: 'sample-desc',
                 ctx: [' — 自前 JS を LZSS 自己展開 wrapper に変換するブラウザツール'] },
+            ]},
+            { tag: 'a', class: 'sample-link', href: 'icon_playground.html', ctx: [
+              { tag: 'span', class: 'sample-no', ctx: ['🎨'] },
+              { tag: 'span', class: 'sample-title', ctx: ['Icon Picker'] },
+              { tag: 'span', class: 'sample-desc',
+                ctx: [' — 同梱 + Lucide のアイコンを選んで ui_icon 用 JSON をコピー'] },
             ]},
             { tag: 'a', class: 'sample-link', href: 'https://github.com/miyoshi-tec/RicDOM', ctx: [
               { tag: 'span', class: 'sample-no', ctx: ['📦'] },

@@ -11,9 +11,10 @@ const assert = require('node:assert/strict');
 const { ui_icon } = require('../ric_ui/control/ui_icon');
 
 // テスト用 descriptor
-const CHECK = { s: 2, p: 'M20 6 9 17l-5-5' };               // stroke (Lucide 系)
-const HEART = { p: 'M12 21 3 12a5 5 0 0 1 9-3 5 5 0 0 1 9 3z' }; // fill (solid 系)
-const MULTI = { s: 2, p: ['M4 4h16', 'M4 12h16', 'M4 20h16'] };  // 複数 path
+const CHECK = { s: 2, p: 'M20 6 9 17l-5-5' };                       // stroke (明示)
+const PLAIN = { p: 'M4 4h16' };                                     // s 省略 → 既定 stroke 2
+const HEART = { s: null, p: 'M12 21 3 12a5 5 0 0 1 9-3 5 5 0 0 1 9 3z' }; // fill (s:null 明示)
+const MULTI = { s: 2, p: ['M4 4h16', 'M4 12h16', 'M4 20h16'] };     // 複数 path
 
 // =====================================================================
 // 1. 構造テスト
@@ -69,7 +70,14 @@ describe('ui_icon: stroke / fill モード', () => {
     assert.equal(n['stroke-linejoin'], 'round');
   });
 
-  test('descriptor.s 無しは fill モード (fill:currentColor, stroke 無し)', () => {
+  test('s 省略は既定 stroke 2 (= 線画。fill ではない)', () => {
+    const n = ui_icon(PLAIN);
+    assert.equal(n.fill, 'none');
+    assert.equal(n.stroke, 'currentColor');
+    assert.equal(n['stroke-width'], 2);
+  });
+
+  test('s:null を明示したときだけ fill モード (fill:currentColor, stroke 無し)', () => {
     const n = ui_icon(HEART);
     assert.equal(n.fill, 'currentColor');
     assert.equal(n.stroke, undefined);
