@@ -57,8 +57,16 @@ try {
   if (typeof RicDOM === 'undefined') return;
 
   const { create_RicDOM } = RicDOM;
-  const { create_ui_page, create_ui_popup, ui_button, create_theme,
+  const { create_ui_page, create_ui_popup, ui_button, ui_icon, create_theme,
           create_ui_tweak_panel, ui_tweak_folder, ui_tweak_row } = RicUI;
+
+  // アイコン: Icon Picker からコピーした descriptor (使う分だけ)。
+  const ICONS = {
+    'menu':          { p: 'M4 6h16M4 12h16M4 18h16' },
+    'arrow-left':    { p: 'M19 12H5M12 19l-7-7 7-7' },
+    'chevron-left':  { p: 'm15 18-6-6 6-6' },
+    'chevron-right': { p: 'm9 18 6-6-6-6' },
+  };
 
   const current_no = nav_el.dataset.sample
     || (location.pathname.match(/(\d{2})_/) || [])[1]
@@ -197,8 +205,8 @@ try {
         ctx: [
           // ── ナビバー本体 ──
           { tag: 'div', style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderBottom: '1px solid var(--ric-color-border)', fontSize: '0.9em', flexShrink: 0, position: 'sticky', top: 0, zIndex: 100, flexWrap: 'wrap' }, ctx: [
-            // ── 左: ← Top ──
-            ui_button({ variant: 'ghost', ctx: ['← Top'], onclick: () => { location.href = '../index.html'; } }),
+            // ── 左: Top ──
+            ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['arrow-left'], { size: 14 }), 'Top'], onclick: () => { location.href = '../index.html'; } }),
             { tag: 'span', style: { color: 'var(--ric-color-border)' }, ctx: ['|'] },
 
             // ── 中央: prev / サンプル一覧（create_ui_popup） / next ──
@@ -206,12 +214,12 @@ try {
             // タイトルのみ表示する。
             ...(current_no ? [
               prev
-                ? ui_button({ variant: 'ghost', ctx: [`← ${prev.no}`], onclick: () => { location.href = prev.file; } })
-                : ui_button({ variant: 'ghost', ctx: ['←'], disabled: true }),
+                ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['chevron-left'], { size: 16 }), prev.no], onclick: () => { location.href = prev.file; } })
+                : ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['chevron-left'], { size: 16 })], disabled: true }),
 
               (() => {
                 const samples_popup = s._samples_popup ??= create_ui_popup();
-                return samples_popup({ label: `${current?.no ?? '?'} – ${current?.title ?? '?'}`, ctx:
+                return samples_popup({ label: `${current?.no ?? '?'} – ${current?.title ?? '?'}`, chevron: true, ctx:
                   SAMPLES.map(sample => {
                     const is_cur = sample.no === current_no;
                     return ui_button({
@@ -224,8 +232,8 @@ try {
               })(),
 
               next
-                ? ui_button({ variant: 'ghost', ctx: [`${next.no} →`], onclick: () => { location.href = next.file; } })
-                : ui_button({ variant: 'ghost', ctx: ['→'], disabled: true }),
+                ? ui_button({ variant: 'ghost', ctx: [next.no, ui_icon(ICONS['chevron-right'], { size: 16 })], onclick: () => { location.href = next.file; } })
+                : ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['chevron-right'], { size: 16 })], disabled: true }),
             ] : [
               // ドキュメントページ: data-doc 属性からタイトルを表示
               { tag: 'span', style: { fontWeight: 600 }, ctx: [nav_el.dataset.doc ?? ''] },
@@ -234,13 +242,13 @@ try {
             // ── スペーサー ──
             { tag: 'span', style: { flex: 1, minWidth: '8px' } },
 
-            // ── 右: 設定サマリー + ≡（create_ui_popup）──
+            // ── 右: 設定サマリー + ≡ メニュー（create_ui_popup）──
             { tag: 'span', style: { fontSize: '0.8em', color: 'var(--ric-color-fg-muted)', whiteSpace: 'nowrap' }, ctx: [summary] },
             (() => {
               const settings_popup = s._settings_popup ??= create_ui_popup();
               // s.tweak に代入することで __notify が注入され folder 開閉で再描画される
               if (!s.tweak) s.tweak = _make_settings_tweak(s.page);
-              return settings_popup({ ctx: [
+              return settings_popup({ icon: ui_icon(ICONS['menu'], { size: 18 }), ctx: [
                 { tag: 'div', onclick: (e) => e.stopPropagation(), ctx: [
                   s.tweak?.() ?? { tag: 'span', ctx: ['loading...'] },
                 ]},

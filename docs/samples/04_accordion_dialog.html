@@ -218,7 +218,17 @@ create_RicDOM('#mount-raw', {
   <!-- 右：RicUI 版 -->
   <script type="text/plain" id="src-rui">
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, ui_panel, ui_text, create_ui_dialog, create_ui_toast, ui_button, ui_row, ui_code_pre } = RicUI;
+const { create_ui_page, ui_panel, ui_text, create_ui_dialog, create_ui_toast, ui_button, ui_row, ui_code_pre, ui_icon } = RicUI;
+
+// アイコン: Icon Picker からコピーした descriptor (使う分だけ)。色は currentColor 追従。
+const ICONS = {
+  'download':       { p: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3' },
+  'circle-check':   { p: ['M12 22a10 10 0 1 0 0-20 10 10 0 1 0 0 20z', 'm9 12 2 2 4-4'] },
+  'circle-x':       { p: ['M12 22a10 10 0 1 0 0-20 10 10 0 1 0 0 20z', 'm15 9-6 6', 'm9 9 6 6'] },
+  'triangle-alert': { p: ['M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', 'M12 9v4', 'M12 17h.01'] },
+  'info':           { p: ['M12 22a10 10 0 1 0 0-20 10 10 0 1 0 0 20z', 'M12 16v-4', 'M12 8h.01'] },
+};
+
 // エクスポート用ヘルパー — state を JSON ファイルとしてダウンロード
 const download_json = (data, filename) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -246,7 +256,7 @@ create_RicDOM('#mount-rui', {
           ui_text({ variant: 'label', ctx: ['設定エクスポート'] }),
           ui_row({ ctx: [
             s.dlg({
-              trigger_ctx: ['📤 設定をエクスポート'],
+              trigger_ctx: [ui_icon(ICONS['download'], { size: 16 }), '設定をエクスポート'],
               title: 'エクスポートの確認',
               ctx: [ui_text({ ctx: ['現在の設定を JSON ファイルとして保存しますか？'] })],
               actions: [
@@ -266,13 +276,13 @@ create_RicDOM('#mount-rui', {
           // ── トースト ──────────────────────────────────────
           ui_text({ variant: 'label', ctx: ['トースト通知'] }),
           ui_row({ ctx: [
-            ui_button({ ctx: ['✔ 成功'],
+            ui_button({ ctx: [ui_icon(ICONS['circle-check'], { size: 16 }), '成功'],
               onclick: () => s.toast.show('保存しました！',       { type: 'success' }) }),
-            ui_button({ ctx: ['✖ エラー'],
+            ui_button({ ctx: [ui_icon(ICONS['circle-x'], { size: 16 }), 'エラー'],
               onclick: () => s.toast.show('エラーが発生しました', { type: 'error'   }) }),
-            ui_button({ ctx: ['⚠ 警告'],
+            ui_button({ ctx: [ui_icon(ICONS['triangle-alert'], { size: 16 }), '警告'],
               onclick: () => s.toast.show('注意が必要です',       { type: 'warning' }) }),
-            ui_button({ ctx: ['ℹ 情報'],
+            ui_button({ ctx: [ui_icon(ICONS['info'], { size: 16 }), '情報'],
               onclick: () => s.toast.show('更新を確認しました',   { type: 'info'    }) }),
           ]}),
 

@@ -10,6 +10,9 @@
 //   // ラベル付き（旧 dropdown）— ポップアップはボタン幅に合う
 //   s.dd({ label: '選択肢', ctx: [...] })
 //
+//   // chevron: true — ラベルに開閉インジケータ（▼）を付ける（開くと 180° 回転）
+//   s.dd({ label: '選択肢', chevron: true, ctx: [...] })
+//
 //   // アイコン（旧 menu）— 正方形ボタン、ポップアップは min-width: 160px
 //   s.menu({ icon: '≡', ctx: [...] })
 //
@@ -47,6 +50,10 @@ const {
   make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others,
 } = require('./_popup_utils');
 const { safe_notify } = require('../_factory_helpers');
+const { ui_icon } = require('../control/ui_icon');
+
+// label モードの開閉インジケータ (chevron:true のとき)。開くと CSS で 180° 回転。
+const _CHEVRON_DOWN = { p: 'm6 9 6 6 6-6' };
 
 // popup 本体の DOM を一意特定するためのモジュールレベルカウンタ。
 let _next_popup_id = 0;
@@ -101,7 +108,7 @@ const create_ui_popup = () => {
   };
 
   // inst(props) → VDOM
-  const inst = ({ label, icon, ghost = false, ctx = [], theme, density, font_size } = {}) => {
+  const inst = ({ label, icon, ghost = false, chevron = false, ctx = [], theme, density, font_size } = {}) => {
     // label / icon どちらもなければデフォルトアイコン
     const is_label = !!label && !icon;
     const trigger_text = icon ?? (label ? undefined : '≡');
@@ -147,6 +154,21 @@ const create_ui_popup = () => {
       + (is_label ? ' ric-popup__trigger--label' : '')
       + (ghost    ? ' ric-popup__trigger--ghost'  : '')
       + (inst._o  ? ' ric-popup__trigger--open' : '');
+
+    // トリガーの中身を組み立てる。
+    //   label モード: ラベル span。chevron:true なら開閉インジケータ (▼) を右端に追加し、
+    //                 開いている間は --open クラスで CSS が 180° 回転させる。
+    //   icon モード:  アイコン文字 (or VDOM) をそのまま。
+    let trigger_ctx;
+    if (is_label) {
+      trigger_ctx = [{ tag: 'span', ctx: [label] }];
+      if (chevron) {
+        trigger_ctx.push(ui_icon(_CHEVRON_DOWN, { size: '1em',
+          class: 'ric-popup__chevron' + (inst._o ? ' ric-popup__chevron--open' : '') }));
+      }
+    } else {
+      trigger_ctx = [trigger_text];
+    }
 
     return {
       tag: 'div', class: 'ric-popup',
@@ -194,9 +216,7 @@ const create_ui_popup = () => {
               });
             }
           },
-          ctx: is_label
-            ? [{ tag: 'span', ctx: [label] }]
-            : [trigger_text],
+          ctx: trigger_ctx,
         },
       ],
     };

@@ -51,7 +51,12 @@
 <script id="src-rui">
 const { create_RicDOM } = RicDOM;
 const { create_ui_page, create_ui_popup, create_ui_tweak_panel,
-        ui_panel, ui_text, ui_code_pre } = RicUI;
+        ui_panel, ui_text, ui_code_pre, ui_icon } = RicUI;
+
+// アイコン: Icon Picker からコピーした descriptor (使う分だけ)。
+const ICONS = {
+  'menu': { p: 'M4 6h16M4 12h16M4 18h16' },
+};
 
 // そのまま編集される「JSON そのもの」。create_ui_tweak_panel に投げ込むだけで GUI 化。
 const params = {
@@ -99,7 +104,7 @@ create_RicDOM('#mount-rui', {
                 ui_text({ variant: 'title', ctx: ['Game Dashboard'] }),
                 // ≡ クリックで tweak パネルが popup する。
                 // stopPropagation でパネル内のクリックがメニュー閉じに伝播しないようにする。
-                s.settings({ ctx: [
+                s.settings({ icon: ui_icon(ICONS['menu'], { size: 18 }), ctx: [
                   { tag: 'div', onclick: (e) => { e.stopPropagation(); }, ctx: [ s.tw() ] },
                 ]}),
               ],

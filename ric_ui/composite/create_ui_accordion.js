@@ -21,6 +21,10 @@
 'use strict';
 
 const { safe_notify } = require('../_factory_helpers');
+const { ui_icon } = require('../control/ui_icon');
+
+// 開閉インジケータ (chevron-down)。閉=下向き、開=CSS で 180° 回転して上向き。
+const _CHEVRON_DOWN = { p: 'm6 9 6 6 6-6' };
 
 const create_ui_accordion = ({ default_open = {} } = {}) => {
   const inst = ({ items = [], multi = true } = {}) => ({
@@ -45,7 +49,8 @@ const create_ui_accordion = ({ default_open = {} } = {}) => {
             },
             ctx: [
               { tag: 'span', class: 'ric-accordion__title', 'data-ric-role': 'accordion-title', ctx: [title] },
-              { tag: 'span', class: 'ric-accordion__arrow', 'data-ric-role': 'accordion-arrow', ctx: ['❯'] },
+              // 開閉インジケータ: ui_icon の chevron。header--open のとき CSS で 180° 回転。
+              ui_icon(_CHEVRON_DOWN, { size: '1em', class: 'ric-accordion__arrow', 'data-ric-role': 'accordion-arrow' }),
             ],
           },
           { tag: 'div',

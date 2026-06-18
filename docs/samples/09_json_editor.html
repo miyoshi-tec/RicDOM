@@ -47,7 +47,15 @@
 <script type="text/plain" id="src-demo">
 'use strict';
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, create_ui_dialog, create_ui_toast, create_ui_collapse_box, ui_button, ui_input, ui_text } = RicUI;
+const { create_ui_page, create_ui_dialog, create_ui_toast, create_ui_collapse_box, ui_button, ui_input, ui_text, ui_icon } = RicUI;
+
+// アイコン: Icon Picker からコピーした descriptor (使う分だけ)。
+const ICONS = {
+  'chevron-down':  { p: 'm6 9 6 6 6-6' },
+  'chevron-right': { p: 'm9 18 6-6-6-6' },
+  'plus':          { p: 'M12 5v14M5 12h14' },
+  'x':             { p: 'M18 6 6 18M6 6l12 12' },
+};
 
 // ── path モデル（このサンプルの中心概念）──
 // 編集対象の位置を「キー / index の配列」で表す。例えば JSON が
@@ -294,9 +302,12 @@ create_RicDOM('#mount-demo', {
                  borderBottom: '1px solid var(--ric-color-border)' },
         ctx: [
           { tag: 'span',
-            style: { width: '16px', userSelect: 'none', color: 'var(--ric-color-fg-muted)' },
+            style: { width: '16px', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                     userSelect: 'none', color: 'var(--ric-color-fg-muted)' },
             ...(is_folder ? { class: 'je-click', onclick: () => toggle(path) } : {}),
-            ctx: [is_folder ? (is_open ? '▼' : '▶') : ' '] },
+            ctx: [is_folder
+              ? ui_icon(ICONS[is_open ? 'chevron-down' : 'chevron-right'], { size: 14, label: is_open ? '折りたたむ' : '展開' })
+              : ' '] },
           { tag: 'span',
             style: { fontFamily: 'monospace', fontWeight: 700, color: 'var(--ric-color-accent)' },
             ...(path.length > 0 ? { class: 'je-click', onclick: () => begin_edit(path, val) } : {}),
@@ -307,10 +318,10 @@ create_RicDOM('#mount-demo', {
             style: { fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
             onclick: is_folder ? () => toggle(path) : () => begin_edit(path, val),
             ctx: [preview(val)] },
-          is_folder       ? ui_button({ variant: 'ghost', ctx: ['+'],   onclick: () => add_row(path, '') }) : null,
-          is_folder       ? ui_button({ variant: 'ghost', ctx: ['+{}'], onclick: () => add_row(path, {}) }) : null,
-          is_folder       ? ui_button({ variant: 'ghost', ctx: ['+[]'], onclick: () => add_row(path, []) }) : null,
-          path.length > 0 ? ui_button({ variant: 'ghost', ctx: ['✕'],   onclick: () => delete_row(path) }) : null,
+          is_folder       ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['plus'], { size: 14, label: '値を追加' })],          onclick: () => add_row(path, '') }) : null,
+          is_folder       ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['plus'], { size: 14 }), '{}'],                       onclick: () => add_row(path, {}) }) : null,
+          is_folder       ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['plus'], { size: 14 }), '[]'],                       onclick: () => add_row(path, []) }) : null,
+          path.length > 0 ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['x'], { size: 14, label: '削除' })],                 onclick: () => delete_row(path) }) : null,
         ].filter(Boolean) };
 
       // folder の子は collapse_box で wrap し、open/closed のアニメを任せる。
