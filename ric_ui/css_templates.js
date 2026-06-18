@@ -232,11 +232,28 @@ ${_P}.ric-panel--row {
 
   // ── control ─────────────────────────────────
 
+  // アイコン (v0.3.28〜)。サイズ・色は ui_icon が inline (style width/height +
+  // currentColor) で持つので、ここでは整列と回転だけを担う。
+  //   vertical-align: -0.125em … テキスト隣接時のベースライン微調整 (標準的な値)
+  //   flex-shrink: 0           … ボタン/flex 内でアイコンが潰れないように
+  //   @keyframes ric-spin      … spin:true (spinner) 用。グローバル定義 (prefix 不要)
+  'ric-icon': () => `
+${_P}.ric-icon {
+  display: inline-block;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+@keyframes ric-spin { to { transform: rotate(360deg); } }
+${_P}.ric-icon--spin {
+  animation: ric-spin 0.8s linear infinite;
+}`,
+
   'ric-button': () => `
 ${_P}.ric-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.4em;
   height: ${_ch};
   padding: 0 ${_px};
   border: ${_b1};
