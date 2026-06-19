@@ -16,6 +16,9 @@
 //     keys はオブジェクトまたは関数。関数なら毎 render で評価され、
 //     パラメータの値に応じた動的 disabled / options 切り替え等が可能。
 //     ネストしたフォルダ内の keys も同様に関数を許容する（全階層で動的評価）。
+//     ctx は配列または「() => 配列」。自前 get/set の ui_tweak_row を ctx で
+//     組む場合は **関数で渡す**こと。静的配列だと初回評価のまま固定され、
+//     get が再実行されず値が外部変更に追従しない（radio の checked 等が古いまま）。
 //   ui_tweak_panel({ title?, ctx, width?, style?, class? })
 //     → stateless wrapper（③向け）。render() 内で毎回呼び出す。
 //   ui_tweak_folder({ label, open?, ctx })
@@ -253,6 +256,11 @@ const _build_panel_vdom = ({ title, rows, ctx, width, style, cls }) => {
         : {}),
     ...(style ?? {}),
   };
+  // ctx は配列のほか「() => 配列」も許容する（keys と同じ流儀）。
+  // create_ui_tweak_panel に関数を渡すと毎 render で再評価されるため、
+  // 自前 get/set の ui_tweak_row を ctx で組む場合でも値が最新に追従する
+  // （関数でなく静的配列を渡すと初回評価のまま固定 = get が再実行されない）。
+  const resolved_ctx = typeof ctx === 'function' ? ctx() : ctx;
   return {
     tag: 'div', class: class_str,
     // range のドラッグ中にネイティブ DnD が始まるのを抑止
@@ -263,7 +271,7 @@ const _build_panel_vdom = ({ title, rows, ctx, width, style, cls }) => {
         ? { tag: 'div', class: 'ric-tweak__title', ctx: [title] }
         : null,
       ...rows,
-      ...(Array.isArray(ctx) ? ctx : ctx != null ? [ctx] : []),
+      ...(Array.isArray(resolved_ctx) ? resolved_ctx : resolved_ctx != null ? [resolved_ctx] : []),
     ].filter(Boolean),
   };
 };

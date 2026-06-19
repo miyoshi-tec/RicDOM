@@ -1535,6 +1535,31 @@ s.tw = create_ui_tweak_panel({
 });
 ```
 
+#### ctx を関数で渡す（自前 get/set の動的追従）
+
+`create_ui_tweak_panel` の `ctx` に **関数** を渡すと、毎 render で再評価される
+（`keys` と同じ流儀）。自前 `get`/`set` の `ui_tweak_row` を `ctx` で組む場合は
+**必ず関数で渡す**こと。静的配列だと初回評価のまま固定され、`get` が再実行されない
+ため、外部で値が変わっても表示が追従しない（例: radio の `checked` が古いまま）。
+
+```javascript
+// ✅ 関数 → 毎 render で get が再評価され、外部変更に追従する
+s.tw = create_ui_tweak_panel({
+  ctx: () => [
+    ui_tweak_row({ label: 'テーマ', type: 'radiobutton',
+      options: ['light', 'dark'],
+      get: () => page.theme,            // 外部 state を読む
+      set: (v) => set_theme(v) }),
+  ],
+});
+
+// ❌ 静的配列 → 初回の get 値で固定。page.theme が変わっても radio が更新されない
+s.tw = create_ui_tweak_panel({ ctx: [ ui_tweak_row({ ... }) ] });
+```
+
+`data` を使う Tier 1/2 では行が毎 render で自動再生成されるためこの問題は起きない。
+これは Tier 3（`ctx` 手組み）を factory に載せる場合の注意点。
+
 ---
 
 ## 5. Performance & Scale

@@ -326,6 +326,36 @@ describe('create_ui_tweak_panel (factory)', () => {
     assert.ok(find_by_class(root, 'extra').length > 0);
   });
 
+  it('ctx 関数: 毎 render で再評価され、自前 get の値が追従する', () => {
+    // 静的配列だと初回固定で get が再実行されず radio の checked が古いまま
+    // になる回帰 (nav_bar テーマ切替で表面化) を防ぐ。
+    let theme = 'light';
+    const inst = create_ui_tweak_panel({
+      ctx: () => [ui_tweak_row({
+        label: 'T', type: 'radiobutton', options: ['light', 'teal'],
+        get: () => theme, set: () => {},
+      })],
+    });
+    const checked_of = (root, v) =>
+      find_by_tag(root, 'input').find(i => i.value === v).checked;
+
+    const root1 = inst();
+    assert.strictEqual(checked_of(root1, 'light'), 1);
+    assert.strictEqual(checked_of(root1, 'teal'),  0);
+
+    theme = 'teal';                 // 外部で値を変更
+    const root2 = inst();           // 再 render → ctx 関数が再評価される
+    assert.strictEqual(checked_of(root2, 'teal'),  1);
+    assert.strictEqual(checked_of(root2, 'light'), 0);
+  });
+
+  it('ctx 静的配列: 従来どおり末尾に置かれる (後方互換)', () => {
+    const root = create_ui_tweak_panel({
+      ctx: [{ tag: 'div', class: 'static-ctx', ctx: ['x'] }],
+    })();
+    assert.ok(find_by_class(root, 'static-ctx').length > 0);
+  });
+
   // ── keys 関数（動的 keys）─────────────────────────────────
 
   it('keys 関数: 毎 render で評価され disabled が動的に切り替わる', () => {

@@ -152,7 +152,9 @@ try {
     if (typeof create_ui_tweak_panel === 'undefined') return null;
     return create_ui_tweak_panel({
       width: '100%',
-      ctx: [
+      // ctx は関数で渡す（毎 render で再評価 → get が再実行され、テーマ等を
+      // 外部変更したときに radio の選択表示が追従する）。静的配列だと初回固定。
+      ctx: () => [
         ui_tweak_row({
           label: 'テーマ', type: 'radiobutton',
           options: ['light', 'dark', 'teal', 'cyber', 'aqua', 'custom'],
