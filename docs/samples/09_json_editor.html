@@ -49,12 +49,16 @@
 const { create_RicDOM } = RicDOM;
 const { create_ui_page, create_ui_dialog, create_ui_toast, create_ui_collapse_box, ui_button, ui_input, ui_text, ui_icon } = RicUI;
 
-// アイコン: Icon Picker からコピーした descriptor (使う分だけ)。
+// アイコン: Icon Picker から「使う分だけ」コピー。
+// 一部 Lucide (ISC License) https://lucide.dev — Copyright (c) Lucide Contributors。
 const ICONS = {
   'chevron-down':  { p: 'm6 9 6 6 6-6' },
   'chevron-right': { p: 'm9 18 6-6-6-6' },
   'plus':          { p: 'M12 5v14M5 12h14' },
   'x':             { p: 'M18 6 6 18M6 6l12 12' },
+  'folder-open':   {"p":"m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"},  // lucide: folder-open
+  'save':          {"p":["M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z","M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7","M7 3v4a1 1 0 0 0 1 1h7"]},  // lucide: save
+  'refresh-ccw':   {"p":["M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8","M3 3v5h5","M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16","M16 16h5v5"]},  // lucide: refresh-ccw
 };
 
 // ── path モデル（このサンプルの中心概念）──
@@ -354,13 +358,13 @@ create_RicDOM('#mount-demo', {
           style: { display: 'flex', gap: '6px', padding: '8px 12px', borderBottom: '1px solid var(--ric-color-border)',
                    alignItems: 'center', flexShrink: 0 },
           ctx: [
-            ui_button({ ctx: ['📂 Open'], onclick: open_file }),
+            ui_button({ ctx: [ui_icon(ICONS['folder-open'], { size: 16 }), 'Open'], onclick: open_file }),
             ui_text({ variant: 'muted', ctx: [s.filename] }),
             // スペーサー: 以降のボタンを右に寄せる
             { tag: 'span', style: { flex: 1 } },
-            ui_button({ ctx: ['💾 Save'], onclick: save_file }),
+            ui_button({ ctx: [ui_icon(ICONS['save'], { size: 16 }), 'Save'], onclick: save_file }),
             s.dlg({
-              trigger_ctx: ['🔄 Reset'],
+              trigger_ctx: [ui_icon(ICONS['refresh-ccw'], { size: 16 }), 'Reset'],
               trigger_variant: 'default',
               title: 'デモデータに戻す',
               ctx: [ui_text({ ctx: ['現在の編集内容は失われます。'] })],

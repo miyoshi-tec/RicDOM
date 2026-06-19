@@ -683,7 +683,7 @@ RicDOM の推奨環境 (Chrome 135+ / Electron 35+) では問題なし。
 | `focus_when(el, cond)` | 条件の立ち上がりエッジで `el.focus()`。`el` は `handle.refs.get('name')` 等（`render(s)` の `s` は state Proxy で `refs` を持たないため、`create_RicDOM` の戻り値 `handle` を closure 経由で参照する） |
 | `ui_checkbox({ checked, onchange, ctx, disabled })` | checked は 0/1（数値） |
 | `bind_checkbox(s, key, options)` | `s[key]` と双方向バインド |
-| `ui_radiobutton({ name, value, options, onchange })` | options: string[] or {value,label}[] |
+| `ui_radiobutton({ name, value, options, onchange })` | options: string[] or {value,label}[]。label は文字列/数値のほか VDOM ノード・配列も可（ui_icon を混ぜられる） |
 | `bind_radiobutton(s, key, options)` | `s[key]` と双方向バインド |
 | `ui_range({ value, min, max, step, oninput, disabled })` | スライダー + 値表示 |
 | `bind_range(s, key, options)` | `s[key]` と双方向バインド |

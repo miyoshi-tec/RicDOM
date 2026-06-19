@@ -180,12 +180,16 @@ const {
   ui_panel, ui_text, ui_button, ui_code_pre, ui_md_pre, ui_icon,
 } = RicUI;
 
-// アイコン: Icon Picker からコピーした descriptor (使う分だけ)。
+// アイコン: Icon Picker から「使う分だけ」コピー。
+// 一部 Lucide (ISC License) https://lucide.dev — Copyright (c) Lucide Contributors。
 const ICONS = {
   'circle-x':     { p: ['M12 22a10 10 0 1 0 0-20 10 10 0 1 0 0 20z', 'm15 9-6 6', 'm9 9 6 6'] },
   'circle-check': { p: ['M12 22a10 10 0 1 0 0-20 10 10 0 1 0 0 20z', 'm9 12 2 2 4-4'] },
   'plus':         { p: 'M12 5v14M5 12h14' },
   'minus':        { p: 'M5 12h14' },
+  'shuffle':      {"p":["m18 14 4 4-4 4","m18 2 4 4-4 4","M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22","M2 6h1.972a4 4 0 0 1 3.6 2.2","M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"]},  // lucide: shuffle
+  'repeat':       {"p":["m17 2 4 4-4 4","M3 11v-1a4 4 0 0 1 4-4h14","m7 22-4-4 4-4","M21 13v1a4 4 0 0 1-4 4H3"]},  // lucide: repeat
+  'refresh-ccw':  {"p":["M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8","M3 3v5h5","M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16","M16 16h5v5"]},  // lucide: refresh-ccw
 };
 
 const MD_EXPLAIN = document.getElementById('md-explain').textContent.trim();
@@ -319,7 +323,7 @@ create_RicDOM('#app', {
         ui_panel({ ctx: [
           ui_text({ variant: 'subtitle', ctx: ['遊び方'] }),
           { tag: 'div', class: 'steps', ctx: [
-            'まず ', { tag: 'b', ctx: ['🔀 シャッフル'] }, ' を押してみてください:',
+            'まず ', { tag: 'b', ctx: [ui_icon(ICONS['shuffle'], { size: 14 }), ' シャッフル'] }, ' を押してみてください:',
             { tag: 'ol', ctx: [
               { tag: 'li', ctx: [
                 { tag: 'span', style: { color: '#dc2626' }, ctx: ['左 (key 無し):'] },
@@ -349,12 +353,12 @@ create_RicDOM('#app', {
         ui_panel({ ctx: [
           ui_text({ variant: 'subtitle', ctx: ['操作 (両カラムに同時適用)'] }),
           { tag: 'div', class: 'toolbar', ctx: [
-            ui_button({ variant: 'primary', ctx: ['🔀 シャッフル'],     onclick: shuffle }),
-            ui_button({ ctx: ['🔁 逆順'],                              onclick: reverse }),
+            ui_button({ variant: 'primary', ctx: [ui_icon(ICONS['shuffle'], { size: 16 }), 'シャッフル'], onclick: shuffle }),
+            ui_button({ ctx: [ui_icon(ICONS['repeat'], { size: 16 }), '逆順'],                          onclick: reverse }),
             ui_button({ ctx: [ui_icon(ICONS['plus'], { size: 16 }), '中央に挿入'],   onclick: insert_middle }),
             ui_button({ ctx: [ui_icon(ICONS['minus'], { size: 16 }), '中央を削除'],  onclick: remove_middle }),
             { tag: 'span', style: { flex: 1 } },
-            ui_button({ variant: 'ghost', ctx: ['🔄 リセット'],          onclick: reset }),
+            ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['refresh-ccw'], { size: 16 }), 'リセット'], onclick: reset }),
           ]},
           { tag: 'div', class: 'cmp-grid', style: { marginTop: '12px' }, ctx: [
 

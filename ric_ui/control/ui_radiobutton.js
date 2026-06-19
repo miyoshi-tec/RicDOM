@@ -3,6 +3,8 @@
 // ui_select と同じ options インターフェースを持つ。
 //
 // options: string[] または { value, label }[] を受け付ける。
+//   label は文字列・数値のほか、VDOM ノード（ui_icon 等）や
+//   それらの配列も渡せる（例: label: [ui_icon(ICONS.list), ' List']）。
 // name:    同じグループの radio input に共通の name 属性（必須）。
 //
 // checked の実装方針：
@@ -34,6 +36,15 @@ const ui_radiobutton = ({
   const normalize = (opt) =>
     typeof opt === 'string' ? { value: opt, label: opt } : opt;
 
+  // label を span の ctx 配列に変換する。
+  //   配列      → そのまま ctx（例: [ui_icon(...), ' List']）
+  //   VDOM ノード → 単一要素 ctx（ui_icon 等のオブジェクト。null は除外）
+  //   文字列/数値 → String 化（従来挙動。null/undefined も "null"/"undefined" になる）
+  const label_ctx = (l) =>
+    Array.isArray(l)                    ? l
+    : (l != null && typeof l === 'object') ? [l]
+    : [String(l)];
+
   const radio_nodes = options.map((opt) => {
     const { value: v, label: l } = normalize(opt);
     const str_v = String(v);
@@ -52,7 +63,7 @@ const ui_radiobutton = ({
           ...(onchange ? { onchange }       : {}),
           ...(disabled ? { disabled: true } : {}),
         },
-        { tag: 'span', ctx: [String(l)] },
+        { tag: 'span', ctx: label_ctx(l) },
       ],
     };
   });
