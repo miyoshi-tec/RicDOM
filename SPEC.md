@@ -895,6 +895,23 @@ s.cfg({ icon: '⚙', ghost: true, ctx: [...] })
 // chevron: true — ラベルモードに開閉インジケータ（▼）を付与（v0.3.28〜）
 // 開いている間は CSS で 180° 回転する（ドロップダウンの affordance）。icon モードでは無視。
 s.dd({ label: '選択肢', chevron: true, ctx: [...] })
+
+// icon は文字列だけでなく VDOM（ui_icon）も受け付ける
+s.cfg({ icon: ui_icon(ICONS.settings, { size: 18 }), ctx: [...] })
+```
+
+**アイコン入りセレクト（`ui_select` の代替）**: ネイティブ `<select>` の option は
+テキストのみ（アイコン不可）。プロバイダ/モデル一覧などで選択肢にアイコンを出したい
+場合は `create_ui_popup` で「選択中ラベル + 選択肢ボタン」を組む:
+
+```javascript
+s.model_dd = create_ui_popup();
+// 選択中をラベルに、選択肢を ctx のボタン群に（各ボタンに ui_icon を入れられる）
+s.model_dd({ label: current.name, chevron: true, ctx: MODELS.map((m) =>
+  ui_button({ variant: m.id === current.id ? 'primary' : 'ghost',
+    ctx: [ui_icon(m.icon, { size: 16 }), m.name],
+    onclick: () => { s.model = m.id; s.model_dd.close(); } })),
+})
 ```
 
 内部状態: `_o`(open), `_c`(closing), `_d`(dir), `_p`(pos), `_m`(measuring, v0.3.27〜), `_eb`(esc_bound, v0.3.27〜)
