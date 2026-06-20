@@ -48,6 +48,19 @@ describe('create_ui_accordion: 基本構造', () => {
     assert.deepEqual(titles[0].ctx, ['タイトル']);
   });
 
+  it('title に VDOM ノード・配列を渡せる (ヘッダーにアイコン混在)', () => {
+    // title は ctx:[title] にそのまま入る。配列はネスト配列として RicDOM が展開する。
+    const inst = create_ui_accordion();
+    const icon = { tag: 'svg', class: 'ric-icon' };
+    const root = inst({ items: [
+      { id: 'a', title: [icon, ' write_file'], ctx: [] },   // 配列 (アイコン + テキスト)
+      { id: 'b', title: icon,                  ctx: [] },   // 単一 VDOM
+    ]});
+    const titles = find_by_class(root, 'ric-accordion__title');
+    assert.deepEqual(titles[0].ctx, [[icon, ' write_file']]);  // ネスト配列で保持 (描画時に展開)
+    assert.deepEqual(titles[1].ctx, [icon]);
+  });
+
   it('item ctx が body-inner に入る', () => {
     const inst = create_ui_accordion();
     const content = { tag: 'p', ctx: ['本文'] };

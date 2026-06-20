@@ -6,6 +6,8 @@
 //   acc({
 //     items: [
 //       { id: 'a', title: 'タイトル', ctx: [ui_text({ ctx: ['本文'] })] },
+//       // title は文字列のほか VDOM ノード・配列も可（ui_icon を混ぜられる）:
+//       { id: 'b', title: [ui_icon(ICONS.wrench), ' write_file'], ctx: [...] },
 //       ...
 //     ],
 //     multi: true,  // true = 複数パネルを同時展開可（デフォルト）
