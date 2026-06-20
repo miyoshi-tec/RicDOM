@@ -326,7 +326,7 @@ create_RicDOM('#mount-demo', {
           is_folder       ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['plus'], { size: 14 }), '{}'],                       onclick: () => add_row(path, {}) }) : null,
           is_folder       ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['plus'], { size: 14 }), '[]'],                       onclick: () => add_row(path, []) }) : null,
           path.length > 0 ? ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS['x'], { size: 14, label: '削除' })],                 onclick: () => delete_row(path) }) : null,
-        ].filter(Boolean) };
+        ] };
 
       // folder の子は collapse_box で wrap し、open/closed のアニメを任せる。
       // key には JSON.stringify(path) を使う (= path の同一性で安定)。
