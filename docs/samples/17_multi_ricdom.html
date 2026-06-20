@@ -448,7 +448,7 @@ const editor_h = create_RicDOM('#editor', {
                 ],
                 onchange: (e) => { s.mode = e.target.value; },
               }) : null,
-            ].filter(Boolean) }),
+            ] }),
           ],
         }),
 
@@ -523,7 +523,7 @@ const editor_h = create_RicDOM('#editor', {
               }}),
           ],
         }),
-      ].filter(Boolean),
+      ],
     });
   },
 });
