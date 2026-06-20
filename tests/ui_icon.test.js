@@ -120,6 +120,17 @@ describe('ui_icon: size', () => {
     assert.equal(n.style.width, '20px');
     assert.equal(n.style.opacity, 0.5, 'style の他プロパティは保持される');
   });
+
+  test('vertical-align が inline style に入る (生 RicDOM でもベースライン整列)', () => {
+    // .ric-icon CSS (create_ui_page 注入) が無い環境でも整列が効くよう inline 化。
+    const n = ui_icon(CHECK);
+    assert.equal(n.style.verticalAlign, '-0.125em');
+  });
+
+  test('vertical-align は opts.style で上書きできる', () => {
+    const n = ui_icon(CHECK, { style: { verticalAlign: 'middle' } });
+    assert.equal(n.style.verticalAlign, 'middle');
+  });
 });
 
 describe('ui_icon: アクセシビリティ (label)', () => {

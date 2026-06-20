@@ -72,10 +72,14 @@ const ui_icon = (descriptor = {}, opts = {}) => {
       'stroke-linejoin': 'round',
     } : {}),
     class: cls_str,
-    // サイズは style で指定する。'1em' を font-size に追従させるには、SVG の
-    // width/height 属性より inline style の方がブラウザ間で確実なため。
-    // size を最後に置くことで opt_style.width 等より優先させる。
-    style: { ...(opt_style || {}), width: size_val, height: size_val },
+    // サイズと縦整列を inline style で持たせる。これにより .ric-icon CSS
+    // (create_ui_page が注入) が無い環境 = 生 RicDOM で使っても、サイズ・
+    // テキスト隣接時のベースライン整列が効く (size を inline 化しているのと同じ流儀)。
+    //   verticalAlign: 先頭に置き opt_style で上書き可能にする (好みで調整できる)。
+    //   width/height: 最後に置き size 引数を opt_style.width 等より優先させる。
+    // '1em' を font-size に追従させるには width/height 属性より inline style の方が
+    // ブラウザ間で確実。
+    style: { verticalAlign: '-0.125em', ...(opt_style || {}), width: size_val, height: size_val },
     // label の有無でアクセシビリティ属性を切り替える (アンケート全員要望)。
     ...(label != null
       ? { role: 'img', 'aria-label': label }
