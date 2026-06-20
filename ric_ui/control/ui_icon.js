@@ -72,14 +72,15 @@ const ui_icon = (descriptor = {}, opts = {}) => {
       'stroke-linejoin': 'round',
     } : {}),
     class: cls_str,
-    // サイズと縦整列を inline style で持たせる。これにより .ric-icon CSS
-    // (create_ui_page が注入) が無い環境 = 生 RicDOM で使っても、サイズ・
-    // テキスト隣接時のベースライン整列が効く (size を inline 化しているのと同じ流儀)。
-    //   verticalAlign: 先頭に置き opt_style で上書き可能にする (好みで調整できる)。
+    // サイズ・縦整列・flex 潰れ防止を inline style で持たせる。これにより
+    // .ric-icon CSS (create_ui_page が注入) が無い環境 = 生 RicDOM で使っても、
+    // サイズ / テキスト隣接時のベースライン整列 / flex 内で潰れない、が効く
+    // (size を inline 化しているのと同じ流儀。複数 consumer が独立に再発見した papercut)。
+    //   verticalAlign / flexShrink: 先頭に置き opt_style で上書き可能にする。
     //   width/height: 最後に置き size 引数を opt_style.width 等より優先させる。
     // '1em' を font-size に追従させるには width/height 属性より inline style の方が
     // ブラウザ間で確実。
-    style: { verticalAlign: '-0.125em', ...(opt_style || {}), width: size_val, height: size_val },
+    style: { verticalAlign: '-0.125em', flexShrink: 0, ...(opt_style || {}), width: size_val, height: size_val },
     // label の有無でアクセシビリティ属性を切り替える (アンケート全員要望)。
     ...(label != null
       ? { role: 'img', 'aria-label': label }

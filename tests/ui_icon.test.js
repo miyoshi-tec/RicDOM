@@ -131,6 +131,17 @@ describe('ui_icon: size', () => {
     const n = ui_icon(CHECK, { style: { verticalAlign: 'middle' } });
     assert.equal(n.style.verticalAlign, 'middle');
   });
+
+  test('flex-shrink:0 が inline style に入る (flex 内で潰れない)', () => {
+    // .ric-icon CSS が無い生 RicDOM の flex コンテナでもアイコンが潰れないよう inline 化。
+    const n = ui_icon(CHECK);
+    assert.equal(n.style.flexShrink, 0);
+  });
+
+  test('flex-shrink は opts.style で上書きできる', () => {
+    const n = ui_icon(CHECK, { style: { flexShrink: 1 } });
+    assert.equal(n.style.flexShrink, 1);
+  });
 });
 
 describe('ui_icon: アクセシビリティ (label)', () => {
