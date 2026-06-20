@@ -79,6 +79,28 @@ describe('ui_radiobutton: options の正規化', () => {
     assert.equal(input.value,    'ja');
     assert.deepEqual(span.ctx, ['日本語']);
   });
+
+  test('数値ラベルは String 化される（従来挙動の維持）', () => {
+    const node = ui_radiobutton({ options: [{ value: 1, label: 1 }] });
+    const span = node.ctx[0].ctx[1];
+    assert.deepEqual(span.ctx, ['1']);
+  });
+
+  test('label に VDOM ノード（オブジェクト）を渡すと span にそのまま入る', () => {
+    const icon = { tag: 'svg', class: 'ric-icon' };
+    const node = ui_radiobutton({ options: [{ value: 'list', label: icon }] });
+    const span = node.ctx[0].ctx[1];
+    assert.equal(span.ctx.length, 1);
+    assert.equal(span.ctx[0], icon);          // ラップ・String 化されず素通し
+  });
+
+  test('label に配列（アイコン + 文字列）を渡すと span の ctx になる', () => {
+    const icon = { tag: 'svg', class: 'ric-icon' };
+    const node = ui_radiobutton({ options: [{ value: 'list', label: [icon, ' List'] }] });
+    const span = node.ctx[0].ctx[1];
+    assert.deepEqual(span.ctx, [icon, ' List']);
+    assert.equal(node.ctx[0].ctx[0].value, 'list');  // value は影響を受けない
+  });
 });
 
 describe('ui_radiobutton: checked', () => {

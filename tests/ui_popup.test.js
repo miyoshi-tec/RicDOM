@@ -58,6 +58,46 @@ describe('create_ui_popup: トリガー構造', () => {
     const btn = find_by_class(root, 'ric-popup__trigger')[0];
     assert.ok(btn.class.includes('ric-popup__trigger--ghost'));
   });
+
+  // chevron オプション (v0.3.28〜): label モードに開閉インジケータを足す
+  it('chevron: true (label モード) → label の後ろに chevron アイコンが付く', () => {
+    const inst = create_ui_popup();
+    const root = inst({ label: '言語', chevron: true, ctx: [] });
+    drain_portal();
+    const btn = find_by_class(root, 'ric-popup__trigger')[0];
+    assert.equal(btn.ctx.length, 2, 'label span + chevron の 2 要素');
+    assert.equal(btn.ctx[0].tag, 'span');
+    const chev = btn.ctx[1];
+    assert.equal(chev.tag, 'svg');
+    assert.match(chev.class, /ric-popup__chevron/);
+    assert.doesNotMatch(chev.class, /--open/, '閉じている間は --open なし');
+  });
+
+  it('chevron: true + open → chevron に --open クラス (CSS で 180° 回転)', () => {
+    const inst = create_ui_popup();
+    inst._o = true;
+    inst.__notify = () => {};
+    const root = inst({ label: '言語', chevron: true, ctx: [] });
+    drain_portal();
+    const btn = find_by_class(root, 'ric-popup__trigger')[0];
+    assert.match(btn.ctx[1].class, /ric-popup__chevron--open/);
+  });
+
+  it('chevron 省略 → label のみ (後方互換)', () => {
+    const inst = create_ui_popup();
+    const root = inst({ label: '言語', ctx: [] });
+    drain_portal();
+    const btn = find_by_class(root, 'ric-popup__trigger')[0];
+    assert.equal(btn.ctx.length, 1, 'chevron 無しなら label span のみ');
+  });
+
+  it('chevron は icon モードには影響しない', () => {
+    const inst = create_ui_popup();
+    const root = inst({ icon: '⚙', chevron: true, ctx: [] });
+    drain_portal();
+    const btn = find_by_class(root, 'ric-popup__trigger')[0];
+    assert.deepEqual(btn.ctx, ['⚙'], 'icon モードは chevron を付けない');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────

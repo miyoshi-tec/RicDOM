@@ -77,8 +77,14 @@ const { create_RicDOM } = RicDOM;
 const {
   create_ui_page, create_ui_scroll_pane, create_ui_splitter,
   ui_panel, ui_row, ui_col, ui_text, ui_button,
-  ui_textarea, ui_input, ui_select, ui_md_pre, focus_when,
+  ui_textarea, ui_input, ui_select, ui_md_pre, ui_icon, focus_when,
 } = RicUI;
+
+// アイコン: Icon Picker からコピーした descriptor (使う分だけ)。
+const ICONS = {
+  'triangle-alert': { p: ['M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', 'M12 9v4', 'M12 17h.01'] },
+  'x':              { p: 'M18 6 6 18M6 6l12 12' },
+};
 
 // ── プロバイダ定義 ──
 // 各プロバイダの URL / ヘッダー / リクエスト body / SSE delta 抽出を 1 テーブルに集約。
@@ -270,11 +276,11 @@ handle.render = (s) => {
                      color: 'rgb(153, 27, 27)', padding: '10px 16px' },
             ctx: [
               ui_row({ style: { alignItems: 'center', gap: '8px' }, ctx: [
-                ui_text({ ctx: ['⚠ ' + s.ui.error] }),
+                ui_text({ ctx: [ui_icon(ICONS['triangle-alert'], { size: 16, label: '警告' }), ' ' + s.ui.error] }),
                 { tag: 'div', style: { flex: 1 } },
                 ui_button({
                   variant: 'ghost',
-                  ctx: ['✕'],
+                  ctx: [ui_icon(ICONS['x'], { size: 16, label: '閉じる' })],
                   onclick: () => { s.ui.error = null; },
                 }),
               ]}),

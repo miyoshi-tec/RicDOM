@@ -14,7 +14,7 @@
 //               ui_range / bind_range
 //               ui_color / bind_color
 //               ui_select / bind_select
-//               ui_separator
+//               ui_separator / ui_icon
 //               focus_when
 //   text      : ui_text / ui_code_pre / ui_md_pre
 //   popup     : create_ui_popup / create_ui_tooltip / create_ui_dialog / create_ui_toast
@@ -53,6 +53,7 @@ const { bind_range       } = require('./control/bind_range');
 const { ui_color         } = require('./control/ui_color');
 const { bind_color       } = require('./control/bind_color');
 const { ui_separator     } = require('./control/ui_separator');
+const { ui_icon          } = require('./control/ui_icon');
 const { focus_when       } = require('./control/focus_when');
 
 const { ui_text     } = require('./text/ui_text');
@@ -111,6 +112,7 @@ module.exports = {
   ui_color,
   bind_color,
   ui_separator,
+  ui_icon,
   ui_select,
   bind_select,
   focus_when,

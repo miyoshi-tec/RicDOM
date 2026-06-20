@@ -259,6 +259,18 @@ create_RicDOM('#mount-raw', {
           ].filter(Boolean),
         },
 
+        // ── ツールチップ（生 RicDOM では title 属性が精一杯）────
+        // RicUI 版の create_ui_tooltip と違い、title は表示方向もデザインも
+        // 制御できず、表示まで ~1 秒の遅延がある（OS ネイティブ任せ）。
+        // → 位置・即時表示・スタイルが要るなら create_ui_tooltip が必要、という対比。
+        { tag: 'p', class: 'ctrl-label', ctx: ['ツールチップ'] },
+        { tag: 'div', style: { display: 'flex', gap: '8px', flexWrap: 'wrap' }, ctx: [
+          // 生 RicDOM: アイコンは絵文字、ツールチップは title 属性 (位置・デザイン・即時性すべて OS 任せ)
+          { tag: 'button', title: 'ファイルをダウンロード', ctx: ['⬇️ ダウンロード'] },
+          { tag: 'button', title: '名前を変更',           ctx: ['✏️ 編集'] },
+          { tag: 'button', title: 'この項目を削除',         ctx: ['🗑️ 削除'] },
+        ]},
+
         // ── State ─────────────────────────────────
         { tag: 'p', class: 'state-label', ctx: ['State'] },
         { tag: 'pre', class: 'state-pre',
@@ -274,7 +286,16 @@ create_RicDOM('#mount-raw', {
   <!-- 右：RicUI 版 -->
   <script type="text/plain" id="src-rui">
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, ui_panel, ui_text, create_ui_popup, create_ui_tooltip, ui_button, ui_col, ui_row, ui_code_pre } = RicUI;
+const { create_ui_page, ui_panel, ui_text, create_ui_popup, create_ui_tooltip, ui_button, ui_col, ui_row, ui_code_pre, ui_icon } = RicUI;
+
+// アイコン: Icon Picker からコピーした descriptor (使う分だけ)。
+const ICONS = {
+  'menu':     { p: 'M4 6h16M4 12h16M4 18h16' },
+  'download': { p: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3' },
+  'pencil':   { p: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z' },
+  'trash-2':  { p: 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6' },
+};
+
 // ── RicDOM インスタンス ──────────────────────────────────────────
 create_RicDOM('#mount-rui', {
   lang: 'ja', last_action: null,
@@ -311,16 +332,16 @@ create_RicDOM('#mount-rui', {
           { tag: 'div',
             style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--ric-gap-md)' },
             ctx: [
-              s.nav_l({ ctx: MENU_CTX }),
+              s.nav_l({ icon: ui_icon(ICONS['menu'], { size: 18 }), ctx: MENU_CTX }),
               ui_text({ variant: 'title', ctx: ['ポップアップ'] }),
-              s.nav_r({ ctx: MENU_CTX }),
+              s.nav_r({ icon: ui_icon(ICONS['menu'], { size: 18 }), ctx: MENU_CTX }),
             ],
           },
 
           // ── カスタムドロップダウン ──────────────────
           ui_col({ ctx: [
             ui_text({ variant: 'label', ctx: ['言語'] }),
-            s.lang_dd({ label: lang_label, ctx: LANG_CTX }),
+            s.lang_dd({ label: lang_label, chevron: true, ctx: LANG_CTX }),
           ]}),
 
           // ── ツールチップ ───────────────────────────
@@ -329,9 +350,12 @@ create_RicDOM('#mount-rui', {
             { tag: 'div',
               style: { display: 'flex', alignItems: 'center', gap: 'var(--ric-gap-md)', flexWrap: 'wrap' },
               ctx: [
-                s.tip1({ content: 'ファイルを開く', ctx: [ui_button({ ctx: ['開く'] })] }),
-                s.tip2({ content: '変更を保存（Ctrl+S）', ctx: [ui_button({ ctx: ['保存'], variant: 'primary' })] }),
-                s.tip3({ content: '下方向に表示', dir: 'bottom', ctx: [ui_button({ ctx: ['初期化'], variant: 'ghost' })] }),
+                s.tip1({ content: 'ファイルをダウンロード',
+                  ctx: [ui_button({ ctx: [ui_icon(ICONS['download'], { size: 16 }), 'ダウンロード'] })] }),
+                s.tip2({ content: '名前を変更',
+                  ctx: [ui_button({ ctx: [ui_icon(ICONS['pencil'], { size: 16 }), '編集'], variant: 'primary' })] }),
+                s.tip3({ content: 'この項目を削除', dir: 'bottom',
+                  ctx: [ui_button({ ctx: [ui_icon(ICONS['trash-2'], { size: 16 }), '削除'], variant: 'ghost' })] }),
               ],
             },
           ]}),

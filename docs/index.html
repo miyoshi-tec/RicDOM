@@ -126,7 +126,7 @@
       <li><strong>JSON 記述</strong> — UI を plain JavaScript object で定義</li>
       <li><strong>Virtual DOM なし</strong> — JSON 差分から実 DOM を直接パッチ。input フォーカス・IME 変換を壊さない</li>
       <li><strong>Proxy 自動追跡</strong> — <code>s.count = 5</code> で自動再描画</li>
-      <li><strong>極小バンドル</strong> — RicDOM コア 10KB / RicUI 64KB (minified)</li>
+      <li><strong>極小バンドル</strong> — RicDOM コア 10KB / RicUI 65KB (minified)</li>
       <li><strong>テーマ × 密度</strong> — CSS 変数で 5 テーマ × 3 密度</li>
       <li><strong>Electron / ブラウザ両対応</strong></li>
     </ul>
@@ -163,6 +163,7 @@ create_RicDOM('#app', {
       <li><a href="https://github.com/miyoshi-tec/RicDOM/blob/main/SPEC.md">SPEC.md (技術仕様)</a></li>
       <li><a href="https://github.com/miyoshi-tec/RicDOM/blob/main/TUTORIAL.md">TUTORIAL.md (チュートリアル)</a></li>
       <li><a href="lz_playground.html">LZ String Playground (圧縮ツール)</a></li>
+      <li><a href="icon_playground.html">Icon Picker (アイコン選択ツール)</a></li>
     </ul>
   </section>
   <section>
@@ -365,7 +366,7 @@ create_RicDOM('#index_page', {
               ui_text({ ctx: ['コア（必須）'] }),
             ]}),
             ui_row({ ctx: [
-              { tag: 'span', class: 'badge badge--ui', ctx: ['RicUI.min.js — 64KB'] },
+              { tag: 'span', class: 'badge badge--ui', ctx: ['RicUI.min.js — 65KB'] },
               { tag: 'span', class: 'badge badge--lz', ctx: ['.lz.min.js — 36KB'] },
               ui_text({ ctx: ['UI コンポーネント集 + パラメータ調整パネル'] }),
             ]}),
@@ -420,6 +421,12 @@ create_RicDOM('#index_page', {
               { tag: 'span', class: 'sample-title', ctx: ['LZ String Playground'] },
               { tag: 'span', class: 'sample-desc',
                 ctx: [' — 自前 JS を LZSS 自己展開 wrapper に変換するブラウザツール'] },
+            ]},
+            { tag: 'a', class: 'sample-link', href: 'icon_playground.html', ctx: [
+              { tag: 'span', class: 'sample-no', ctx: ['🎨'] },
+              { tag: 'span', class: 'sample-title', ctx: ['Icon Picker'] },
+              { tag: 'span', class: 'sample-desc',
+                ctx: [' — 同梱 + Lucide のアイコンを選んで ui_icon 用 JSON をコピー'] },
             ]},
             { tag: 'a', class: 'sample-link', href: 'https://github.com/miyoshi-tec/RicDOM', ctx: [
               { tag: 'span', class: 'sample-no', ctx: ['📦'] },

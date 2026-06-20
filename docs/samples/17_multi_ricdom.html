@@ -150,12 +150,25 @@ const {
   // layout / surface / text
   create_ui_page, ui_panel, ui_text, ui_row, ui_md_pre,
   // controls
-  ui_button, ui_input, ui_textarea, bind_input, ui_radiobutton,
+  ui_button, ui_input, ui_textarea, bind_input, ui_radiobutton, ui_icon,
   // popups
   create_ui_dialog,
   // composite
   create_ui_splitter,
 } = RicUI;
+
+// アイコン: Icon Picker から「使う分だけ」コピー。
+// 一部 Lucide (ISC License) https://lucide.dev — Copyright (c) Lucide Contributors。
+// (フィルタの 🔍 は placeholder=文字列専用のため据え置き)
+const ICONS = {
+  'pencil':      { p: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z' },
+  'trash-2':     { p: 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6' },
+  'circle-dot':  { s: null, p: 'M12 6a6 6 0 1 0 0 12 6 6 0 1 0 0-12z' },
+  'list':        {"p":["M3 5h.01","M3 12h.01","M3 19h.01","M8 5h13","M8 12h13","M8 19h13"]},  // lucide: list
+  'sticky-note': {"p":["M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z","M15 3v5a1 1 0 0 0 1 1h5"]},  // lucide: sticky-note
+  'save':        {"p":["M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z","M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7","M7 3v4a1 1 0 0 0 1 1h7"]},  // lucide: save
+  'folder':      {"p":"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"},  // lucide: folder
+};
 
 // ── 永続化 ──
 const STORAGE_KEY = 'ric-multi-memo';
@@ -342,15 +355,15 @@ const list_h = create_RicDOM('#list', {
                    padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' },
           ctx: [
             ui_row({ style: { alignItems: 'center', gap: '8px' }, ctx: [
-              ui_text({ variant: 'label', ctx: ['📋 List'] }),
+              ui_text({ variant: 'label', ctx: [ui_icon(ICONS['list'], { size: 16 }), ' List'] }),
               { tag: 'span', class: 'render-counter', ctx: [`(R: ${list_renders})`] },
               { tag: 'span', style: { flex: 1 } },
               ui_radiobutton({
                 name: 'view-' + Math.random(),  // 他の radio と name 衝突回避
                 value: s.view,
                 options: [
-                  { value: 'list',  label: '⊞ List' },
-                  { value: 'cards', label: '🗒 付箋' },
+                  { value: 'list',  label: [ui_icon(ICONS['list'], { size: 14 }), ' List'] },
+                  { value: 'cards', label: [ui_icon(ICONS['sticky-note'], { size: 14 }), ' 付箋'] },
                 ],
                 onchange: (e) => { s.view = e.target.value; },
               }),
@@ -422,9 +435,9 @@ const editor_h = create_RicDOM('#editor', {
                    padding: '8px 12px' },
           ctx: [
             ui_row({ style: { alignItems: 'center', gap: '8px' }, ctx: [
-              ui_text({ variant: 'label', ctx: ['✏️ Editor'] }),
+              ui_text({ variant: 'label', ctx: [ui_icon(ICONS['pencil'], { size: 16 }), ' Editor'] }),
               { tag: 'span', class: 'render-counter', ctx: [`(R: ${editor_renders})`] },
-              s.dirty ? ui_text({ variant: 'muted', ctx: ['● 未保存'] }) : null,
+              s.dirty ? ui_text({ variant: 'muted', ctx: [ui_icon(ICONS['circle-dot'], { size: 12 }), ' 未保存'] }) : null,
               { tag: 'span', style: { flex: 1 } },
               has_selection ? ui_radiobutton({
                 name: 'editor-mode',
@@ -461,12 +474,12 @@ const editor_h = create_RicDOM('#editor', {
                 // ボタン行
                 ui_row({ style: { gap: '8px' }, ctx: [
                   ui_button({
-                    variant: 'primary', ctx: ['💾 Save'],
+                    variant: 'primary', ctx: [ui_icon(ICONS['save'], { size: 16 }), 'Save'],
                     disabled: s.dirty ? null : 'disabled',
                     onclick: save_draft,
                   }),
                   s.delete_dlg({
-                    trigger_ctx: ['🗑 Delete...'],
+                    trigger_ctx: [ui_icon(ICONS['trash-2'], { size: 16 }), 'Delete...'],
                     title: 'メモを削除',
                     ctx: [ ui_text({ ctx: [`「${s.draft.title || '(無題)'}」を削除します。元には戻せません。`] }) ],
                     actions: [
@@ -529,7 +542,7 @@ const toolbar_h = create_RicDOM('#toolbar', {
         ui_panel({
           style: { margin: 0, border: 0, borderRadius: 0, padding: '8px 16px' },
           ctx: [ ui_row({ style: { alignItems: 'center', gap: '12px' }, ctx: [
-            ui_text({ variant: 'title', ctx: ['🗂 Memo App'] }),
+            ui_text({ variant: 'title', ctx: [ui_icon(ICONS['folder'], { size: 18 }), ' Memo App'] }),
             { tag: 'span', class: 'render-counter', ctx: [`(R: ${toolbar_renders})`] },
             { tag: 'span', style: { flex: 1 } },
             ui_button({ variant: 'primary', ctx: ['+ New'], onclick: create_new_memo }),

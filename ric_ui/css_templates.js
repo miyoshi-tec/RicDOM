@@ -232,11 +232,28 @@ ${_P}.ric-panel--row {
 
   // ── control ─────────────────────────────────
 
+  // アイコン (v0.3.28〜)。サイズ・色は ui_icon が inline (style width/height +
+  // currentColor) で持つので、ここでは整列と回転だけを担う。
+  //   vertical-align: -0.125em … テキスト隣接時のベースライン微調整 (標準的な値)
+  //   flex-shrink: 0           … ボタン/flex 内でアイコンが潰れないように
+  //   @keyframes ric-spin      … spin:true (spinner) 用。グローバル定義 (prefix 不要)
+  'ric-icon': () => `
+${_P}.ric-icon {
+  display: inline-block;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+@keyframes ric-spin { to { transform: rotate(360deg); } }
+${_P}.ric-icon--spin {
+  animation: ric-spin 1.4s linear infinite;
+}`,
+
   'ric-button': () => `
 ${_P}.ric-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.4em;
   height: ${_ch};
   padding: 0 ${_px};
   border: ${_b1};
@@ -712,6 +729,9 @@ ${_P}.ric-popup__trigger--open {
   border-color: ${_ac};
 }
 
+${_P}.ric-popup__chevron { transition: transform 0.2s ${_eas}; opacity: 0.7; }
+${_P}.ric-popup__chevron--open { transform: rotate(180deg); }
+
 .ric-popup__body {
   min-width: 160px;
   background: ${_ct};
@@ -875,8 +895,8 @@ ${_P}.ric-tooltip { display: inline-flex; }
 }
 .ric-accordion__header:hover, .ric-accordion__header--open { background: ${_bd}; }
 .ric-accordion__title { flex: 1; text-align: left; }
-.ric-accordion__arrow { font-size: 0.6em; color: ${_fm}; margin-left: ${_g}; rotate: 90deg; transition: rotate ${_da}; }
-.ric-accordion__header--open .ric-accordion__arrow { rotate: 270deg; }
+.ric-accordion__arrow { color: ${_fm}; margin-left: ${_g}; transition: transform ${_da}; }
+.ric-accordion__header--open .ric-accordion__arrow { transform: rotate(180deg); }
 /* grid-template-rows のトリックで auto 高さに対してアニメーションする。
    閉じ: 0fr → 開き: 1fr（子要素は min-height:0 + overflow:hidden が必須） */
 .ric-accordion__body {

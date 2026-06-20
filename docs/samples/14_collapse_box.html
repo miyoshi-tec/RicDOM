@@ -282,8 +282,17 @@ collapse_box の wrapper には `data-ric-visible="true" / "false"` 属性が付
 const { create_RicDOM } = RicDOM;
 const {
   create_ui_page, create_ui_collapse_box,
-  ui_panel, ui_text, ui_button, ui_code_pre, ui_md_pre,
+  ui_panel, ui_text, ui_button, ui_code_pre, ui_md_pre, ui_icon,
 } = RicUI;
+
+// アイコン: Icon Picker から「使う分だけ」コピー。
+// 一部 Lucide (ISC License) https://lucide.dev — Copyright (c) Lucide Contributors。
+const ICONS = {
+  'x':         { p: 'M18 6 6 18M6 6l12 12' },
+  'plus':      { p: 'M12 5v14M5 12h14' },
+  'file':      {"p":["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z","M14 2v5a1 1 0 0 0 1 1h5"]},  // lucide: file
+  'lightbulb': {"p":["M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5","M9 18h6","M10 22h4"]},  // lucide: lightbulb
+};
 
 const MD_PITFALLS = document.getElementById('md-pitfalls').textContent.trim();
 const MD_E2E      = document.getElementById('md-e2e').textContent.trim();
@@ -540,7 +549,7 @@ s.box({
             ]},
           ]},
           { tag: 'div', class: 'style-pick', ctx: [
-            '💡 ', { tag: 'strong', ctx: ['本サンプルは A スタイル'] }, 'です。',
+            ui_icon(ICONS['lightbulb'], { size: 16 }), ' ', { tag: 'strong', ctx: ['本サンプルは A スタイル'] }, 'です。',
             '要素数が数百以下で頻繁更新でないなら A、',
             '数千以上を頻繁に追加削除するなら B を検討してください。',
             'state がそのまま「真実の source」になる A の方が読み手に優しいので、',
@@ -548,11 +557,11 @@ s.box({
           ]},
 
           { tag: 'div', class: 'demo-card', ctx: [
-            ui_button({ variant: 'primary', ctx: ['+ 行を追加 (アニメ ON)'], onclick: add_row_p3 }),
+            ui_button({ variant: 'primary', ctx: [ui_icon(ICONS['plus'], { size: 14 }), '行を追加 (アニメ ON)'], onclick: add_row_p3 }),
             { tag: 'div', style: { marginTop: '8px', border: '1px solid var(--ric-color-border)', borderRadius: '4px', overflow: 'hidden' },
               ctx: s.p3_items.map((item) => {
                 const row = { tag: 'div', class: 'list-row', ctx: [
-                  { tag: 'span', class: 'list-row__icon', ctx: ['📄'] },
+                  { tag: 'span', class: 'list-row__icon', ctx: [ui_icon(ICONS['file'], { size: 16 })] },
                   { tag: 'span', ctx: [item.label] },
                 ]};
                 return wrap_anim_row(s.p3_box, item, row);
@@ -605,13 +614,13 @@ items.map((item) => {
             'なので削除時のアニメは CSS animation で別に書く、と役割を分けます。',
           ]}),
           { tag: 'div', class: 'demo-card', ctx: [
-            ui_button({ variant: 'primary', ctx: ['+ 行を追加 (アニメ ON)'], onclick: add_row_p4 }),
+            ui_button({ variant: 'primary', ctx: [ui_icon(ICONS['plus'], { size: 14 }), '行を追加 (アニメ ON)'], onclick: add_row_p4 }),
             { tag: 'div', style: { marginTop: '8px', border: '1px solid var(--ric-color-border)', borderRadius: '4px', overflow: 'hidden' },
               ctx: s.p4_items.map((item) => {
                 const row = { tag: 'div', class: 'list-row', ctx: [
-                  { tag: 'span', class: 'list-row__icon', ctx: ['📄'] },
+                  { tag: 'span', class: 'list-row__icon', ctx: [ui_icon(ICONS['file'], { size: 16 })] },
                   { tag: 'span', ctx: [item.label] },
-                  { tag: 'span', class: 'list-row__del', onclick: () => remove_row_p4(item.id), ctx: ['✕ 削除'] },
+                  { tag: 'span', class: 'list-row__del', onclick: () => remove_row_p4(item.id), ctx: [ui_icon(ICONS['x'], { size: 14 }), ' 削除'] },
                 ]};
                 return wrap_anim_row(s.p4_box, item, row);
               }),
