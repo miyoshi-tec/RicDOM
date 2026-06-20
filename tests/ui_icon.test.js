@@ -120,6 +120,28 @@ describe('ui_icon: size', () => {
     assert.equal(n.style.width, '20px');
     assert.equal(n.style.opacity, 0.5, 'style の他プロパティは保持される');
   });
+
+  test('vertical-align が inline style に入る (生 RicDOM でもベースライン整列)', () => {
+    // .ric-icon CSS (create_ui_page 注入) が無い環境でも整列が効くよう inline 化。
+    const n = ui_icon(CHECK);
+    assert.equal(n.style.verticalAlign, '-0.125em');
+  });
+
+  test('vertical-align は opts.style で上書きできる', () => {
+    const n = ui_icon(CHECK, { style: { verticalAlign: 'middle' } });
+    assert.equal(n.style.verticalAlign, 'middle');
+  });
+
+  test('flex-shrink:0 が inline style に入る (flex 内で潰れない)', () => {
+    // .ric-icon CSS が無い生 RicDOM の flex コンテナでもアイコンが潰れないよう inline 化。
+    const n = ui_icon(CHECK);
+    assert.equal(n.style.flexShrink, 0);
+  });
+
+  test('flex-shrink は opts.style で上書きできる', () => {
+    const n = ui_icon(CHECK, { style: { flexShrink: 1 } });
+    assert.equal(n.style.flexShrink, 1);
+  });
 });
 
 describe('ui_icon: アクセシビリティ (label)', () => {
