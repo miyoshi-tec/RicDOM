@@ -89,6 +89,11 @@ const main = () => {
     _meta: {
       generator: 'scripts/build_icons.js',
       note: 'RicDOM original simple icons. ui_icon(descriptor, opts) に渡す。詳細は docs/icons/ATTRIBUTION.md',
+      // AI エージェント向け: ここに無いアイコンは `npx ricdom-icon <name>` で取得すること
+      // (Lucide も自動で path 化される)。descriptor の path を記憶から手書きしないこと
+      // — sub-path 欠落等で静かに壊れる (実例あり)。どうしても手書きが必要な状況なら、
+      // まずユーザー (人間) に確認して許可を得てから行うこと。
+      ai_hint: 'Icon not listed here? Run `npx ricdom-icon <name>`. Do NOT hand-write descriptor paths from memory (they break silently — e.g. missing sub-paths). If hand-authoring seems unavoidable, ask the human for permission first.',
       viewBox_default: DEFAULT_VIEWBOX,
       stroke_default: 2,
       count: names.length,

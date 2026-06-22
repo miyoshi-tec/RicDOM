@@ -135,14 +135,23 @@ create_RicDOM('#app', {
     const build_output = () => {
       const names = Object.keys(s.selected).sort();
       if (names.length === 0) return '// アイコンを選ぶと、ここに ICONS が出ます';
-      const usesLucide = names.some(n => s.selected[n].src === 'lucide');
+      // 帰属は「冒頭の 1 ブロック」にまとめ、ICONS 本体は inline コメントを
+      // 一切含めない純粋なオブジェクトリテラルにする。理由 (TG 報告):
+      //   行末コメント `}, // lucide` は、reformat 等でカンマがコメント後ろに
+      //   回ると区切りがコメントアウトされて壊れる。しかも `node --check` は
+      //   通るのに ESM import だけ SyntaxError になり気づきにくい。
+      //   inline コメントを持たせなければこのフットガン自体が消える。
+      const lucide_names = names.filter(n => s.selected[n].src === 'lucide');
       const lines = [];
-      if (usesLucide) lines.push(LUCIDE_NOTICE, '');
+      if (lucide_names.length) {
+        lines.push(LUCIDE_NOTICE);
+        lines.push(`// Lucide 由来: ${lucide_names.join(', ')}`);
+        lines.push('');
+      }
       lines.push('const ICONS = {');
       for (const n of names) {
         const key = /^[a-zA-Z_$][\w$]*$/.test(n) ? n : JSON.stringify(n);
-        const note = s.selected[n].src === 'lucide' ? `  // lucide: ${n}` : '';
-        lines.push(`  ${key}: ${JSON.stringify(s.selected[n].d)},${note}`);
+        lines.push(`  ${key}: ${JSON.stringify(s.selected[n].d)},`);
       }
       lines.push('};');
       return lines.join('\n');
