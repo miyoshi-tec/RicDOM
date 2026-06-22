@@ -152,6 +152,29 @@ global 副作用は decompress 後の `eval` で発火する。consumer の bund
 あるか」の推奨も表示するので、インストール不要で適用判断が可能。
 公開ページ: <https://miyoshi-tec.github.io/RicDOM/lz_playground.html>
 
+## アイコン CLI (`ricdom-icon`)
+
+`ui_icon` の descriptor を**名前 → stdout** で引く CLI。アイコンピッカー
+(`docs/icon_playground.html`) のヘッドレス版で、GUI を開けない CLI / CI / AI
+エージェント向け。同梱 35 個はオフライン即返し、Lucide は取得して `svg_to_descriptor`
+で path 化する(circle/rect も自動変換 → 手書きで壊す事故を防ぐ)。
+
+```bash
+# 貼れる const ICONS = {...} (Lucide 由来は ISC 帰属コメント込み) を stdout に
+$ npx ricdom-icon settings refresh-cw chat >> src/icons.js
+
+# 素の descriptor だけ ({ name: {...} }) — 自前マージ用
+$ npx ricdom-icon settings --json
+
+# 名前が分からない時の候補出し / 同梱一覧
+$ npx ricdom-icon --search gear
+$ npx ricdom-icon --names
+```
+
+ログ/警告は stderr、descriptor は stdout(pipe を汚さない)。同梱を読むだけなら
+`docs/icons/icons.json` を直接読んでもよい。変換器単体は
+`require('ricdom/docs/icons/svg_to_descriptor')`(UMD)。
+
 ### Hello World（RicDOM のみ）
 
 ```html

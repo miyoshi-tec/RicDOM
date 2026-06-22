@@ -1,6 +1,6 @@
 {
   "name": "ricdom",
-  "version": "0.3.29",
+  "version": "0.3.30",
   "description": "JSON-based real-time control DOM library for Electron/browser",
   "license": "SEE LICENSE IN LICENSE",
   "author": "miyoshi-tec",
@@ -19,7 +19,8 @@
   ],
   "main": "src/ricdom.js",
   "bin": {
-    "ricdom-lz": "./scripts/build_lz_bundle.js"
+    "ricdom-lz": "./scripts/build_lz_bundle.js",
+    "ricdom-icon": "./scripts/icon.js"
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
