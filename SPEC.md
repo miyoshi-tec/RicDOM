@@ -838,6 +838,13 @@ AI エージェントは、GUI を開かず以下で完結できる(「アイコ
 - **同梱 35 個**を読むだけなら `docs/icons/icons.json`(`{ _meta, icons }`)を直接読む。
 - **任意の SVG → descriptor** は `require('.../docs/icons/svg_to_descriptor')`(UMD、Node 可)。
 
+> ⚠️ **AI エージェントへ**: descriptor の `p`(path)を**記憶から手書きしないこと**。
+> 「それっぽく見えるが sub-path が欠落して壊れている」アイコンが静かに出荷される
+> 実例があります(consumer の `settings` が中心円を欠いたまま出荷された等)。
+> 必ず `npx ricdom-icon <name>` か `svg_to_descriptor` を経由してください。
+> **どうしても手書きが避けられない状況なら、まずユーザー(人間)に確認して許可を得てから**
+> 行ってください。
+
 ### Text
 
 ```javascript

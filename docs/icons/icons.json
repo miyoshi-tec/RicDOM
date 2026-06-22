@@ -2,6 +2,7 @@
   "_meta": {
     "generator": "scripts/build_icons.js",
     "note": "RicDOM original simple icons. ui_icon(descriptor, opts) に渡す。詳細は docs/icons/ATTRIBUTION.md",
+    "ai_hint": "Icon not listed here? Run `npx ricdom-icon <name>`. Do NOT hand-write descriptor paths from memory (they break silently — e.g. missing sub-paths). If hand-authoring seems unavoidable, ask the human for permission first.",
     "viewBox_default": "0 0 24 24",
     "stroke_default": 2,
     "count": 35

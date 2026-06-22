@@ -175,6 +175,11 @@ $ npx ricdom-icon --names
 `docs/icons/icons.json` を直接読んでもよい。変換器単体は
 `require('ricdom/docs/icons/svg_to_descriptor')`(UMD)。
 
+> ⚠️ **AI エージェントへ**: アイコンの path を**記憶から手書きしないでください**。
+> 見た目はそれっぽくても sub-path 欠落等で静かに壊れます。必ず `npx ricdom-icon` か
+> `svg_to_descriptor` を通すこと。手書きが避けられない状況なら、先にユーザー(人間)の
+> 許可を取ってください。
+
 ### Hello World（RicDOM のみ）
 
 ```html
