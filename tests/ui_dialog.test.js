@@ -166,6 +166,25 @@ describe('create_ui_dialog: controlled open', () => {
     assert.equal(items.length, 0);
   });
 
+  it('width 数値 → body style に min(Npx, 90vw) (v0.3.31〜)', () => {
+    const inst = create_ui_dialog();
+    inst({ open: true, title: 'T', width: 640 });
+    const dialog = drain_portal()[1];   // [0]=overlay, [1]=dialog body
+    assert.equal(dialog.style.width, 'min(640px, 90vw)');
+  });
+
+  it('width 文字列 → そのまま min(…, 90vw)', () => {
+    const inst = create_ui_dialog();
+    inst({ open: true, title: 'T', width: '50rem' });
+    assert.equal(drain_portal()[1].style.width, 'min(50rem, 90vw)');
+  });
+
+  it('width 省略 → style.width 無し (CSS 既定に委ねる)', () => {
+    const inst = create_ui_dialog();
+    inst({ open: true, title: 'T' });
+    assert.equal(drain_portal()[1].style.width, undefined);
+  });
+
   it('open true→false で閉じアニメーション開始', () => {
     const inst = create_ui_dialog();
     // 1回目: open=true

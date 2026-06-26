@@ -1036,6 +1036,10 @@ s.dlg({
 - `on_close` は overlay クリック・✕ ボタン・ESC キーで発火する。
   親が `open` を `false` にすると閉じアニメーションが再生され、完了後にポータルから除去される。
 - ESC キーは uncontrolled / controlled 両モードで有効。
+- **`width`（v0.3.31〜）**: ダイアログ幅。数値→px / CSS 文字列→そのまま。小画面で
+  溢れないよう内部で `min(…, 90vw)` に包むのでレスポンシブ。省略時は CSS 既定
+  `min(360px, 90vw)`。`dlg({ open, on_close, title, ctx, width: 640 })`。
+  （これで `[data-ric-role="dialog"] { width: …!important }` の CSS 上書きは不要。）
 
 **`on_close(reason)` — close 発生源の区別（v0.3.26〜）**:
 
