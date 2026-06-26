@@ -214,6 +214,12 @@ create_RicDOM('#app', {
 RicUI では `create_RicDOM('#app', state)` でハンドルを作り、`s.render` を後から設定します。
 popup や dialog のファクトリを render の外で初期化できるため、コードの見通しが良くなります。
 
+> ⚠️ **RicUI 部品は必ず `create_ui_page` の中で描いてください。** 配下にないと CSS が
+> 注入されず「無装飾(ブラウザ既定の部品)」になります(エラーは出ません)。モーダル/
+> ポータル/別マウントも `create_ui_page` で包む(またはモーダルは `create_ui_dialog` を
+> 使う)。無装飾は見た目だけ壊れて DOM テストは通るので、**E2E でスクショ確認**を推奨。
+> 詳細は SPEC.md「スタイルスコープ」節。
+
 ```javascript
 const { create_RicDOM } = RicDOM;
 const { create_ui_page, ui_panel, ui_text, bind_input } = RicUI;

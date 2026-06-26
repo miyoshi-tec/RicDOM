@@ -21,6 +21,11 @@
 //         title: '...', ctx: [...] })
 //   ↑ 戻り値は null。trigger_ctx は併用禁止 (console.error)。
 //
+// width オプション (v0.3.31〜): ダイアログ幅を指定する。数値→px / 文字列→そのまま。
+//   dlg({ open, on_close, title, ctx, width: 640 })   // → width: min(640px, 90vw)
+//   小画面で溢れないよう min(…, 90vw) で包むのでレスポンシブ。省略時は CSS 既定
+//   (min(360px, 90vw))。これで [data-ric-role="dialog"]{width:…!important} は不要。
+//
 // 1インスタンス = 1ダイアログ。
 // 開いているときバックドロップ＋ダイアログ本体を _page_portal_queue に積む。
 // ui_page がレンダー時に取り出して .ric-page 末尾に展開する（ポータルパターン）。
@@ -99,7 +104,7 @@ const create_ui_dialog = () => {
   const inst = (props = {}) => {
     const {
       trigger_ctx, title = '', ctx = [], actions = [],
-      trigger_variant = 'primary', open, on_close,
+      trigger_variant = 'primary', open, on_close, width,
       theme, density, font_size,
     } = props;
 
@@ -157,6 +162,12 @@ const create_ui_dialog = () => {
             top:       '50%',
             left:      '50%',
             transform: 'translate(-50%,-50%)',
+            // width: 数値→px / 文字列→そのまま。小画面で溢れないよう min(…, 90vw) で
+            // 包む (CSS 既定 width:min(360px,90vw) を上書きしつつレスポンシブ維持)。
+            // これで [data-ric-role="dialog"]{width:…!important} の上書きが不要になる。
+            ...(width != null
+              ? { width: `min(${typeof width === 'number' ? width + 'px' : width}, 90vw)` }
+              : {}),
           },
           onanimationend: _on_anim_end,
           ctx: [

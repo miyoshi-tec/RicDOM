@@ -184,7 +184,7 @@ create_RicDOM('#app', {
       <li><a href="samples/12_md_viewer.html">12 — Markdown ビューア</a></li>
       <li><a href="samples/13_controlled_dialog_splitter.html">13 — Controlled Mode</a></li>
       <li><a href="samples/14_collapse_box.html">14 — Collapse Box (入退場アニメ)</a></li>
-      <li><a href="samples/15_ai_chat.html">15 — AI Chat (live)</a></li>
+      <li><a href="samples/15_ai_chat.html">15 — AI チャット + 接続設定 (create_ui_dialog / ui_tabs / SSE streaming)</a></li>
       <li><a href="samples/16_svg_editor.html">16 — SVG ツリーエディタ</a></li>
       <li><a href="samples/17_multi_ricdom.html">17 — Multi-instance Memo</a></li>
       <li><a href="samples/18_key_reconciliation.html">18 — Key Reconciliation (リスト並べ替え)</a></li>
@@ -247,7 +247,7 @@ const SAMPLES = [
   { no: '12', file: '12_md_viewer.html',          title: 'Markdown ビューア',  desc: 'ui_md_pre で Markdown → VDOM 変換' },
   { no: '13', file: '13_controlled_dialog_splitter.html', title: 'Controlled Mode',   desc: 'state 駆動の dialog / splitter + SVG グラフ + コード表示' },
   { no: '14', file: '14_collapse_box.html',         title: 'Collapse Box',      desc: 'collapse_box の入退場アニメーション 6 パターン (v0.3.23〜)' },
-  { no: '15', file: '15_ai_chat.html',             title: 'AI Chat (live)',    desc: '4 プロバイダ対応、SSE ストリーミング、API キーは state のみ保持' },
+  { no: '15', file: '15_ai_chat.html',             title: 'AI チャット + 接続設定', desc: 'OpenAI 互換で各種 LLM を切替・接続確認しそのまま会話。create_ui_dialog(width) / ui_tabs / SSE streaming' },
   { no: '16', file: '16_svg_editor.html',          title: 'SVG ツリーエディタ', desc: 'SVG ノードを選択・編集・追加、ドラッグで直感的に配置' },
   { no: '17', file: '17_multi_ricdom.html',        title: 'Multi-instance Memo', desc: 'create_RicDOM をパネル単位に分けて再描画スコープを分離' },
   { no: '18', file: '18_key_reconciliation.html',  title: 'Key Reconciliation',  desc: 'key 属性でリスト並べ替え時に input focus / value が混ざらない (v0.3.25〜)' },
