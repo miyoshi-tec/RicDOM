@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="各種 LLM を OpenAI 互換として切替・接続確認する設定ダイアログ。create_ui_dialog / ui_tabs のリファレンス。">
+  <meta name="description" content="各種 LLM を OpenAI 互換として切替・接続確認し、そのまま会話できる設定ダイアログ + チャット。create_ui_dialog / ui_tabs のリファレンス。">
   <meta name="author" content="miyoshi-tec">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://miyoshi-tec.github.io/RicDOM/samples/19_ai_connection.html">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://miyoshi-tec.github.io/RicDOM/samples/19_ai_connection.html">
   <meta property="og:title" content="AI 接続設定ダイアログ — RicDOM">
-  <meta property="og:description" content="各種 LLM を OpenAI 互換として切替・接続確認する設定ダイアログ。create_ui_dialog / ui_tabs のリファレンス。">
+  <meta property="og:description" content="各種 LLM を OpenAI 互換として切替・接続確認し、そのまま会話できる設定ダイアログ + チャット。create_ui_dialog / ui_tabs のリファレンス。">
   <meta property="og:site_name" content="RicDOM">
   <meta property="og:locale" content="ja_JP">
   <meta name="twitter:card" content="summary">
@@ -45,7 +45,7 @@
     <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
     <header>
       <h1>AI 接続設定ダイアログ — RicDOM</h1>
-      <p>各種 LLM を OpenAI 互換として切替・接続確認する設定ダイアログ。create_ui_dialog / ui_tabs のリファレンス。</p>
+      <p>各種 LLM を OpenAI 互換として切替・接続確認し、そのまま会話できる設定ダイアログ + チャット。create_ui_dialog / ui_tabs のリファレンス。</p>
     </header>
     <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
     JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
@@ -57,13 +57,14 @@
     <!-- ▲ 静的 SEO fallback はここまで ▲ -->
   </div>
 <p class="page-intro">
-  <strong>AI 接続設定ダイアログ</strong>のリファレンス実装。LM Studio / Ollama / OpenAI /
+  <strong>接続設定ダイアログ + 実 AI チャット</strong>。LM Studio / Ollama / OpenAI /
   Claude / Gemini / Grok / その他 を <strong>OpenAI 互換</strong>として切り替え、
-  <code>GET /models</code> で一覧取得・<code>POST /chat/completions</code> で接続テストします。
+  <code>GET /models</code> で一覧取得・接続テストし、<strong>そのまま会話</strong>できます
+  (<code>POST /chat/completions</code> を SSE streaming、応答は <code>ui_md_pre</code> で Markdown 整形)。
   <code>create_ui_dialog</code>(controlled・<code>width</code> 指定)、<code>ui_tabs</code>(pill で択一)、
-  <code>ui_select / ui_input</code>、<code>ui_icon</code> の組み合わせ例。
+  <code>create_ui_scroll_pane</code>(下端追従)、<code>ui_textarea</code> + <code>focus_when</code> の組み合わせ例。
   設定は <code>localStorage</code> に保存しますが <strong>API キーは保存しません</strong>。
-  一覧取得・接続テストはブラウザ直 fetch のため <strong>CORS の影響</strong>を受けます
+  ブラウザ直 fetch のため一覧取得・会話は <strong>CORS の影響</strong>を受けます
   (UI の表示・操作は接続先が無くても確認できます)。下ペインに実コードを表示しています。
   <br><small>提供: 三好製作所 (PDF ビューア開発) — 実アプリの設定 UI を切り出した寄稿サンプル。</small>
 </p>
@@ -80,8 +81,9 @@
 //     リアクティブに完結。モーダル内容も必ず create_ui_page スコープ内に描く。
 
 const { create_RicDOM } = RicDOM;
-const { create_ui_page, create_ui_dialog, ui_panel, ui_row, ui_col, ui_text,
-        ui_button, ui_tabs, ui_input, ui_select, ui_icon } = RicUI;
+const { create_ui_page, create_ui_dialog, create_ui_scroll_pane, ui_panel, ui_row, ui_col,
+        ui_text, ui_button, ui_tabs, ui_input, ui_select, ui_textarea, ui_md_pre,
+        ui_icon, focus_when } = RicUI;
 
 // ── アイコン (Lucide(ISC) は ricdom-icon CLI 出力を貼付。手書きしない) ──
 // Lucide icons (settings, refresh-cw, plug-zap) © Lucide contributors, ISC License.
@@ -118,6 +120,7 @@ const isExternal = (mode) => EXTERNAL_MODES.includes(mode);
 const apiKeyFor = (mode, cfg) => (isExternal(mode) ? (cfg.apiKey || '') : ''); // APIキーは外部APIのみ有効
 const endpointBase = (u) => (u || '').trim().replace(/\/+$/, '');
 const activeCfg = (s) => { const m = s.cfg.mode, c = s.cfg[m]; return { mode: m, baseURL: c.baseURL, model: c.model, apiKey: apiKeyFor(m, c) }; };
+const configReady = (ac) => !!(ac && ac.baseURL && ac.baseURL.trim() && ac.model && ac.model.trim());
 
 function loadCfg() {
   let saved = {};
@@ -220,41 +223,161 @@ function buildConfigPanel(s) {
   ]});
 }
 
-// ── アプリ (単一 create_RicDOM インスタンス) ──
-create_RicDOM('#mount-demo', {
+// ── チャット送信 (OpenAI 互換 /chat/completions を SSE streaming) ──
+// 19 は全モードを OpenAI 互換として扱うので、15_ai_chat の per-provider 分岐は不要で
+// 単一コードパス。delta は choices[0].delta.content。
+async function streamChat({ baseURL, model, apiKey, messages, onChunk }) {
+  const headers = { 'content-type': 'application/json' };
+  if (apiKey) headers.authorization = 'Bearer ' + apiKey;
+  const res = await fetch(endpointBase(baseURL) + '/chat/completions', {
+    method: 'POST', headers,
+    body: JSON.stringify({ model, messages, stream: true }),
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ` + t.slice(0, 200)); }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n'); buf = lines.pop() || '';
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t || t.startsWith(':') || t.startsWith('event:')) continue;
+      if (t === 'data: [DONE]') return;
+      if (!t.startsWith('data:')) continue;
+      try {
+        const ev = JSON.parse(t.slice(5).trim());
+        const delta = ev.choices?.[0]?.delta?.content;
+        if (delta) onChunk(delta);
+      } catch { /* SSE コメント / 部分 JSON は無視 */ }
+    }
+  }
+}
+
+// ── 送信処理 (15_ai_chat と同じ流儀。重い messages 配列は s.ignore に置く) ──
+async function send(s) {
+  const ac = activeCfg(s);
+  const text = s.input.trim();
+  if (!text || s.busy) return;
+  if (!configReady(ac)) { s.chatError = '先に右上「接続設定」で Endpoint と Model を設定してください'; s.settingsOpen = true; return; }
+
+  s.ignore.messages = [...s.ignore.messages, { role: 'user', text }, { role: 'assistant', text: '' }];
+  s.input = ''; s.busy = true; s.chatError = null;
+  s.pane.scroll_to_bottom();
+  try {
+    await streamChat({
+      baseURL: ac.baseURL, model: ac.model, apiKey: ac.apiKey,
+      messages: s.ignore.messages.slice(0, -1).map((m) => ({ role: m.role, content: m.text })), // 空 assistant を除く
+      onChunk: (chunk) => {
+        const msgs = s.ignore.messages, last = msgs[msgs.length - 1];
+        s.ignore.messages = [...msgs.slice(0, -1), { role: 'assistant', text: last.text + chunk }];
+        s.pane.scroll_to_bottom();
+      },
+    });
+  } catch (e) {
+    s.ignore.messages = s.ignore.messages.slice(0, -1); // 空 assistant を削除
+    s.chatError = String(e.message || e);
+  } finally {
+    s.busy = false;
+  }
+}
+
+// ── アプリ (単一 create_RicDOM インスタンス。接続設定 + チャット) ──
+// handle を捕捉して focus_when から refs を参照する (render は後付け)。
+const app = create_RicDOM('#mount-demo', {
   cfg: loadCfg(),
   models: {}, modelStatus: {}, testStatus: {},
   settingsOpen: false,
+  input: '', busy: false, chatError: null,
+  ignore: { messages: [] },           // { role:'user'|'assistant', text }[] (再描画不要の重い配列)
   page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'md' }),
-  dlg: create_ui_dialog(), // 公式ダイアログ (overlay/Esc/✕/フォーカス/スコープ内蔵)
-  render(s) {
-    const ac = activeCfg(s);
-    const connected = s.testStatus[ac.mode]?.state === 'ok' || s.modelStatus[ac.mode]?.state === 'ok';
-
-    // controlled モード。render で毎回呼ぶ (portal 登録)。戻り値 null。
-    // width: 640 で横長に (data-ric-role の CSS 上書きは不要、v0.3.31〜)。
-    const dialog = s.dlg({
-      open: s.settingsOpen,
-      on_close: () => { s.settingsOpen = false; },
-      title: 'AI接続設定',
-      width: 640,
-      ctx: [buildConfigPanel(s)],
-    });
-
-    return s.page({ style: { height: '100%', overflow: 'auto', padding: '24px', borderRadius: 0 }, ctx: [
-      ui_panel({ ctx: [
-        ui_text({ variant: 'title', ctx: ['AI 接続設定ダイアログ'] }),
-        ui_text({ variant: 'muted', ctx: ['LM Studio / Ollama / OpenAI / Claude / Gemini / Grok / その他 を OpenAI 互換として切替。一覧取得・接続テスト付き。'] }),
-        ui_row({ style: { alignItems: 'center', gap: '10px', marginTop: '12px' }, ctx: [
-          ui_button({ variant: 'primary', ctx: [ui_icon(ICONS.settings, { size: 15 }), ' AI接続設定を開く'], onclick: () => { s.settingsOpen = true; } }),
-          { tag: 'span', class: 'status-dot' + (connected ? ' on' : '') },
-          ui_text({ variant: 'muted', ctx: [(connected ? '接続確認済み — ' : '未接続 — ') + `${MODE_LABELS[ac.mode]}: ${ac.model || 'モデル未設定'}`] }),
-        ]}),
-      ]}),
-      dialog,
-    ]});
-  },
+  dlg:  create_ui_dialog(),           // 公式ダイアログ (overlay/Esc/✕/フォーカス/スコープ内蔵)
+  pane: create_ui_scroll_pane({ follow: 'bottom', threshold: 40 }), // 下端自動追従
 });
+
+app.render = (s) => {
+  // 応答中以外は入力欄にフォーカス (立ち上がりエッジ)
+  focus_when(app.refs.get('chat_input'), !s.busy);
+
+  const ac = activeCfg(s);
+  const ready = configReady(ac);
+  const connected = s.testStatus[ac.mode]?.state === 'ok' || s.modelStatus[ac.mode]?.state === 'ok';
+
+  // controlled ダイアログ。render で毎回呼ぶ (portal 登録)。戻り値 null。
+  // width: 640 で横長に (data-ric-role の CSS 上書き不要、v0.3.31〜)。
+  const dialog = s.dlg({
+    open: s.settingsOpen,
+    on_close: () => { s.settingsOpen = false; },
+    title: 'AI接続設定',
+    width: 640,
+    ctx: [buildConfigPanel(s)],
+  });
+
+  // ── ヘッダー (タイトル + 状態 + 接続設定ボタン) ──
+  const header = ui_panel({ style: { margin: 0, borderRadius: 0, borderLeft: 0, borderRight: 0, borderTop: 0 }, ctx: [
+    ui_row({ style: { alignItems: 'center', gap: '10px' }, ctx: [
+      ui_text({ variant: 'title', ctx: ['AI チャット'] }),
+      { tag: 'span', style: { flex: 1 } },
+      { tag: 'span', class: 'status-dot' + (connected ? ' on' : '') },
+      ui_text({ variant: 'muted', ctx: [`${MODE_LABELS[ac.mode]}: ${ac.model || 'モデル未設定'}`] }),
+      ui_button({ variant: 'ghost', ctx: [ui_icon(ICONS.settings, { size: 15 }), ' 接続設定'], onclick: () => { s.settingsOpen = true; } }),
+    ]}),
+  ]});
+
+  // ── メッセージ履歴 (scroll pane、下端追従) ──
+  const messages = s.pane({ style: { flex: 1, padding: '16px', minHeight: 0 }, ctx: [
+    ui_col({ style: { gap: '12px' }, ctx: [
+      s.ignore.messages.length === 0
+        ? ui_text({ variant: 'muted', ctx: [
+            ready
+              ? '↓ メッセージを送信してください (OpenAI 互換エンドポイントへ SSE streaming)。応答は Markdown 整形されます。'
+              : '右上「接続設定」で Endpoint と Model を設定すると会話できます (ローカル LM Studio / Ollama や各種 API)。',
+          ]})
+        : null,
+      ...s.ignore.messages.map((m) => ui_panel({
+        style: {
+          margin: 0, maxWidth: '80%',
+          alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+          background: m.role === 'user' ? 'var(--ric-color-accent)' : 'var(--ric-color-control)',
+          color: m.role === 'user' ? 'var(--ric-color-accent-fg, #fff)' : 'var(--ric-color-fg)',
+          ...(m.role === 'user' ? { whiteSpace: 'pre-wrap' } : {}),
+        },
+        ctx: [
+          m.role === 'assistant'
+            ? ui_md_pre({ ctx: [m.text || (s.busy ? '…' : '')], style: { margin: 0, background: 'transparent', border: 0, padding: 0 } })
+            : ui_text({ ctx: [m.text] }),
+        ],
+      })),
+    ]}),
+  ]});
+
+  // ── 入力エリア ──
+  const inputRow = ui_panel({ style: { margin: 0, borderRadius: 0, borderLeft: 0, borderRight: 0, borderBottom: 0 }, ctx: [
+    s.chatError
+      ? ui_text({ variant: 'label', style: { color: 'rgb(153,27,27)' }, ctx: [ui_icon(ICONS.triangleAlert, { size: 14 }), ' ' + s.chatError] })
+      : null,
+    ui_row({ style: { gap: '8px', alignItems: 'flex-end' }, ctx: [
+      { tag: 'div', style: { flex: 1 }, ctx: [
+        ui_textarea({
+          ref: 'chat_input',
+          value: s.input,
+          placeholder: s.busy ? '応答中…' : 'メッセージを入力 (Shift+Enter で改行)',
+          disabled: s.busy,
+          auto_resize: { min_rows: 1, max_rows: 6 },
+          oninput: (e) => { s.input = e.target.value; },
+          onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey && !s.busy) { e.preventDefault(); send(s); } },
+        }),
+      ]},
+      ui_button({ variant: 'primary', disabled: s.busy || !s.input.trim(), ctx: ['送信'], onclick: () => send(s) }),
+    ]}),
+  ]});
+
+  return s.page({ style: { height: '100%', padding: 0, borderRadius: 0, display: 'flex', flexDirection: 'column' }, ctx: [
+    header, messages, inputRow, dialog,
+  ]});
+};
 </script>
 
 <!-- ════════════════════════════════════════════════════════════════
