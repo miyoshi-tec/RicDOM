@@ -61,6 +61,17 @@ describe('create_ui_accordion: 基本構造', () => {
     assert.deepEqual(titles[1].ctx, [icon]);
   });
 
+  it('header に開閉インジケータ (ui_icon chevron) が入る', () => {
+    // 矢印は ❯ グリフから ui_icon の chevron に置換済み (CSS で開時 180° 回転)。
+    const inst = create_ui_accordion();
+    const root = inst({ items: [{ id: 'a', title: 'A', ctx: [] }] });
+    const arrows = find_by_class(root, 'ric-accordion__arrow');
+    assert.equal(arrows.length, 1);
+    assert.equal(arrows[0].tag, 'svg');                 // ui_icon の出力 = SVG
+    assert.equal(arrows[0]['data-ric-role'], 'accordion-arrow');
+    assert.ok(Array.isArray(arrows[0].ctx) && arrows[0].ctx[0].tag === 'path'); // chevron path
+  });
+
   it('item ctx が body-inner に入る', () => {
     const inst = create_ui_accordion();
     const content = { tag: 'p', ctx: ['本文'] };
