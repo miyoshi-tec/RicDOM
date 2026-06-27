@@ -292,6 +292,17 @@ top level of state so RicDOM can wire it up:
 
 このメッセージが出たら、上の ✅ パターンに直してください。
 
+> ⚠️ **警告の発火タイミングに注意**: この `console.warn` は「ファクトリが**内部イベントで
+> 再描画しようとした瞬間**」(splitter の collapse、popup の開閉、dialog の閉じアニメ、
+> theme-change 等) に初めて出ます。**初回 render の時点では出ません。** そのため:
+> - **controlled ダイアログ**のように開閉を**親 state が駆動**するケースは、ファクトリ自身が
+>   `__notify` をほぼ呼ばないため、state 外に置いても**警告が出ないまま**「初回は出るが
+>   その後うまく動かない/特定操作で固まる」状態になりえます。
+> - 「エラーも警告も無いのに見た目だけ変」のときは、まず **`create_ui_*` をすべて
+>   `s.xxx = create_ui_xxx()` の形(state トップレベル)に置いているか**を確認してください
+>   (= この canon を守れば踏みません)。`create_ui_dialog` / `create_ui_page` を含む
+>   **全 `create_ui_*` ファクトリが対象**です。
+
 > **「render のたびに作り直したくない」と思ったときも、state 配置で OK**:
 > state に置けば一度生成された instance を使い回せます (再代入しない限り
 > Proxy はそのまま `s.split` を返す)。「state 外に置けば 1 度だけ生成される」
