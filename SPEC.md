@@ -39,8 +39,12 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 
 `create_ui_*` を state 外 (module level const 等) に置くと `__notify` が
 注入されず、内部イベントから再描画が発火されない silent failure が起きる。
-v0.3.8 以降は初回呼び出しで `console.warn` が一度出るので、誤用に気付ける。
-詳しくは [TUTORIAL.md「ありがちな誤用」](TUTORIAL.md#ありがちな誤用--create_ui_-を-state-外に置かない) を参照。
+v0.3.8 以降は誤用検知で `console.warn` が一度出る。ただし**警告は「ファクトリが
+内部イベントで再描画しようとした瞬間」に出る** (= 初回 render では出ない)。
+**controlled ダイアログのように親 state が開閉を駆動するケースは、ファクトリ自身が
+`__notify` をほぼ呼ばないため警告が出ないことがある** — 「エラーも警告も無いのに
+見た目だけ変」のときは全 `create_ui_*` を `s.xxx = create_ui_xxx()` に置いているか
+確認すること。詳しくは [TUTORIAL.md「ありがちな誤用」](TUTORIAL.md#ありがちな誤用--create_ui_-を-state-外に置かない) を参照。
 
 ### data-ric-role 属性 (v0.3.8〜)
 
