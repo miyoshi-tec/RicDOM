@@ -8,7 +8,7 @@
 // ── 方向判定 ──────────────────────────────────────────────────────
 // trigger の下に content_h px 収まるか判定して 'below' | 'above' を返す。
 // 収まらない場合でも上のスペースより下のスペースが大きければ 'below'。
-const make_popup_dir = (trigger_el, content_h) => {
+const _make_popup_dir = (trigger_el, content_h) => {
   const rect        = trigger_el.getBoundingClientRect();
   const space_below = window.innerHeight - rect.bottom;
   return (space_below >= content_h || space_below >= rect.top)
@@ -82,4 +82,4 @@ const _close_others = (self) => {
   _popup_registry.forEach(p => { if (p !== self) p.close(); });
 };
 
-module.exports = { make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others };
+module.exports = { _make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others };

@@ -47,7 +47,7 @@
 const _portal                   = require('./_page_portal_queue');
 const { apply_theme_to_portal } = require('./_wrap_portal');
 const {
-  make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others,
+  _make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others,
 } = require('./_popup_utils');
 const { safe_notify } = require('../_factory_helpers');
 const { ui_icon } = require('../control/ui_icon');
@@ -187,7 +187,7 @@ const create_ui_popup = () => {
             _close_others(inst);
 
             // 暫定方向: ctx.length 見積りで一旦決める (実測前のプレースホルダ)。
-            inst._d = make_popup_dir(trigger_el, ctx.length * 38 + 8);
+            inst._d = _make_popup_dir(trigger_el, ctx.length * 38 + 8);
             inst._p = _compute_pos(rect, cb, inst._d, is_label, trigger_el);
 
             // rAF + document があれば実測フェーズに入る (visibility:hidden で開く)。
@@ -206,7 +206,7 @@ const create_ui_popup = () => {
                 if (!body) { inst._m = false; safe_notify(inst, 'create_ui_popup'); return; }
                 // 実測した本体高さで方向を再判定
                 const measured_h = body.offsetHeight;
-                const new_dir = make_popup_dir(trigger_el, measured_h);
+                const new_dir = _make_popup_dir(trigger_el, measured_h);
                 if (new_dir !== inst._d) {
                   inst._d = new_dir;
                   inst._p = _compute_pos(rect, cb, new_dir, is_label, trigger_el);
