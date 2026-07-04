@@ -71,6 +71,10 @@ const canonicalize = (def) => {
 const main = () => {
   const raw = JSON.parse(fs.readFileSync(SRC, 'utf8'));
   const icons = raw.icons || {};
+  if (!raw.icons || Object.keys(icons).length === 0) {
+    console.error('[build_icons] icons/src.json に icons が無い (キー欠如 or 空)');
+    process.exit(1);
+  }
   const names = Object.keys(icons).sort();
 
   for (const name of names) validate(name, icons[name]);
