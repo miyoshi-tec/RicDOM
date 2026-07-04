@@ -244,19 +244,19 @@ const is_event_handler_key = (key) => /^on[a-z]/.test(key);
 const STRUCTURAL_NODE_KEYS = new Set(['node_type','tag','id','class','style','ctx','ref','key']);
 
 // ノードに属性・プロパティ・イベントハンドラを適用する
-const apply_attributes_to_element = (el, normalized_node) => {
+const apply_attributes_to_element = (el, normalized) => {
   // id
-  if (normalized_node.id) {
-    el.id = normalized_node.id;
+  if (normalized.id) {
+    el.id = normalized.id;
   }
 
   // class (SVG では setAttribute 必須なので _set_class 経由)
-  if (normalized_node.class && normalized_node.class.length > 0) {
-    _set_class(el, normalized_node.class.join(' '));
+  if (normalized.class && normalized.class.length > 0) {
+    _set_class(el, normalized.class.join(' '));
   }
 
   // style
-  const style = normalized_node.style;
+  const style = normalized.style;
   if (style) {
     if (typeof style === 'string') {
       el.style.cssText = style;
@@ -268,7 +268,7 @@ const apply_attributes_to_element = (el, normalized_node) => {
   }
 
   // その他の属性（イベント・プロパティ・HTML属性）
-  for (const [key, val] of Object.entries(normalized_node)) {
+  for (const [key, val] of Object.entries(normalized)) {
     // normalize 済みの構造キーはスキップ
     if (STRUCTURAL_NODE_KEYS.has(key)) continue;
 
@@ -598,15 +598,15 @@ const patch_children = (prev_raw_children, next_raw_children, parent_el) => {
 const patch_children_by_key = (prev_children, next_children, parent_el) => {
   // 1) prev を keyed Map と unkeyed queue に振り分け
   const prev_doms      = Array.from(parent_el.childNodes);
-  const prev_keyed_map = new Map();   // key → { norm, dom }
-  const prev_unkeyed   = [];           // [{ norm, dom }, ...] FIFO
+  const prev_keyed_map = new Map();   // key → { normalized, dom }
+  const prev_unkeyed   = [];           // [{ normalized, dom }, ...] FIFO
   for (let i = 0; i < prev_children.length; i++) {
-    const norm = normalize_ric_node(prev_children[i]);
+    const normalized = normalize_ric_node(prev_children[i]);
     const dom  = prev_doms[i];
-    if (norm.node_type === 'element' && norm.key !== null) {
-      prev_keyed_map.set(norm.key, { norm, dom });
+    if (normalized.node_type === 'element' && normalized.key !== null) {
+      prev_keyed_map.set(normalized.key, { normalized, dom });
     } else {
-      prev_unkeyed.push({ norm, dom });
+      prev_unkeyed.push({ normalized, dom });
     }
   }
 
@@ -614,28 +614,28 @@ const patch_children_by_key = (prev_children, next_children, parent_el) => {
   let cursor = parent_el.firstChild;   // 「ここに挿入する」位置 (= 次に処理するべき DOM ノード)
   for (let i = 0; i < next_children.length; i++) {
     const next_raw  = next_children[i];
-    const next_norm = normalize_ric_node(next_raw);
+    const next_normalized = normalize_ric_node(next_raw);
     let target_dom = null;
-    let prev_norm  = null;
+    let prev_normalized  = null;
 
-    if (next_norm.node_type === 'element' && next_norm.key !== null) {
+    if (next_normalized.node_type === 'element' && next_normalized.key !== null) {
       // keyed: prev_keyed_map から同 key を探して再利用
-      const entry = prev_keyed_map.get(next_norm.key);
+      const entry = prev_keyed_map.get(next_normalized.key);
       if (entry) {
         target_dom = entry.dom;
-        prev_norm  = entry.norm;
-        prev_keyed_map.delete(next_norm.key);
+        prev_normalized  = entry.normalized;
+        prev_keyed_map.delete(next_normalized.key);
       }
     } else {
       // unkeyed: prev_unkeyed の先頭から取り、tag 一致 (or text 同士) なら再利用
       if (prev_unkeyed.length > 0) {
         const entry = prev_unkeyed[0];
         const same_type =
-          entry.norm.node_type === next_norm.node_type &&
-          (next_norm.node_type === 'text' || entry.norm.tag === next_norm.tag);
+          entry.normalized.node_type === next_normalized.node_type &&
+          (next_normalized.node_type === 'text' || entry.normalized.tag === next_normalized.tag);
         if (same_type) {
           target_dom = entry.dom;
-          prev_norm  = entry.norm;
+          prev_normalized  = entry.normalized;
           prev_unkeyed.shift();
         }
       }
@@ -656,14 +656,14 @@ const patch_children_by_key = (prev_children, next_children, parent_el) => {
     }
 
     // 既存 DOM 再利用なら attribute / child を patch
-    if (prev_norm) {
-      if (next_norm.node_type === 'text') {
-        if (target_dom.nodeType === Node.TEXT_NODE && target_dom.textContent !== next_norm.text) {
-          target_dom.textContent = next_norm.text;
+    if (prev_normalized) {
+      if (next_normalized.node_type === 'text') {
+        if (target_dom.nodeType === Node.TEXT_NODE && target_dom.textContent !== next_normalized.text) {
+          target_dom.textContent = next_normalized.text;
         }
-      } else if (next_norm.node_type === 'element') {
-        patch_attributes(prev_norm, next_norm, target_dom);
-        patch_children(prev_norm.ctx ?? [], next_norm.ctx ?? [], target_dom);
+      } else if (next_normalized.node_type === 'element') {
+        patch_attributes(prev_normalized, next_normalized, target_dom);
+        patch_children(prev_normalized.ctx ?? [], next_normalized.ctx ?? [], target_dom);
       }
     }
   }
