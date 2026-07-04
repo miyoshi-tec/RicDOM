@@ -847,6 +847,18 @@ const create_RicDOM = (target, raw_state = {}) => {
     return NOOP_PROXY;
   }
 
+  // state が null / undefined の場合もエラーを通知する
+  // （raw_state.render への次のアクセスより前にガードする必要がある。
+  //   このチェックが後ろにあると null.render で TypeError が throw され、
+  //   ハウス契約「throw しない (console.error + NOOP_PROXY 返却)」に反する）
+  if (raw_state === null || raw_state === undefined || typeof raw_state !== 'object') {
+    console.error(
+      'RicDOM: state がオブジェクトではありません。\n' +
+      '✅ 正しい例: create_RicDOM(\'#app\', { count: 0 })',
+    );
+    return NOOP_PROXY;
+  }
+
   const render_fn = raw_state.render;
   // render は state のプロパティだが、raw_state からは削除しない
   // （s.render の get/set trap で管理するため）
@@ -864,15 +876,6 @@ const create_RicDOM = (target, raw_state = {}) => {
   // render_fn 省略時は null。handle.render = fn で設定するまで描画しない。
   let _render_fn = typeof render_fn === 'function' ? render_fn : null;
   const _render_fn_provided = _render_fn !== null;
-
-  // state が null / undefined の場合もエラーを通知する
-  if (raw_state === null || raw_state === undefined || typeof raw_state !== 'object') {
-    console.error(
-      'RicDOM: state がオブジェクトではありません。\n' +
-      '✅ 正しい例: create_RicDOM(\'#app\', { count: 0 })',
-    );
-    return NOOP_PROXY;
-  }
 
   // ---------------------------------------------------------------
   // インスタンス固有の変数
