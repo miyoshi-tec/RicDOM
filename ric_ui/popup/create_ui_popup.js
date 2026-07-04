@@ -30,7 +30,7 @@
 //   _p  — pos           位置情報オブジェクト
 //   _m  — measuring     実測フェーズ中（v0.3.27〜。下記参照）
 //   _eb — esc_bound     ESC ハンドラの bind 状態（v0.3.27〜）
-//   _pid— popup_id      DOM 上の本体を一意特定するための id（v0.3.27〜）
+//   _pid— popup_id      DOM 上の本体を一意特定するための id（v0.3.27〜。closure const。inst._pid ではない）
 //
 // 開き方向 (above/below) の決定 (v0.3.27〜):
 //   旧実装は `ctx.length * 38px` で高さを見積もっていたが、ctx をラッパー要素で

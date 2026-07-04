@@ -387,6 +387,8 @@ const build_serial_key_list = (children, dup_tags) => {
 };
 
 // 属性の差分を DOM に反映する
+// build 時の apply_attributes_to_element と対になる diff 版。処理対象キーの
+// 分類 (id/ref/class/style/その他) は共通。
 const patch_attributes = (prev_normalized, next_normalized, el) => {
   // id の差分
   const next_id = next_normalized.id ?? '';
@@ -916,6 +918,8 @@ const create_RicDOM = (target, raw_state = {}) => {
       enumerable: false, configurable: true, writable: true,
     });
   };
+  // 複数 instance 生成時に毎回走るが、_inject_notify は冪等 (既に __notify が
+  // あれば早期 return) なので安全。
   for (const key of Object.keys(raw_state)) {
     if (key === 'ignore' || key === 'render') continue;
     _inject_notify(raw_state[key]);

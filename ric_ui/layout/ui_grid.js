@@ -37,6 +37,9 @@ const _expand_tracks = (v) => {
 // normalize_style が cssText 直設定 / 配列マージで処理する) — ただし
 // 透過時は columns/rows/gap の引数は無効 (style と columns を同時に渡したい
 // ときは object 形式で書く前提)。v0.3.7 canon に従い object 形式を推奨。
+// ※ ui_tweak.js の同名ヘルパーとは判定基準が異なる (ui_tweak は prototype
+//    チェックあり = クラスインスタンスを json_preview 行きにするため / ui_grid は
+//    緩い判定で足りる)。共通化しないこと。
 const _is_plain_object = (v) =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
 
