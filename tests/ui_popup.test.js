@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { create_ui_popup } = require('../ric_ui');
 const _portal = require('../ric_ui/popup/_page_portal_queue');
 const { find_by_class } = require('./_helpers/dom_find');
+const { setup_jsdom: setup_jsdom_base } = require('./_helpers/jsdom_env');
 
 const drain_portal = () => _portal.drain();
 
@@ -178,11 +179,7 @@ describe('create_ui_popup: 排他制御', () => {
   it('a を open すると、既に open の b が自動で閉じられる', () => {
     // 実際の onclick は getBoundingClientRect / window.innerHeight などを使うため
     // jsdom で DOM を用意する。
-    const { JSDOM } = require('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body><button id="t"></button></body></html>');
-    global.window   = dom.window;
-    global.document = dom.window.document;
-    global.getComputedStyle = dom.window.getComputedStyle;
+    setup_jsdom_base({ body: '<button id="t"></button>', globals: ['getComputedStyle'] });
 
     const a = create_ui_popup();
     const b = create_ui_popup();
@@ -212,15 +209,9 @@ describe('create_ui_popup: 排他制御', () => {
 describe('create_ui_popup: 開き方向の実 DOM 実測 (v0.3.27〜)', () => {
 
   // jsdom + rAF shim + offsetHeight モックで「実測フェーズ」を再現する。
+  // rAF shim (setImmediate) の根拠は tests/_helpers/jsdom_env.js を参照。
   const setup = (trigger_rect, body_height, innerHeight = 800) => {
-    const { JSDOM } = require('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body><button id="t"></button></body></html>');
-    global.window   = dom.window;
-    global.document = dom.window.document;
-    global.getComputedStyle = dom.window.getComputedStyle;
-    // rAF shim は setImmediate (setTimeout(0) は Node の timer phase 跨ぎで
-    // 稀に starve する。collapse_box テストで確立した canon に合わせる)
-    global.requestAnimationFrame = (cb) => setImmediate(cb);
+    const dom = setup_jsdom_base({ body: '<button id="t"></button>', globals: ['getComputedStyle'] });
     Object.defineProperty(dom.window, 'innerHeight', { configurable: true, value: innerHeight });
     // trigger の rect をモック
     const btn = document.getElementById('t');
@@ -290,14 +281,7 @@ describe('create_ui_popup: 開き方向の実 DOM 実測 (v0.3.27〜)', () => {
 // ─────────────────────────────────────────────────────────────
 describe('create_ui_popup: ESC キー (v0.3.27〜)', () => {
 
-  const setup_jsdom = () => {
-    const { JSDOM } = require('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    global.window   = dom.window;
-    global.document = dom.window.document;
-    global.KeyboardEvent = dom.window.KeyboardEvent;
-    return dom;
-  };
+  const setup_jsdom = () => setup_jsdom_base({ body: '', globals: ['KeyboardEvent'] });
 
   it('開いている間に ESC で閉じアニメーションが始まる', () => {
     setup_jsdom();

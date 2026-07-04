@@ -9,6 +9,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { ui_icon } = require('../ric_ui/control/ui_icon');
+const { setup_jsdom, flush } = require('./_helpers/jsdom_env');
 
 // テスト用 descriptor
 const CHECK = { s: 2, p: 'M20 6 9 17l-5-5' };                       // stroke (明示)
@@ -188,16 +189,7 @@ describe('ui_icon: spin / class / rest 透過', () => {
 
 describe('ui_icon: 実 DOM レンダー (SVG)', () => {
 
-  const setup = () => {
-    const { JSDOM } = require('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body><div id="app"></div></body></html>');
-    global.window   = dom.window;
-    global.document = dom.window.document;
-    global.Node     = dom.window.Node;
-    global.HTMLElement = dom.window.HTMLElement;
-    global.requestAnimationFrame = (cb) => setImmediate(cb);
-  };
-  const flush = () => new Promise((r) => setTimeout(r, 10));
+  const setup = () => setup_jsdom();
 
   test('svg が SVG namespace で生成され viewBox / path が正しく出る', async () => {
     setup();

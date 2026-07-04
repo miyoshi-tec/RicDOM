@@ -15,24 +15,9 @@
 
 const { test, describe, beforeEach } = require('node:test');
 const { strict: assert } = require('node:assert');
-const { JSDOM } = require('jsdom');
 
-const setup_jsdom = () => {
-  const dom = new JSDOM('<!DOCTYPE html><html><body><div id="app"></div></body></html>');
-  global.window   = dom.window;
-  global.document = dom.window.document;
-  global.Node     = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  // rAF shim: setImmediate を使う (setTimeout(cb, 0) ではない)。
-  // Node.js (v24 で確認) では setTimeout(0) の連鎖が稀に starve する race があり、
-  // _measure → safe_notify → schedule_render → rAF の連鎖で
-  // rAF callback が flush(10ms) 内に発火しない fail が ~30% 起きる。
-  // setImmediate は I/O ループ末尾で確実に発火するため、deterministic に動く。
-  global.requestAnimationFrame = (cb) => setImmediate(cb);
-  return dom;
-};
-
-const flush = (ms = 10) => new Promise(r => setTimeout(r, ms));
+// rAF shim の根拠は tests/_helpers/jsdom_env.js を参照
+const { setup_jsdom, flush } = require('./_helpers/jsdom_env');
 
 // --------------------------------------------------------------------------
 // 純粋関数としての VDOM 検査 (DOM をマウントせず factory の戻り値だけを見る)
