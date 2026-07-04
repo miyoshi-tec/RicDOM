@@ -268,3 +268,71 @@ describe('ui_radiobutton: rest スプレッド', () => {
     assert.ok(!Object.prototype.hasOwnProperty.call(node, 'onchange'));
   });
 });
+
+// =====================================================================
+// 3. options の per-option 追加キー（rest スプレッド契約、v0.3.32〜）
+// =====================================================================
+describe('ui_radiobutton: options の per-option 追加キー', () => {
+
+  test('title が opt に付くと label ノードに転送される', () => {
+    const node = ui_radiobutton({
+      options: [{ value: 'a', label: 'A', title: '説明文' }],
+    });
+    const label = node.ctx[0];
+    assert.equal(label.title, '説明文');
+  });
+
+  test('data-* も label ノードに転送される', () => {
+    const node = ui_radiobutton({
+      options: [{ value: 'a', label: 'A', 'data-testid': 'opt-a' }],
+    });
+    assert.equal(node.ctx[0]['data-testid'], 'opt-a');
+  });
+
+  test('opt.class は基底 ric-radio と連結される（置換ではない）', () => {
+    const node = ui_radiobutton({
+      options: [{ value: 'a', label: 'A', class: 'my-radio' }],
+    });
+    assert.equal(node.ctx[0].class, 'ric-radio my-radio');
+  });
+
+  test('disabled と opt.class の連結でも基底クラスが両方保たれる', () => {
+    const node = ui_radiobutton({
+      disabled: true,
+      options: [{ value: 'a', label: 'A', class: 'my-radio' }],
+    });
+    assert.equal(node.ctx[0].class, 'ric-radio ric-radio--disabled my-radio');
+  });
+
+  test('value/label のみの既存形は label ノードに余計なキーが増えない', () => {
+    const node = ui_radiobutton({ options: [{ value: 'a', label: 'A' }] });
+    const label = node.ctx[0];
+    assert.deepEqual(Object.keys(label).sort(), ['class', 'ctx', 'tag']);
+  });
+
+  test('string[] 形式でも label ノードに余計なキーが増えない', () => {
+    const node = ui_radiobutton({ options: ['a'] });
+    const label = node.ctx[0];
+    assert.deepEqual(Object.keys(label).sort(), ['class', 'ctx', 'tag']);
+  });
+
+  test('転送先は label であり input には付かない', () => {
+    const node = ui_radiobutton({
+      options: [{ value: 'a', label: 'A', title: '説明文' }],
+    });
+    const label = node.ctx[0];
+    const input = label.ctx[0];
+    assert.equal(label.title, '説明文');
+    assert.equal(input.title, undefined);
+  });
+
+  test('opt_rest で tag / ctx を上書きできない', () => {
+    const node = ui_radiobutton({
+      options: [{ value: 'a', label: 'A', tag: 'span', ctx: ['dummy'] }],
+    });
+    const label = node.ctx[0];
+    assert.equal(label.tag, 'label');
+    assert.equal(label.ctx[0].tag, 'input');
+    assert.equal(label.ctx[1].tag, 'span');
+  });
+});

@@ -5,6 +5,9 @@
 // options: string[] または { value, label }[] を受け付ける。
 //   label は文字列・数値のほか、VDOM ノード（ui_icon 等）や
 //   それらの配列も渡せる（例: label: [ui_icon(ICONS.list), ' List']）。
+//   追加キー（title / data-* / id / class 等）は各選択肢の <label> に
+//   転送される（rest スプレッド契約。例: { value, label, title: '説明' } で
+//   ホバー範囲がラジオ丸ごと label 行全体になる。UnizonTool 要望）。
 // name:    同じグループの radio input に共通の name 属性（必須）。
 //
 // checked の実装方針：
@@ -46,10 +49,15 @@ const ui_radiobutton = ({
     : [String(l)];
 
   const radio_nodes = options.map((opt) => {
-    const { value: v, label: l } = normalize(opt);
+    // opt_rest: 各選択肢の追加キー（title / data-* / id / class 等）。
+    // tag / ctx は構造要素のため opt_rest では上書きされないよう分離する。
+    const { value: v, label: l, ...opt_rest } = normalize(opt);
     const str_v = String(v);
-    const cls = disabled ? 'ric-radio ric-radio--disabled' : 'ric-radio';
+    const cls_base = disabled ? 'ric-radio ric-radio--disabled' : 'ric-radio';
+    // class だけは置換ではなく連結（ui_button 等と同じ流儀）
+    const cls = opt_rest.class ? cls_base + ' ' + opt_rest.class : cls_base;
     return {
+      ...opt_rest,
       tag:   'label',
       class: cls,
       ctx: [
