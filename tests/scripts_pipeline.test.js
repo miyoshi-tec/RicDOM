@@ -135,3 +135,29 @@ describe('build_icons.js', () => {
     assert.deepEqual(after, before, 'build_icons 再実行で icons.json の内容が変わった (drift の疑い)');
   });
 });
+
+// =====================================================================
+// update_sizes.js (冪等スクリプト、実 repo に対して実行)
+//
+// R9 で「0-match でも無言で成功ログ」を WARN 化した。regex がドキュメント側の
+// 実際の文言にマッチしなくなった場合 (将来の README/index.html 改稿など) に、
+// この特性テストが落ちて気付けるようにする。
+// =====================================================================
+
+describe('update_sizes.js', () => {
+  test('実行しても WARN が出ず、README.md / docs/index.html の内容が変わらない (regex が現物に一致・現値が正)', () => {
+    const readme_path = path.join(ROOT, 'README.md');
+    const index_path  = path.join(ROOT, 'docs', 'index.html');
+    const before_readme = fs.readFileSync(readme_path, 'utf8');
+    const before_index  = fs.readFileSync(index_path, 'utf8');
+
+    const stdout = execFileSync('node', [path.join(ROOT, 'scripts', 'update_sizes.js')], { cwd: ROOT, encoding: 'utf8' });
+
+    assert.ok(!/WARN/.test(stdout), `update_sizes.js が WARN を出した (regex がドキュメントにマッチしていない):\n${stdout}`);
+
+    const after_readme = fs.readFileSync(readme_path, 'utf8');
+    const after_index  = fs.readFileSync(index_path, 'utf8');
+    assert.equal(before_readme, after_readme, 'update_sizes 実行で README.md の内容が変わった (サイズ表記が stale だった疑い)');
+    assert.equal(before_index, after_index, 'update_sizes 実行で docs/index.html の内容が変わった (サイズ表記が stale だった疑い)');
+  });
+});
