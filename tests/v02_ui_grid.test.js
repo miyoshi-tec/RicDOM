@@ -13,6 +13,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { ui_grid } = require('../ric_ui/layout/ui_grid');
+const { run_rest_spread_contract } = require('./_helpers/rest_spread_contract');
 
 describe('ui_grid: 基本構造', () => {
   test('tag は div', () => {
@@ -87,7 +88,7 @@ describe('ui_grid: 後方互換 style', () => {
   });
 });
 
-describe('ui_grid: style override / rest スプレッド契約', () => {
+describe('ui_grid: style override (固有)', () => {
   test('style で追加 CSS を渡せる', () => {
     const n = ui_grid({ columns: 2, style: { padding: '8px' } });
     assert.equal(n.style.gridTemplateColumns, '1fr 1fr');
@@ -99,15 +100,8 @@ describe('ui_grid: style override / rest スプレッド契約', () => {
     const n = ui_grid({ columns: 3, style: { gridTemplateColumns: '1fr' } });
     assert.equal(n.style.gridTemplateColumns, '1fr 1fr 1fr');
   });
-  test('rest で id / data-* / onclick が透過する', () => {
-    const fn = () => {};
-    const n = ui_grid({ columns: 2, id: 'g1', 'data-k': 'v', onclick: fn });
-    assert.equal(n.id, 'g1');
-    assert.equal(n['data-k'], 'v');
-    assert.equal(n.onclick, fn);
-  });
-  test('rest.class が ric-grid の後ろに連結される (基底クラス保持)', () => {
-    const n = ui_grid({ class: 'my' });
-    assert.equal(n.class, 'ric-grid my');
-  });
 });
+
+// 汎用契約 (id/data-*/aria-*/onclick 透過、class 連結、tag 上書き不可) は
+// tests/_helpers/rest_spread_contract.js の run_rest_spread_contract で検証。
+run_rest_spread_contract({ name: 'ui_grid', factory: ui_grid, expected_tag: 'div', base_class: 'ric-grid' });
