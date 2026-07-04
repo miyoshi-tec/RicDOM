@@ -9,15 +9,8 @@ const assert = require('node:assert/strict');
 
 const { create_ui_scroll_pane } = require('../ric_ui');
 
-const setup_jsdom = () => {
-  const { JSDOM } = require('jsdom');
-  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-  global.window   = dom.window;
-  global.document = dom.window.document;
-  global.Node     = dom.window.Node;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
+const { setup_jsdom: setup_jsdom_base } = require('./_helpers/jsdom_env');
+const setup_jsdom = () => setup_jsdom_base({ body: '' });
 
 // ─────────────────────────────────────────────────────────────
 // 基本構造

@@ -10,21 +10,9 @@ process.env.NODE_ENV = 'test';
 
 const { test } = require('node:test');
 const { strict: assert } = require('node:assert');
-const { JSDOM } = require('jsdom');
 
-const setup_jsdom = () => {
-  const dom = new JSDOM(
-    '<!DOCTYPE html><html><body>' +
-    '<div id="a"></div><div id="b"></div>' +
-    '</body></html>');
-  global.window   = dom.window;
-  global.document = dom.window.document;
-  global.Node     = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
-const flush = () => new Promise(r => setTimeout(r, 10));
+const { setup_jsdom: setup_jsdom_base, flush } = require('./_helpers/jsdom_env');
+const setup_jsdom = () => setup_jsdom_base({ body: '<div id="a"></div><div id="b"></div>' });
 
 // =====================================================================
 // 共有 state + 独立 render（2 引数 form + handle.render）

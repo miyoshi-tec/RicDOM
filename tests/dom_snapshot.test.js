@@ -7,25 +7,14 @@ process.env.NODE_ENV = 'test';
 
 const { test, before } = require('node:test');
 const { strict: assert } = require('node:assert');
-const { JSDOM } = require('jsdom');
 
+const { setup_jsdom: setup_jsdom_base, flush: flush_raf } = require('./_helpers/jsdom_env');
 // jsdom 環境をセットアップする（ricdom.js は window / document を前提とする）
-const setup_jsdom = (body = '<div id="app"></div>') => {
-  const dom = new JSDOM(`<!DOCTYPE html><html><head></head><body>${body}</body></html>`);
-  global.window   = dom.window;
-  global.document = dom.window.document;
-  global.Node     = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  // Element は SVGElement target を直接渡すケース (v0.3.15〜) で必要。
-  // _is_dom_element は HTMLElement にも fallback するので、Element 未設定の
-  // 古い setup でも HTML target は動作するが、SVG target テストには必須。
-  global.Element  = dom.window.Element;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0); // rAF をポーリングで代替
-  return dom;
-};
-
-// rAF（setTimeout(0)）が実行されるまで待つ
-const flush_raf = () => new Promise(resolve => setTimeout(resolve, 10));
+// Element は SVGElement target を直接渡すケース (v0.3.15〜) で必要。
+// _is_dom_element は HTMLElement にも fallback するので、Element 未設定の
+// 古い setup でも HTML target は動作するが、SVG target テストには必須。
+const setup_jsdom = (body = '<div id="app"></div>') =>
+  setup_jsdom_base({ body, globals: ['Element'] });
 
 // =====================================================================
 // 初回描画（フルビルド）
@@ -293,9 +282,6 @@ test('ref が動的に変化しても refs.get() が追従する', async () => {
 
 test('false / undefined は描画されない', async () => {
   const dom = setup_jsdom();
-  global.document = dom.window.document;
-  global.window   = dom.window;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
   const { create_RicDOM } = require('../src/ricdom');
 
   const state = {};

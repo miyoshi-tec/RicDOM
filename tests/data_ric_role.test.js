@@ -11,19 +11,8 @@
 
 const { test, describe, beforeEach } = require('node:test');
 const { strict: assert } = require('node:assert');
-const { JSDOM } = require('jsdom');
 
-const setup_jsdom = () => {
-  const dom = new JSDOM('<!DOCTYPE html><html><body><div id="app"></div></body></html>');
-  global.window   = dom.window;
-  global.document = dom.window.document;
-  global.Node     = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
-
-const flush = () => new Promise(r => setTimeout(r, 10));
+const { setup_jsdom, flush } = require('./_helpers/jsdom_env');
 
 // DOM 全体から data-ric-role 一覧を抽出する
 const roles_in = (root) =>

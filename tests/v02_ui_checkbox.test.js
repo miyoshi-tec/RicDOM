@@ -12,20 +12,7 @@ const assert = require('node:assert/strict');
 const { ui_checkbox }   = require('../ric_ui/control/ui_checkbox');
 const { bind_checkbox } = require('../ric_ui/control/bind_checkbox');
 
-const setup_jsdom = () => {
-  const { JSDOM } = require('jsdom');
-  const dom = new JSDOM(
-    '<!DOCTYPE html><html><head></head><body><div id="app"></div></body></html>',
-  );
-  global.window      = dom.window;
-  global.document    = dom.window.document;
-  global.Node        = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
-
-const flush_raf = () => new Promise(resolve => setTimeout(resolve, 10));
+const { setup_jsdom, flush: flush_raf } = require('./_helpers/jsdom_env');
 
 // =====================================================================
 // 1. 構造テスト：ui_checkbox

@@ -15,17 +15,7 @@ const { ui_textarea   } = require('../ric_ui/control/ui_textarea');
 const { bind_textarea } = require('../ric_ui/control/bind_textarea');
 const { run_rest_spread_contract } = require('./_helpers/rest_spread_contract');
 
-const setup_jsdom = () => {
-  const { JSDOM } = require('jsdom');
-  const dom = new JSDOM('<!DOCTYPE html><html><body><div id="app"></div></body></html>');
-  global.window      = dom.window;
-  global.document    = dom.window.document;
-  global.Node        = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
-const flush_raf = () => new Promise(r => setTimeout(r, 10));
+const { setup_jsdom, flush: flush_raf } = require('./_helpers/jsdom_env');
 
 // ─────────────────────────────────────────────────────────────
 // 構造
