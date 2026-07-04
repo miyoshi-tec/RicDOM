@@ -26,7 +26,7 @@ const ENTRIES = {
   '12_md_viewer.html':                 { title: 'Markdown ビューア — RicDOM',                   desc: 'ui_md_pre で Markdown を VDOM に変換、コードハイライト対応。' },
   '13_controlled_dialog_splitter.html':{ title: 'Controlled Mode — RicDOM',                    desc: 'state 駆動の dialog / splitter + SVG グラフ + コード表示。' },
   '14_collapse_box.html':              { title: 'Collapse Box — RicDOM',                       desc: 'collapse_box の入退場アニメーション、6 パターン。配列状態とフラグの扱い canon。' },
-  '15_ai_chat.html':                   { title: 'AI Chat — RicDOM',                            desc: 'AI チャット UI、4 プロバイダ対応、SSE ストリーミング、API キーは state のみ保持。' },
+  '15_ai_chat.html':                   { title: 'AI チャット + 接続設定 — RicDOM',              desc: '各種 LLM を OpenAI 互換として切替・接続確認し、そのまま会話できる設定ダイアログ + チャット。create_ui_dialog / ui_tabs のリファレンス。' },
   '16_svg_editor.html':                { title: 'SVG ツリーエディタ — RicDOM',                  desc: 'SVG ノードの選択・編集・追加、ドラッグで直感的に配置。' },
   '17_multi_ricdom.html':              { title: 'Multi-instance Memo — RicDOM',                desc: '複数の create_RicDOM インスタンスをパネル単位に配置して再描画スコープを分離。' },
   '18_key_reconciliation.html':        { title: 'Key Reconciliation — RicDOM',                 desc: 'key 属性でリスト並べ替え時に input focus / value が混ざらない、FLIP アニメで可視化。' },

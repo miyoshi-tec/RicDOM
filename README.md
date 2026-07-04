@@ -653,7 +653,7 @@ ui_tweak_panel({
 | `12_md_viewer.html` | Markdown ビューア（`ui_md_pre`） |
 | `13_controlled_dialog_splitter.html` | controlled mode（外部 state で開閉管理）|
 | `14_collapse_box.html` | collapse_box — 入退場アニメーション 6 パターン |
-| `15_ai_chat.html` | AI チャット UI（自動スクロール + textarea + ストリーミング）|
+| `15_ai_chat.html` | AI チャット + 接続設定（OpenAI 互換プロバイダ切替・接続テスト・SSE streaming）|
 | `16_svg_editor.html` | SVG ツリーエディタ（rect / circle / path のドラッグ編集）|
 | `17_multi_ricdom.html` | Multi-instance Memo（create_RicDOM をパネル単位に分離）|
 | `18_key_reconciliation.html` | Key Reconciliation — `key` 属性で並べ替え時に focus / value が混ざらない（v0.3.25〜）|
