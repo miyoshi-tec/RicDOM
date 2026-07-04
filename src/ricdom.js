@@ -1031,6 +1031,12 @@ const create_RicDOM = (target, raw_state = {}) => {
   // 描画処理
   // ---------------------------------------------------------------
 
+  // next_render() 用の保留 Promise（v0.3.32〜）。
+  // 呼ばれるまで作らない（未使用時に Promise ゴミを増やさないため）。
+  // do_render の DOM commit 完了直後に resolve → 参照をクリアし、次回呼び出しで新規作成する。
+  let pending_render_resolve = null;
+  let pending_render_promise = null;
+
   const do_render = () => {
     if (is_destroyed)  return;
     if (!target_el)    return;
@@ -1059,6 +1065,15 @@ const create_RicDOM = (target, raw_state = {}) => {
     register_refs_from_element(target_el);
 
     prev_tree = next_raw_tree;
+
+    // DOM commit 完了。next_render() の待機者がいれば resolve して手放す
+    // （自然スケジュール／render_now() どちらの完了でもここを通る）。
+    if (pending_render_resolve) {
+      const resolve = pending_render_resolve;
+      pending_render_resolve = null;
+      pending_render_promise = null;
+      resolve();
+    }
   };
 
   // ---------------------------------------------------------------
@@ -1145,6 +1160,24 @@ const create_RicDOM = (target, raw_state = {}) => {
     do_render();
   };
 
+  // render_now = 強制・同期（呼んだ瞬間に do_render を叩く）。
+  // next_render = 非強制・観測専用（v0.3.32〜）。
+  //   「次に完了する render」を待つ Promise を返すだけで、自分からは
+  //   render を一切起こさない。自然スケジュール（rAF バッチ）でも
+  //   render_now() 強制でも、do_render が完了すればどちらでも resolve する。
+  //   state 変化が一度も起きなければ resolve されない（呼び出し側の責任）。
+  //   UnizonTool 要望: headless E2E で `el.click(); await handle.next_render();`
+  //   として、setTimeout マジックナンバーなしに rAF バッチ経路のまま完了を待ちたい。
+  // 複数箇所から同時に await されても、同じ Promise を共有する（1 render で全員 resolve）。
+  const instance_next_render = () => {
+    if (!pending_render_promise) {
+      pending_render_promise = new Promise((resolve) => {
+        pending_render_resolve = resolve;
+      });
+    }
+    return pending_render_promise;
+  };
+
   // ---------------------------------------------------------------
   // インスタンスハンドルの生成
   // ---------------------------------------------------------------
@@ -1153,11 +1186,13 @@ const create_RicDOM = (target, raw_state = {}) => {
   // refs はインスタンス固有にする
   // destroy は内部実装として存在するが、_internal 経由でのみアクセス可能。
   // render_now は v0.3.25〜 正規 API として公開 (handle.render_now())。
+  // next_render は v0.3.32〜 正規 API として公開 (handle.next_render())。
   // _internal.force_render は後方互換のため残置。
   const instance_handle = new Proxy(shared_proxy, {
     get(_, key) {
-      if (key === 'refs')       return refs_map;
-      if (key === 'render_now') return instance_force_render;
+      if (key === 'refs')        return refs_map;
+      if (key === 'render_now')  return instance_force_render;
+      if (key === 'next_render') return instance_next_render;
       if (key === '_internal')  return { destroy: instance_destroy, force_render: instance_force_render };
       return shared_proxy[key]; // それ以外は共有Proxy に委譲
     },

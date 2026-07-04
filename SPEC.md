@@ -15,6 +15,7 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 | `handle.refs: Map<string, Element>` | `ref: 'name'` 付き要素の DOM 参照 (再描画ごとに rebuild、unmount された ref は自動削除) |
 | `handle.render = fn` | render 関数の per-instance 差し替え |
 | `handle.render_now()` | 同期的に即時再描画 (v0.3.25〜、要約: rAF を待たずに do_render する) |
+| `handle.next_render()` | 次の render 完了で resolve する Promise (非強制・観測専用、v0.3.32〜) |
 | VDOM ノードの `key` | リスト reconciliation 用の論理 ID (v0.3.25〜、§DOM 差分アルゴリズム 参照) |
 | `RicDOM.version` | バージョン文字列 |
 
@@ -493,6 +494,15 @@ render(s) {
 - 同一フレーム内の複数 state 変更 → 1回の再描画
 - `render_scheduled` フラグで重複防止
 
+`render_now()` と `next_render()` は対になる API（v0.3.32〜）。`render_now()` は
+**強制・同期**（呼んだ瞬間に rAF を待たず `do_render` する）。`next_render()` は
+**非強制・観測専用**（次に完了する render を待つ Promise を返すだけで、自分からは
+render を一切起こさない。自然スケジュール／`render_now()` 強制のどちらの完了でも
+resolve する。state 変化が起きなければ resolve されないので、呼び出し側が先に
+state を変える責任を持つ）。headless E2E で `el.click()` → `await handle.next_render()`
+→ DOM を assert、という流れなら setTimeout マジックナンバーなしに rAF バッチ経路
+そのままで完了を待てる（UnizonTool 要望）。
+
 ### NOOP_PROXY
 
 エラー時の安全なフォールバック。全ての get/set/apply/delete が自身を返す。
@@ -770,7 +780,7 @@ RicDOM の推奨環境 (Chrome 135+ / Electron 35+) では問題なし。
 | `focus_when(el, cond)` | 条件の立ち上がりエッジで `el.focus()`。`el` は `handle.refs.get('name')` 等（`render(s)` の `s` は state Proxy で `refs` を持たないため、`create_RicDOM` の戻り値 `handle` を closure 経由で参照する） |
 | `ui_checkbox({ checked, onchange, ctx, disabled })` | checked は 0/1（数値） |
 | `bind_checkbox(s, key, options)` | `s[key]` と双方向バインド |
-| `ui_radiobutton({ name, value, options, onchange })` | options: string[] or {value,label}[]。label は文字列/数値のほか VDOM ノード・配列も可（ui_icon を混ぜられる） |
+| `ui_radiobutton({ name, value, options, onchange })` | options: string[] or {value,label}[]。label は文字列/数値のほか VDOM ノード・配列も可（ui_icon を混ぜられる）。opt の追加キー（title / data-* / id / class 等）は各選択肢の `<label>` に転送される（v0.3.32〜） |
 | `bind_radiobutton(s, key, options)` | `s[key]` と双方向バインド |
 | `ui_range({ value, min, max, step, oninput, disabled })` | スライダー + 値表示 |
 | `bind_range(s, key, options)` | `s[key]` と双方向バインド |
