@@ -236,6 +236,7 @@ const build_wrapper = (compressed, marker_code, substitution) => {
 // ──────────────────────────────────────────────
 // 内部で round-trip を検証 (decompress 結果が元と一致するか) し、不一致なら
 // 詳細を含む Error を throw する。
+// ※ 同名の scripts/build_lz_bundle.js はこの関数を呼ぶ CLI (別ファイル)。
 const build_lz_bundle = (original) => {
   const { marker_code, substitution } = find_marker(original);
   let src = original;

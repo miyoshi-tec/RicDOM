@@ -15,6 +15,8 @@
 // 将来 Lucide 等の SVG を vendoring する場合は、このスクリプトを拡張して
 // icons/vendor/*.svg を読み、<path>/<line>/<polyline> を抽出 → 同じ descriptor
 // 形式にマージすればよい (= ピッカー側は出力 JSON しか見ないので透過)。
+// (v0.3.30 の ricdom-icon CLI で実行時 fetch 方式は実現済み。本コメントは
+//  同梱へ静的 vendoring する場合の拡張ポイントとして残す)
 
 'use strict';
 
