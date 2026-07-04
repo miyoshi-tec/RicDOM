@@ -41,6 +41,9 @@ const { safe_notify    } = require('../_factory_helpers');
 // ─────────────────────────────────────────────────────────────
 // 型推論
 // ─────────────────────────────────────────────────────────────
+// ※ ui_grid.js の同名ヘルパーとは判定基準が異なる (ui_tweak は prototype
+//    チェックあり = クラスインスタンスを json_preview 行きにするため / ui_grid は
+//    緩い判定で足りる)。共通化しないこと。
 const _is_plain_object = (v) =>
   v !== null && typeof v === 'object' && !Array.isArray(v)
   && Object.getPrototypeOf(v) === Object.prototype;
@@ -141,6 +144,8 @@ const ui_tweak_row = ({
 
   if (t === 'radiobutton') {
     return wrap(ui_radiobutton({
+      // ⚠ name は label 由来。同一ページに同じ label の radiobutton 行を
+      // 2 つ置くと同一 radio グループに merge される (回避はラベルを変える)。
       name: 'rtw_' + label,
       value,
       options: options ?? [],

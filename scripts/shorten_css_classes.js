@@ -48,6 +48,8 @@ const before = src.length;
 
 // BEM ベースクラス（__ を含むもの）を抽出し、出現回数をカウント
 // modifier（--zzz）は除外してベース部分のみ集める
+// ※ コンポーネント名は英小文字のみ想定 (数字入り名は短縮対象から漏れる —
+//    壊れはしないがサイズ削減が効かない)
 const base_re = /ric-[a-z]+__[a-z_-]+/g;
 const all = src.match(base_re) || [];
 

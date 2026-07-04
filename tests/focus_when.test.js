@@ -8,15 +8,8 @@ const assert = require('node:assert/strict');
 
 const { focus_when } = require('../ric_ui/control/focus_when');
 
-const setup_jsdom = () => {
-  const { JSDOM } = require('jsdom');
-  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-  global.window   = dom.window;
-  global.document = dom.window.document;
-  global.Node     = dom.window.Node;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
+const { setup_jsdom: setup_jsdom_base } = require('./_helpers/jsdom_env');
+const setup_jsdom = () => setup_jsdom_base({ body: '' });
 // focus_when 内の 2 段ネスト rAF と同じ深さで待ち、CPU 負荷下でも確実に
 // focus コールバックが完了するようにする（固定タイムアウトだと flaky になる）。
 const flush = () => new Promise((r) =>

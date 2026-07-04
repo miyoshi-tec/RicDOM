@@ -16,21 +16,7 @@ const { ui_input }   = require('../ric_ui/control/ui_input');
 const { bind_input } = require('../ric_ui/control/bind_input');
 
 // jsdom 環境をテストごとに生成する
-const setup_jsdom = () => {
-  const { JSDOM } = require('jsdom');
-  const dom = new JSDOM(
-    '<!DOCTYPE html><html><head></head><body><div id="app"></div></body></html>',
-  );
-  global.window      = dom.window;
-  global.document    = dom.window.document;
-  global.Node        = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
-
-// rAF（setTimeout 0 代替）の完了を待つ
-const flush_raf = () => new Promise(resolve => setTimeout(resolve, 10));
+const { setup_jsdom, flush: flush_raf } = require('./_helpers/jsdom_env');
 
 // =====================================================================
 // 1. 構造テスト：ui_input の vdom ノード

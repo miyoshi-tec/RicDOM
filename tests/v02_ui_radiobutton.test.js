@@ -12,20 +12,8 @@ const assert = require('node:assert/strict');
 const { ui_radiobutton }   = require('../ric_ui/control/ui_radiobutton');
 const { bind_radiobutton } = require('../ric_ui/control/bind_radiobutton');
 
-const setup_jsdom = () => {
-  const { JSDOM } = require('jsdom');
-  const dom = new JSDOM(
-    '<!DOCTYPE html><html><head></head><body><div id="app"></div></body></html>',
-  );
-  global.window      = dom.window;
-  global.document    = dom.window.document;
-  global.Node        = dom.window.Node;
-  global.HTMLElement = dom.window.HTMLElement;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-  return dom;
-};
-
-const flush_raf = () => new Promise(resolve => setTimeout(resolve, 10));
+const { setup_jsdom, flush: flush_raf } = require('./_helpers/jsdom_env');
+const { run_rest_spread_contract } = require('./_helpers/rest_spread_contract');
 
 // =====================================================================
 // 1. 構造テスト：ui_radiobutton
@@ -240,23 +228,11 @@ describe('bind_radiobutton: 双方向バインド', () => {
 // rest スプレッド（ui_button / ui_input / ui_panel と同じ流儀）
 // =====================================================================
 
-describe('ui_radiobutton: rest スプレッド', () => {
-  test('onclick がラッパー div に透過される', () => {
-    const fn = () => {};
-    assert.equal(ui_radiobutton({ onclick: fn }).onclick, fn);
-  });
-  test('id / data-* / aria-* がラッパー div に透過される', () => {
-    const n = ui_radiobutton({ id: 'rg', 'data-role': 'group', 'aria-label': 'Role' });
-    assert.equal(n.id, 'rg');
-    assert.equal(n['data-role'], 'group');
-    assert.equal(n['aria-label'], 'Role');
-  });
-  test('class が ric-radiogroup の後ろに連結される', () => {
-    assert.equal(ui_radiobutton({ class: 'my' }).class, 'ric-radiogroup my');
-  });
-  test('rest で tag を上書きできない', () => {
-    assert.equal(ui_radiobutton({ tag: 'span' }).tag, 'div');
-  });
+// 汎用契約 (id/data-*/aria-*/onclick 透過、class 連結、tag 上書き不可) は
+// tests/_helpers/rest_spread_contract.js の run_rest_spread_contract で検証。
+run_rest_spread_contract({ name: 'ui_radiobutton', factory: ui_radiobutton, expected_tag: 'div', base_class: 'ric-radiogroup' });
+
+describe('ui_radiobutton: rest スプレッド (固有・隔離契約)', () => {
   // 隔離契約: onchange は各 radio input に掛かり、wrapper div には漏れない
   test('onchange は radio input に掛かり wrapper div に混入しない', () => {
     const fn = () => {};

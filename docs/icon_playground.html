@@ -132,6 +132,10 @@ create_RicDOM('#app', {
     };
 
     // ── 出力テキスト生成 ──
+    // ※ この帰属ブロックと ICONS 整形は scripts/icon.js と意図的に重複
+    //    (browser/Node 境界を跨ぐため共通化しない。なお CLI は引数順維持・GUI は
+    //    ソートという意味差もある)。出力フォーマット変更時は両方 + tests/icon_cli.test.js
+    //    を更新すること。
     const build_output = () => {
       const names = Object.keys(s.selected).sort();
       if (names.length === 0) return '// アイコンを選ぶと、ここに ICONS が出ます';

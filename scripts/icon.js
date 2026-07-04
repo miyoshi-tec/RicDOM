@@ -30,6 +30,10 @@ const ICONS_JSON  = path.join(__dirname, '..', 'docs', 'icons', 'icons.json');
 const LUCIDE_SVG  = (name) => `https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/${name}.svg`;
 const LUCIDE_TAGS = 'https://cdn.jsdelivr.net/npm/lucide-static@latest/tags.json';
 
+// ※ この帰属ブロックと ICONS 整形は docs/icon_playground.html と意図的に重複
+//    (browser/Node 境界を跨ぐため共通化しない。なお CLI は引数順維持・GUI は
+//    ソートという意味差もある)。出力フォーマット変更時は両方 + tests/icon_cli.test.js
+//    を更新すること。
 const LUCIDE_NOTICE =
 `// アイコン: Lucide (ISC License) https://lucide.dev/
 // Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as

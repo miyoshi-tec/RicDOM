@@ -30,7 +30,7 @@
 //   _p  — pos           位置情報オブジェクト
 //   _m  — measuring     実測フェーズ中（v0.3.27〜。下記参照）
 //   _eb — esc_bound     ESC ハンドラの bind 状態（v0.3.27〜）
-//   _pid— popup_id      DOM 上の本体を一意特定するための id（v0.3.27〜）
+//   _pid— popup_id      DOM 上の本体を一意特定するための id（v0.3.27〜。closure const。inst._pid ではない）
 //
 // 開き方向 (above/below) の決定 (v0.3.27〜):
 //   旧実装は `ctx.length * 38px` で高さを見積もっていたが、ctx をラッパー要素で
@@ -47,7 +47,7 @@
 const _portal                   = require('./_page_portal_queue');
 const { apply_theme_to_portal } = require('./_wrap_portal');
 const {
-  make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others,
+  _make_popup_dir, _pos_style, _get_portal_cb, _get_expand_ref, _register_popup, _close_others,
 } = require('./_popup_utils');
 const { safe_notify } = require('../_factory_helpers');
 const { ui_icon } = require('../control/ui_icon');
@@ -187,7 +187,7 @@ const create_ui_popup = () => {
             _close_others(inst);
 
             // 暫定方向: ctx.length 見積りで一旦決める (実測前のプレースホルダ)。
-            inst._d = make_popup_dir(trigger_el, ctx.length * 38 + 8);
+            inst._d = _make_popup_dir(trigger_el, ctx.length * 38 + 8);
             inst._p = _compute_pos(rect, cb, inst._d, is_label, trigger_el);
 
             // rAF + document があれば実測フェーズに入る (visibility:hidden で開く)。
@@ -206,7 +206,7 @@ const create_ui_popup = () => {
                 if (!body) { inst._m = false; safe_notify(inst, 'create_ui_popup'); return; }
                 // 実測した本体高さで方向を再判定
                 const measured_h = body.offsetHeight;
-                const new_dir = make_popup_dir(trigger_el, measured_h);
+                const new_dir = _make_popup_dir(trigger_el, measured_h);
                 if (new_dir !== inst._d) {
                   inst._d = new_dir;
                   inst._p = _compute_pos(rect, cb, new_dir, is_label, trigger_el);

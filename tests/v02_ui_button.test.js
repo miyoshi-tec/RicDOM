@@ -9,6 +9,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { ui_button } = require('../ric_ui/control/ui_button');
+const { run_rest_spread_contract } = require('./_helpers/rest_spread_contract');
 
 // =====================================================================
 // 1. 構造テスト：vdom ノード
@@ -78,29 +79,17 @@ describe('ui_button: onclick', () => {
 // rest スプレッド（ui_panel と同じ流儀：rest 先頭 → 計算済みが上書き）
 // =====================================================================
 
-describe('ui_button: rest スプレッド', () => {
+// 汎用契約 (id/data-*/aria-*/onclick 透過、class 連結、tag 上書き不可) は
+// tests/_helpers/rest_spread_contract.js の run_rest_spread_contract で検証。
+run_rest_spread_contract({ name: 'ui_button', factory: ui_button, expected_tag: 'button', base_class: 'ric-button' });
 
-  test('id / data-* / aria-* が透過される', () => {
-    const n = ui_button({ id: 'btn1', 'data-role': 'submit', 'aria-label': 'Send' });
-    assert.equal(n.id, 'btn1');
-    assert.equal(n['data-role'], 'submit');
-    assert.equal(n['aria-label'], 'Send');
-  });
-
-  // 基底クラスが消えないことを保証する回帰テスト（rest 末尾置きバグの再発防止）
-  test('class が ric-button の後ろに連結される（基底クラスが消えない）', () => {
-    assert.equal(ui_button({ class: 'my-btn' }).class, 'ric-button my-btn');
-  });
+describe('ui_button: rest スプレッド (固有)', () => {
 
   test('variant=primary + class 連結', () => {
     assert.equal(
       ui_button({ variant: 'primary', class: 'my-btn' }).class,
       'ric-button ric-button--primary my-btn',
     );
-  });
-
-  test('rest で tag を上書きできない', () => {
-    assert.equal(ui_button({ tag: 'div' }).tag, 'button');
   });
 
   test('rest で onclick を上書きしようとしても明示引数が勝つ', () => {

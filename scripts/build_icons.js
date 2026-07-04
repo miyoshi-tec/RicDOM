@@ -15,6 +15,8 @@
 // 将来 Lucide 等の SVG を vendoring する場合は、このスクリプトを拡張して
 // icons/vendor/*.svg を読み、<path>/<line>/<polyline> を抽出 → 同じ descriptor
 // 形式にマージすればよい (= ピッカー側は出力 JSON しか見ないので透過)。
+// (v0.3.30 の ricdom-icon CLI で実行時 fetch 方式は実現済み。本コメントは
+//  同梱へ静的 vendoring する場合の拡張ポイントとして残す)
 
 'use strict';
 
@@ -71,6 +73,10 @@ const canonicalize = (def) => {
 const main = () => {
   const raw = JSON.parse(fs.readFileSync(SRC, 'utf8'));
   const icons = raw.icons || {};
+  if (!raw.icons || Object.keys(icons).length === 0) {
+    console.error('[build_icons] icons/src.json に icons が無い (キー欠如 or 空)');
+    process.exit(1);
+  }
   const names = Object.keys(icons).sort();
 
   for (const name of names) validate(name, icons[name]);

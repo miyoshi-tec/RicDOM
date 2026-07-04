@@ -7,24 +7,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { create_ui_splitter } = require('../ric_ui');
-
-// ─────────────────────────────────────────────────────────────
-// ヘルパー
-// ─────────────────────────────────────────────────────────────
-const collect_nodes = (node, out = []) => {
-  if (!node || typeof node !== 'object') return out;
-  if (Array.isArray(node)) {
-    for (const c of node) collect_nodes(c, out);
-    return out;
-  }
-  out.push(node);
-  if (Array.isArray(node.ctx)) {
-    for (const child of node.ctx) collect_nodes(child, out);
-  }
-  return out;
-};
-const find_by_class = (root, cls) =>
-  collect_nodes(root).filter(n => typeof n.class === 'string' && n.class.split(' ').includes(cls));
+const { find_by_class } = require('./_helpers/dom_find');
 
 // ─────────────────────────────────────────────────────────────
 // 基本構造

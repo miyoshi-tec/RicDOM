@@ -150,8 +150,9 @@ describe('ui_inline_menu: dev warning (親の positioning)', () => {
     global.document = dom.window.document;
     global.getComputedStyle = dom.window.getComputedStyle;
     global.WeakSet = WeakSet;
-    // jsdom 標準には rAF が無いので setTimeout で代替
-    global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+    // jsdom 標準には rAF が無いので setImmediate で代替
+    // (setTimeout(cb,0) は Node v24 で稀に starve する race がある。tests/_helpers/jsdom_env.js 参照)
+    global.requestAnimationFrame = (cb) => setImmediate(cb);
 
     const warns = [];
     const orig_warn = console.warn;
