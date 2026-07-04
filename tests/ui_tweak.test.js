@@ -18,20 +18,9 @@ const {
 // ─────────────────────────────────────────────────────────────
 // ヘルパー
 // ─────────────────────────────────────────────────────────────
-const collect_nodes = (node, out = []) => {
-  if (!node || typeof node !== 'object') return out;
-  if (Array.isArray(node)) {
-    for (const c of node) collect_nodes(c, out);
-    return out;
-  }
-  out.push(node);
-  if (Array.isArray(node.ctx)) {
-    for (const child of node.ctx) collect_nodes(child, out);
-  }
-  return out;
-};
-const find_by_tag   = (root, tag) => collect_nodes(root).filter(n => n.tag === tag);
-const find_by_class = (root, cls) => collect_nodes(root).filter(n => typeof n.class === 'string' && n.class.split(' ').includes(cls));
+const { collect_nodes, find_by_tag, find_by_class } = require('./_helpers/dom_find');
+// find_by_class (トークン一致) と違い部分一致で拾う (ric-tweak-row と
+// ric-tweak-row__label の両方にマッチさせたいケース向けのローカル専用ヘルパー)
 const find_class_contains = (root, cls) => collect_nodes(root).filter(n => typeof n.class === 'string' && n.class.includes(cls));
 
 // ─────────────────────────────────────────────────────────────
