@@ -8,6 +8,7 @@
 //     min:         60,      // 最小サイズ (px)
 //     max:         null,    // 最大サイズ (px, null=制限なし)
 //     collapsible: true,    // 折り畳みボタンを表示するか
+//     on_resize_end: (size) => save(size),  // ドラッグ終了で 1 回 (永続化向け)
 //   });
 //
 //   // render 内で毎回呼ぶ:
@@ -23,6 +24,13 @@
 //     side: { ctx: [...] },
 //     main: { ctx: [...] },
 //   })
+//
+// on_resize_end(size) 契約 (v0.3.33〜):
+//   - ドラッグ中 (mousemove) には呼ばない。ドラッグ終了 (mouseup) で 1 回だけ呼ぶ。
+//   - 引数は最終サイズ (min/max clamp 済みの px 数値。get_size() と同じ値)。
+//   - サイズが結果的に変わらなかったドラッグでも呼ぶ（変化判定は consumer 側に委ねる、
+//     シンプルな契約を優先）。
+//   - 折り畳みボタンのトグルでは呼ばない（ドラッグ終了専用）。
 //
 // 内部状態（短縮名 → 原名）:
 //   _sz — size       現在のサイドパネルサイズ (px)
@@ -41,6 +49,7 @@ const create_ui_splitter = ({
   min         = 60,
   max         = null,
   collapsible = true,
+  on_resize_end = null,  // ドラッグ終了時に最終サイズ(px)を1回受け取るコールバック
 } = {}) => {
 
   // 水平分割 (left/right) か垂直分割 (top/bottom) か
@@ -94,6 +103,8 @@ const create_ui_splitter = ({
       document.removeEventListener('mousemove', on_move);
       document.removeEventListener('mouseup',   on_up);
       // _sz はクロージャに確定済み。次の自然な再レンダー時に inline style に反映される。
+      // ドラッグ終了を1回だけ通知（永続化などのため）。リスナー解除後に呼ぶ。
+      if (typeof on_resize_end === 'function') on_resize_end(inst._sz);
     };
 
     document.addEventListener('mousemove', on_move);

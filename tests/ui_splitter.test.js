@@ -2,12 +2,14 @@
 
 // create_ui_splitter テスト
 // VDOM 構造検査 + 内部状態操作で controlled / uncontrolled 両モードを検証。
+// on_resize_end (v0.3.33〜) は実 DOM イベントが要るため jsdom マウントで検証する。
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { create_ui_splitter } = require('../ric_ui');
 const { find_by_class } = require('./_helpers/dom_find');
+const { setup_jsdom, flush } = require('./_helpers/jsdom_env');
 
 // ─────────────────────────────────────────────────────────────
 // 基本構造
@@ -246,5 +248,152 @@ describe('create_ui_splitter: transitionend バグ修正', () => {
     const root = inst();
     const side_panel = find_by_class(root, 'ric-splitter__side')[0];
     assert.equal(side_panel.ontransitionend, undefined);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// on_resize_end (v0.3.33〜、Rancha 要望)
+// 実 DOM イベント (mousedown → mousemove → mouseup) が要るため jsdom マウントで検証する。
+// jsdom は getBoundingClientRect が常に 0 を返すが、_on_mouse_down はドラッグ量を
+// clientX/clientY の差分で計算するだけで getBoundingClientRect には依存しない
+// (実装確認済み) ので、MouseEvent の clientX/clientY を直接指定すれば成立する。
+// ─────────────────────────────────────────────────────────────
+describe('create_ui_splitter: on_resize_end (v0.3.33〜)', () => {
+
+  // divider 要素をマウント済み DOM から取得
+  const get_divider = () => document.querySelector('[data-ric-role="splitter-divider"]');
+
+  const dispatch_mouse = (type, opts = {}) => {
+    const ev = new window.MouseEvent(type, { bubbles: true, cancelable: true, ...opts });
+    document.dispatchEvent(ev);
+  };
+
+  const dispatch_mousedown_on = (el, opts = {}) => {
+    const ev = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true, ...opts });
+    el.dispatchEvent(ev);
+  };
+
+  it('ドラッグ (mousedown→mousemove→mouseup) で on_resize_end が1回・数値で呼ばれる', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+    setup_jsdom();
+
+    let calls = [];
+    const split = create_ui_splitter({
+      side: 'left', size: 200, min: 50, max: 400,
+      on_resize_end: (sz) => calls.push(sz),
+    });
+
+    const handle = create_RicDOM('#app', {
+      render: () => split({ side: { ctx: ['SIDE'] }, main: { ctx: ['MAIN'] } }),
+    });
+    await flush();
+
+    const divider = get_divider();
+    assert.ok(divider, 'divider element should exist in mounted DOM');
+
+    dispatch_mousedown_on(divider, { clientX: 100, clientY: 0 });
+    dispatch_mouse('mousemove', { clientX: 150, clientY: 0 });
+    dispatch_mouse('mouseup', { clientX: 150, clientY: 0 });
+
+    assert.equal(calls.length, 1, 'on_resize_end は1回だけ呼ばれる');
+    assert.equal(typeof calls[0], 'number', 'on_resize_end の引数は数値');
+
+    handle._internal.destroy?.();
+  });
+
+  it('mousemove なしの mousedown→mouseup でも1回呼ばれる（変化なしドラッグ）', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+    setup_jsdom();
+
+    let calls = [];
+    const split = create_ui_splitter({
+      side: 'left', size: 200,
+      on_resize_end: (sz) => calls.push(sz),
+    });
+
+    const handle = create_RicDOM('#app', {
+      render: () => split({ side: { ctx: ['SIDE'] }, main: { ctx: ['MAIN'] } }),
+    });
+    await flush();
+
+    const divider = get_divider();
+    dispatch_mousedown_on(divider, { clientX: 100, clientY: 0 });
+    dispatch_mouse('mouseup', { clientX: 100, clientY: 0 });
+
+    assert.equal(calls.length, 1, 'mousemove が無くても mouseup で1回呼ばれる');
+    assert.equal(calls[0], 200, 'サイズが変化していなければ元の size がそのまま渡る');
+
+    handle._internal.destroy?.();
+  });
+
+  it('ドラッグしなければ (マウント直後) 呼ばれない', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+    setup_jsdom();
+
+    let calls = [];
+    const split = create_ui_splitter({
+      side: 'left', size: 200,
+      on_resize_end: (sz) => calls.push(sz),
+    });
+
+    const handle = create_RicDOM('#app', {
+      render: () => split({ side: { ctx: ['SIDE'] }, main: { ctx: ['MAIN'] } }),
+    });
+    await flush();
+
+    assert.equal(calls.length, 0, 'ドラッグしていないので呼ばれない');
+
+    handle._internal.destroy?.();
+  });
+
+  it('on_resize_end 未指定でもドラッグがエラーなく動く（後方互換）', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+    setup_jsdom();
+
+    // on_resize_end を渡さない
+    const split = create_ui_splitter({ side: 'left', size: 200, min: 50, max: 400 });
+
+    const handle = create_RicDOM('#app', {
+      render: () => split({ side: { ctx: ['SIDE'] }, main: { ctx: ['MAIN'] } }),
+    });
+    await flush();
+
+    const divider = get_divider();
+    assert.doesNotThrow(() => {
+      dispatch_mousedown_on(divider, { clientX: 100, clientY: 0 });
+      dispatch_mouse('mousemove', { clientX: 150, clientY: 0 });
+      dispatch_mouse('mouseup', { clientX: 150, clientY: 0 });
+    });
+
+    handle._internal.destroy?.();
+  });
+
+  it('collapse ボタンのクリックでは呼ばれない', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+    setup_jsdom();
+
+    let calls = [];
+    const split = create_ui_splitter({
+      side: 'left', size: 200, collapsible: true,
+      on_resize_end: (sz) => calls.push(sz),
+    });
+
+    // split を state トップレベルに置き __notify を自動注入させる
+    // (collapse トグルは safe_notify を発火するため、警告なしで再描画させたい)
+    const handle = create_RicDOM('#app', {
+      split,
+      render: (s) => s.split({ side: { ctx: ['SIDE'] }, main: { ctx: ['MAIN'] } }),
+    });
+    await flush();
+
+    const toggle_btn = document.querySelector('[data-ric-role="splitter-toggle"]');
+    assert.ok(toggle_btn, 'collapse button should exist');
+
+    toggle_btn.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    await flush();
+
+    assert.equal(calls.length, 0, 'collapse トグルでは on_resize_end は呼ばれない');
+
+    handle._internal.destroy?.();
   });
 });
