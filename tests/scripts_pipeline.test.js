@@ -18,7 +18,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -151,9 +151,14 @@ describe('update_sizes.js', () => {
     const before_readme = fs.readFileSync(readme_path, 'utf8');
     const before_index  = fs.readFileSync(index_path, 'utf8');
 
-    const stdout = execFileSync('node', [path.join(ROOT, 'scripts', 'update_sizes.js')], { cwd: ROOT, encoding: 'utf8' });
+    // update_sizes.js は WARN を console.warn (= stderr) に出す。execFileSync の戻り値は
+    // stdout のみで stderr は含まれない (デフォルトでは親プロセスに継承されて画面には出るが
+    // 呼び出し元の変数には乗らない) ため、WARN を捕捉するには spawnSync で stderr も
+    // 明示的に取得する必要がある。
+    const result = spawnSync('node', [path.join(ROOT, 'scripts', 'update_sizes.js')], { cwd: ROOT, encoding: 'utf8' });
+    assert.equal(result.status, 0, `update_sizes.js が異常終了した:\n${result.stderr}`);
 
-    assert.ok(!/WARN/.test(stdout), `update_sizes.js が WARN を出した (regex がドキュメントにマッチしていない):\n${stdout}`);
+    assert.ok(!/WARN/.test(result.stderr), `update_sizes.js が WARN を出した (regex がドキュメントにマッチしていない):\n${result.stderr}`);
 
     const after_readme = fs.readFileSync(readme_path, 'utf8');
     const after_index  = fs.readFileSync(index_path, 'utf8');
