@@ -49,6 +49,7 @@ try {
     { no: '16', file: '16_svg_editor.html',        title: 'SVG ツリーエディタ' },
     { no: '17', file: '17_multi_ricdom.html',      title: 'Multi-instance Memo' },
     { no: '18', file: '18_key_reconciliation.html',title: 'Key Reconciliation' },
+    { no: '19', file: '19_css_embed.html',          title: '埋め込み (css_for)' },
   ];
 
   // ── 現在のページ検出 ──
