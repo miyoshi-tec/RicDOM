@@ -33,7 +33,8 @@ AI（Claude Code 等）がコーディングする際の詳細仕様書。
 | **composite（ファクトリ）** | `create_ui_accordion` / `create_ui_splitter` / `create_ui_scroll_pane` / `create_ui_collapse_box` / `create_ui_tweak_panel` |
 | **composite (純関数)** | `ui_tabs` / `bind_tabs` / `ui_inline_menu` / `ui_tweak_panel` / `ui_tweak_folder` / `ui_tweak_row` / `tweak_infer_type` |
 | **helpers** | `watch_outside_click` |
-| **theme util** | `create_theme` / `create_density` / `create_font_size` / `export_theme` / `export_settings` |
+| **theme util** | `create_theme` / `create_density` / `create_font_size` / `export_theme` / `export_settings` / `make_css_vars` |
+| **css util** | `css_for(...names)`（v0.3.34〜、「使う分だけ」CSS を取り出す公式ルート） |
 | **meta** | `version` |
 
 全 `ui_*` は rest スプレッド契約（任意 DOM 属性透過）、`create_ui_*` は `s` のトップレベル格納＋`__notify` 自動注入、という共通ルール。詳細は [rest スプレッド契約](#任意属性の透過rest-スプレッド契約) と [Controlled / Uncontrolled パターン](#controlled--uncontrolled-パターン) を参照。
@@ -613,7 +614,16 @@ s.page.density = 'compact';
   `.ric-page` スコープを内蔵。手組み不要)。
 - 素の div に `class="ric-page"` を付けるだけでは**当てにならない**(その部品の規則を
   どこかの `create_ui_page` が既に集めていない限り規則自体が存在しない)。確実なのは
-  `create_ui_page` で包むこと。
+  `create_ui_page` で包むこと。**v0.3.34〜 は `css_for()` で規則を自分で置けば、
+  素の `ric-page` + `make_css_vars` で page なしの styled mount が公式にできる**
+  (詳細は [css_for / make_css_vars](#css_for--make_css_vars-v0334) 参照):
+  ```javascript
+  // page なしで styled にマウントする 3 点セット
+  { tag: 'div', class: 'ric-page', style: make_css_vars({ theme: 'dark' }), ctx: [
+    { tag: 'style', ctx: [css_for('ric-button')] },
+    ui_button({ ctx: ['OK'] }),
+  ]}
+  ```
 
 > ⚠️ **無装飾は「見た目だけ・無言」で壊れる**(エラーも警告も出ない)。「要素が存在する /
 > クリックできる」系の E2E テストは**通ってしまう**。特に画面を直接見られない AI
@@ -653,6 +663,36 @@ ui_grid({ columns: 2, gap: '8px 16px', ctx: [...] })  // row-gap col-gap
 
 プロパティ: `columns` / `rows` / `gap` / `style` / `ctx`、および任意 DOM 属性
 (rest スプレッド契約)。gap 省略時は `--ric-gap-md` から自動取得。
+
+#### css_for / make_css_vars (v0.3.34〜)
+
+「使う分だけ」哲学の CSS 版。`create_ui_page` は内部で「ツリー内の使用 `ric-*`
+クラスを集めて `<style>` を注入する」処理をしているが、これを**公開関数として直接
+呼べる**ようにしたもの。`create_ui_page` で包めない/包みたくない mount
+(別 iframe、外部ウィジェットホスト、既存アプリへの部分導入等) に、規則を自分の
+`<style>` として置く公式ルート。
+
+```javascript
+const { css_for, make_css_vars, ui_button } = require('ricdom/ric_ui'); // または window.RicUI
+
+// page なしで styled にマウントする 3 点セット
+{ tag: 'div', class: 'ric-page', style: make_css_vars({ theme: 'dark' }), ctx: [
+  { tag: 'style', ctx: [css_for('ric-button')] },
+  ui_button({ ctx: ['OK'] }),
+]}
+```
+
+- `css_for(...names)`: 指定したテンプレート名 (`'ric-button'` 等、`ric_ui/css_templates.js`
+  の `CSS_TEMPLATES` キー) の CSS を連結して返す。`create_ui_page` が注入するものと
+  **同一のルール**(`.ric-page ` プレフィックス込み、同じ `build_css` キャッシュを共有)。
+- 引数を省略すると **全テンプレート**の CSS を返す(全部入り。公式に許可)。
+- 未知のキー(タイポ等)は `console.warn` を出してスキップする(typo 検出。例外は投げない)。
+- CSS_TEMPLATES の規則はセレクタが `.ric-page ` スコープなので、**wrapper 側にも
+  `class: 'ric-page'` が必要**。テーマ変数は `make_css_vars` が呼び出した要素の
+  `style` に直接載る(`:root` は使わないので、既存ページの他の `.ric-page` と
+  衝突しない)。
+- `make_css_vars({ theme, density, font_size })` は元々 `create_ui_page` /
+  `create_ui_panel` の内部関数だったが、v0.3.34 で公開 export に追加(挙動は不変)。
 
 ### Surface
 

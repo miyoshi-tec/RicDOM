@@ -26,7 +26,8 @@
 //               tweak_infer_type
 //   helpers   : watch_outside_click
 //   theme util: create_theme / create_density / create_font_size
-//               export_theme / export_settings
+//               export_theme / export_settings / make_css_vars
+//   css util  : css_for（v0.3.34〜、「使う分だけ」CSS を取り出す公式ルート）
 
 'use strict';
 
@@ -76,7 +77,8 @@ const { create_ui_tweak_panel, ui_tweak_panel, ui_tweak_folder, ui_tweak_row, in
 
 const { watch_outside_click } = require('./dom_helpers');
 
-const { create_theme, create_density, create_font_size, export_theme, export_settings } = require('./context');
+const { create_theme, create_density, create_font_size, export_theme, export_settings, make_css_vars } = require('./context');
+const { css_for } = require('./css_registry');
 
 const version = require('../src/version');
 
@@ -89,11 +91,14 @@ module.exports = {
   create_font_size,
   export_theme,
   export_settings,
+  make_css_vars,
   // layout
   create_ui_page,
   ui_col,
   ui_row,
   ui_grid,
+  // css util
+  css_for,
   // surface
   ui_panel,
   create_ui_panel,
