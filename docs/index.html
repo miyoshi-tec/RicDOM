@@ -188,6 +188,7 @@ create_RicDOM('#app', {
       <li><a href="samples/16_svg_editor.html">16 — SVG ツリーエディタ</a></li>
       <li><a href="samples/17_multi_ricdom.html">17 — Multi-instance Memo</a></li>
       <li><a href="samples/18_key_reconciliation.html">18 — Key Reconciliation (リスト並べ替え)</a></li>
+      <li><a href="samples/19_css_embed.html">19 — 埋め込み (css_for)</a></li>
     </ul>
   </section>
   <footer>
@@ -251,6 +252,7 @@ const SAMPLES = [
   { no: '16', file: '16_svg_editor.html',          title: 'SVG ツリーエディタ', desc: 'SVG ノードを選択・編集・追加、ドラッグで直感的に配置' },
   { no: '17', file: '17_multi_ricdom.html',        title: 'Multi-instance Memo', desc: 'create_RicDOM をパネル単位に分けて再描画スコープを分離' },
   { no: '18', file: '18_key_reconciliation.html',  title: 'Key Reconciliation',  desc: 'key 属性でリスト並べ替え時に input focus / value が混ざらない (v0.3.25〜)' },
+  { no: '19', file: '19_css_embed.html',           title: '埋め込み (css_for)', desc: 'create_ui_page で包めない既存アプリの一角に css_for + make_css_vars で RicUI の島を作る (v0.3.34〜)' },
 ];
 
 // ── メインレンダー ──
@@ -366,7 +368,7 @@ create_RicDOM('#index_page', {
               ui_text({ ctx: ['コア（必須）'] }),
             ]}),
             ui_row({ ctx: [
-              { tag: 'span', class: 'badge badge--ui', ctx: ['RicUI.min.js — 65KB'] },
+              { tag: 'span', class: 'badge badge--ui', ctx: ['RicUI.min.js — 66KB'] },
               { tag: 'span', class: 'badge badge--lz', ctx: ['.lz.min.js — 38KB'] },
               ui_text({ ctx: ['UI コンポーネント集 + パラメータ調整パネル'] }),
             ]}),

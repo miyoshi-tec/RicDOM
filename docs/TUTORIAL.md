@@ -350,6 +350,52 @@ ui_panel({
 外側の要素には漏れません。そのため、これらのコンポーネントに `id` や
 `onclick` を付けても、イベントハンドラが混線する心配はありません。
 
+### page で包めないとき — css_for で埋め込み (v0.3.34〜)
+
+ここまでは常に `create_ui_page` でアプリ全体を包んできました。これが**基本
+(canon)** です。しかし「既存アプリの一角に RicUI の部品を少しだけ置きたい」
+「その部分に `.ric-page` の見た目(背景色・パディング等)が乗るのは邪魔」
+というケースでは、`create_ui_page` で全体を包み直すのは大げさすぎます。
+
+判断基準:
+
+- アプリ全体・1 ページ丸ごとが RicUI = **`create_ui_page` が基本**
+- 既存アプリの中の一部だけに RicUI 部品を置きたい／page の見た目(背景色・
+  パディング)がそのまま乗ると邪魔 = **`css_for` の 3 点セット**を使う
+
+```javascript
+const { css_for, make_css_vars, ui_panel, ui_text, ui_button } = RicUI;
+
+// 3 点セット: ① class 'ric-page' ② make_css_vars を style に ③ css_for を <style> に
+{
+  tag: 'div',
+  class: 'ric-page',                              // ① CSS_TEMPLATES は .ric-page スコープ
+  style: make_css_vars({ theme: 'dark' }),        // ② テーマ変数をこの要素に注入
+  ctx: [
+    { tag: 'style', ctx: [css_for('ric-panel', 'ric-button', 'ric-text')] }, // ③ 使う分だけ
+    ui_panel({ ctx: [
+      ui_text({ ctx: ['既存アプリの中の RicUI 島'] }),
+      ui_button({ ctx: ['OK'], onclick: () => {} }),
+    ]}),
+  ],
+}
+```
+
+`create_ui_page` は内部でこれと同じこと(使用クラスの収集 → `css_for` 相当 →
+`<style>` 注入)をツリー全体に対して自動でやっています。`css_for` は公開版 —
+自分でスコープを絞って好きな場所に置けます。
+
+> ⚠️ **portal 系 (`create_ui_popup` / `create_ui_tooltip` / `create_ui_dialog` /
+> `create_ui_toast`) は css_for 島では使えません。** これらは開くと VDOM を
+> キューに積むだけで、**`create_ui_page` の render がそれを drain して展開する**
+> ため、page を経由しない島の中では永遠に表示されないか、別の場所の
+> `create_ui_page` に意図せず出てしまいます。popup/dialog/toast/tooltip が
+> 必要な部分は `create_ui_page` で包んでください。
+
+「既存アプリへの埋め込み」の完全なサンプルは
+[docs/samples/19_css_embed.html](docs/samples/19_css_embed.html) を参照してください。
+テーマの異なる 2 つの島を並べ、島ごとに独立してテーマを持てることも示しています。
+
 ---
 
 ## 6. JSON を投げるだけで調整パネルを作る

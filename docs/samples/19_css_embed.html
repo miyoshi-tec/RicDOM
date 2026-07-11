@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="create_ui_page で包めない既存アプリの一角に、css_for + make_css_vars の 3 点セットで RicUI の島を作る。埋め込みの公式ルート。">
+  <meta name="author" content="miyoshi-tec">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://miyoshi-tec.github.io/RicDOM/samples/19_css_embed.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://miyoshi-tec.github.io/RicDOM/samples/19_css_embed.html">
+  <meta property="og:title" content="埋め込み (css_for) — RicDOM">
+  <meta property="og:description" content="create_ui_page で包めない既存アプリの一角に、css_for + make_css_vars の 3 点セットで RicUI の島を作る。埋め込みの公式ルート。">
+  <meta property="og:site_name" content="RicDOM">
+  <meta property="og:locale" content="ja_JP">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="埋め込み (css_for) — RicDOM">
+  <meta name="twitter:description" content="既存アプリの一角に RicUI の島を作る css_for + make_css_vars の 3 点セット。">
+  <title>埋め込み (css_for) — RicUI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    .page-intro { padding: 14px 20px; margin: 0; font-size: 14px; line-height: 1.6;
+                  border-bottom: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.02); }
+    .page-intro code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+                       font-family: ui-monospace, monospace; font-size: 12.5px; }
+    /* ── 「既存アプリ」を模した自前スタイル (RicUI とは無関係) ──
+       わざと RicUI と違う書体・配色にして「島」との対比を分かりやすくする。 */
+    .legacy-app {
+      height: 100%; overflow: auto; font-family: Georgia, 'Times New Roman', serif;
+      background: #f4f1ea; color: #2b2822;
+    }
+    .legacy-header {
+      padding: 16px 24px; background: #2b2822; color: #f4f1ea;
+      display: flex; align-items: baseline; gap: 12px;
+    }
+    .legacy-header h2 { margin: 0; font-size: 18px; font-weight: normal; letter-spacing: 0.02em; }
+    .legacy-header span { font-size: 12px; opacity: 0.7; }
+    .legacy-body { padding: 20px 24px; }
+    .legacy-body p { max-width: 640px; line-height: 1.7; }
+    .legacy-islands { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+    .legacy-island-label { font-size: 12px; opacity: 0.6; margin: 0 0 6px; font-family: ui-monospace, monospace; }
+  </style>
+  <script src="../RicDOM.min.js"></script>
+  <script src="../RicUI.min.js"></script>
+</head>
+<body>
+<div id="nav_bar" data-sample="19">
+    <!-- ▼ 静的 SEO fallback (RicDOM の最初の render で innerHTML='' により消える) ▼ -->
+    <header>
+      <h1>埋め込み (css_for) — RicDOM</h1>
+      <p>create_ui_page で包めない既存アプリの一角に、css_for + make_css_vars の 3 点セットで RicUI の島を作る。埋め込みの公式ルート。</p>
+    </header>
+    <p><small>これは <strong>RicDOM</strong> 公式のサンプルページです。
+    JavaScript を有効にすると、ナビゲーションバーと実動するデモが表示されます。</small></p>
+    <nav>
+      <a href="../index.html">← RicDOM トップ</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM/blob/main/docs/samples/19_css_embed.html">GitHub でソースを見る</a> ·
+      <a href="https://github.com/miyoshi-tec/RicDOM">リポジトリ</a>
+    </nav>
+    <!-- ▲ 静的 SEO fallback はここまで ▲ -->
+  </div>
+<p class="page-intro">
+  <strong>既存アプリへの埋め込み</strong>。通常は <code>create_ui_page</code> でアプリ全体を
+  包むのが canon ですが(他のサンプル参照)、<code>create_ui_page</code> で包めない・
+  包みたくない場面(既存アプリの一角、iframe、外部ウィジェットホスト等)では
+  <code>css_for</code> + <code>make_css_vars</code> の 3 点セットで RicUI の「島」を
+  自分で作れます(v0.3.34〜)。下の「既存アプリ」風の領域(RicUI と無関係な自前 CSS)の
+  中に、テーマの異なる 2 つの島(teal / dark)を埋め込んでいます。
+  <strong>島には portal 系(popup/dialog/toast/tooltip)は置けません</strong>
+  (詳細はコード中のコメント参照)。下ペインに実コードを表示しています。
+</p>
+<div id="app-frame" style="flex:1;min-height:0;overflow:hidden"></div>
+
+<script type="text/plain" id="src-demo">
+// ── 既存アプリへの埋め込み (css_for) ──
+//
+// 🎯 RicDOM/RicUI の見どころ:
+//   - 通常ルートは create_ui_page でアプリ全体を包むのが canon (他の全サンプル参照)。
+//     これは「escape hatch」のサンプルであり、page を置き換えるものではない。
+//   - create_ui_page で包めない/包みたくない場面(既存アプリの一角、iframe、外部
+//     ウィジェットホスト等)向けに、css_for + make_css_vars の 3 点セットで RicUI の
+//     「島」を自分で作る公式ルート (v0.3.34〜)。
+//   - 3 点セット: ①class 'ric-page' ②make_css_vars を style に ③css_for を <style> に。
+//   - 島は create_ui_page を経由しないため、portal 系 (popup/dialog/toast/tooltip) は
+//     使えない — portal の展開(drain)は create_ui_page の render の責務であり、page が
+//     無いと VDOM がキューに溜まったまま表示されないか、他の page に意図せず出てしまう。
+//     島には非 portal 部品 (button/input/panel/text/icon 等) だけを置くこと。
+//   - 島ごとに独立したテーマを持てることも同時に示す (teal と dark)。
+
+const { create_RicDOM } = RicDOM;
+const { css_for, make_css_vars, ui_panel, ui_row, ui_col, ui_text, ui_button, bind_input, ui_icon } = RicUI;
+
+// ── アイコン (docs/icons/icons.json 同梱の 'check'。ricdom-icon で取得、手書きしない) ──
+const ICON_CHECK = { p: 'M20 6 9 17l-5-5' };
+
+// css_for に渡すテンプレート名。この島で実際に使う部品の ric-* クラスだけを列挙する
+// ( 省略すると全テンプレートが返るが、「使う分だけ」哲学に合わせて絞る)。
+const ISLAND_TEMPLATES = ['ric-panel', 'ric-button', 'ric-input', 'ric-text', 'ric-icon'];
+
+// ── RicUI の「島」を 1 つ組み立てる (3 点セット) ──
+function island(theme, s, key) {
+  return {
+    tag: 'div',
+    class: 'ric-page',                                   // ① CSS_TEMPLATES は .ric-page スコープ
+    style: make_css_vars({ theme }),                      // ② テーマ変数をこの要素の style に注入
+    ctx: [
+      { tag: 'style', ctx: [css_for(...ISLAND_TEMPLATES)] }, // ③ 使う部品の CSS だけを注入
+      ui_panel({ style: { margin: 0 }, ctx: [
+        ui_text({ variant: 'label', ctx: [`テーマ: ${theme}`] }),
+        bind_input(s, key, { placeholder: 'メモを入力…' }),
+        ui_row({ style: { marginTop: '8px', gap: '8px', alignItems: 'center' }, ctx: [
+          ui_button({ variant: 'primary', ctx: [ui_icon(ICON_CHECK, { size: 14 }), ' 保存'],
+            onclick: () => { s[key + 'Saved'] = s[key]; } }),
+          s[key + 'Saved']
+            ? ui_text({ variant: 'muted', ctx: [`保存済み: ${s[key + 'Saved']}`] })
+            : null,
+        ]}),
+      ]}),
+    ],
+  };
+}
+
+// ── アプリ本体。トップレベルに create_ui_page は置かない (このサンプルの主題) ──
+// 「既存アプリ」風の領域は .legacy-* という RicUI と無関係な自前 CSS クラスで描く。
+create_RicDOM('#mount-demo', {
+  tealNote: '', tealNoteSaved: '',
+  darkNote: '', darkNoteSaved: '',
+
+  render(s) {
+    return {
+      tag: 'div', class: 'legacy-app', ctx: [
+        { tag: 'div', class: 'legacy-header', ctx: [
+          { tag: 'h2', ctx: ['既存アプリ (RicUI 不使用の領域)'] },
+          { tag: 'span', ctx: ['ヘッダー / 配色 / フォントは自前 CSS'] },
+        ]},
+        { tag: 'div', class: 'legacy-body', ctx: [
+          { tag: 'p', ctx: [
+            'ここから下は create_ui_page を一切使わない、既存アプリを模した領域です。',
+            '右下に RicUI の「島」を 2 つ埋め込んでいます。島の外側は RicUI の CSS の',
+            '影響を受けません(逆に、島の中は自前 CSS の影響を受けません)。',
+          ]},
+          { tag: 'div', class: 'legacy-islands', ctx: [
+            { tag: 'div', ctx: [
+              { tag: 'p', class: 'legacy-island-label', ctx: ['island: teal'] },
+              island('teal', s, 'tealNote'),
+            ]},
+            { tag: 'div', ctx: [
+              { tag: 'p', class: 'legacy-island-label', ctx: ['island: dark'] },
+              island('dark', s, 'darkNote'),
+            ]},
+          ]},
+        ]},
+      ],
+    };
+  },
+});
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ここから下は docs サイト用のラッパー (デモ本体ではない)。
+     上の <script type="text/plain" id="src-demo"> を取り出して eval し、
+     #mount-demo にデモを流し込み、その下にコードペインを並べるだけ。
+     ════════════════════════════════════════════════════════════════ -->
+<script src="_nav_bar.js"></script>
+<script>
+(() => {
+  const { create_RicDOM } = RicDOM;
+  const { create_ui_page, create_ui_splitter, ui_code_pre } = RicUI;
+  const demo_src = document.getElementById('src-demo').textContent.trim();
+
+  create_RicDOM('#app-frame', {
+    page: create_ui_page(window._ric_settings ?? { theme: 'light', font_size: 'lg' }),
+    outer_sp: create_ui_splitter({ side: 'bottom', size: 340, min: 120, collapsible: true }),
+
+    render(s) {
+      return s.page({
+        style: { height: '100%', padding: 0, borderRadius: 0,
+                 display: 'flex', flexDirection: 'column' },
+        ctx: [
+          s.outer_sp({
+            main: { ctx: [{ tag: 'div', id: 'mount-demo', style: { height: '100%', overflow: 'auto' } }] },
+            side: {
+              style: { height: '100%', overflow: 'auto', padding: 0 },
+              ctx: [
+                ui_code_pre({
+                  lang: 'javascript',
+                  ctx: [demo_src],
+                  style: { margin: 0, borderRadius: 0, border: 0, height: '100%' },
+                }),
+              ],
+            },
+          }),
+        ],
+      });
+    },
+  });
+
+  requestAnimationFrame(() => { new Function(demo_src)(); });
+})();
+</script>
+</body>
+</html>
