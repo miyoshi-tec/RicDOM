@@ -71,7 +71,7 @@ const ui_radiobutton = ({
           ...(onchange ? { onchange }       : {}),
           ...(disabled ? { disabled: true } : {}),
         },
-        { tag: 'span', ctx: label_ctx(l) },
+        { tag: 'span', class: 'ric-radio__label', ctx: label_ctx(l) },
       ],
     };
   });

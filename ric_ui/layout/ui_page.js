@@ -36,6 +36,20 @@ const create_ui_page = (initial = {}) => {
   //       （ui_button / ui_input / ui_panel 等と同じ流儀）
   const inst = ({ ctx = [], style: extra_style = '', ...rest } = {}) => {
 
+    // state 外 (module scope 等) に置かれた場合、__notify が注入されないため
+    // 内部イベント (theme-change 等) での再描画が効かない silent failure になる。
+    // 'ric-theme-change' が一度も発火しない kiosk アプリ等では既存の window リスナー
+    // 経由の safe_notify では検知できないため、初回 render 時点で直接チェックする
+    // (v0.3.35〜、Unizon kiosk consumer 報告)。
+    if (typeof inst.__notify !== 'function' && !inst._warned_no_state) {
+      inst._warned_no_state = true;
+      console.warn(
+        '[RicUI] create_ui_page() instance has no __notify — ' +
+        'state のトップレベルに置いてください: create_RicDOM(target, { page: create_ui_page({...}) })\n' +
+        'この状態のままだとテーマ変更等の内部イベントで再描画されません。'
+      );
+    }
+
     // ポータルキューを取り出す。
     // 直前の children 評価で push() された popup/dialog/tooltip/toast の VDOM を
     // 全部吸い上げる。複数 ui_page でも JS の評価順（左から順）で完結するため
