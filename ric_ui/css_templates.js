@@ -574,6 +574,11 @@ ${_P}.ric-radio input[type="radio"] {
   cursor: pointer;
   accent-color: ${_ac};
 }
+${_P}.ric-radio__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
 ${_P}.ric-radio--disabled {
   opacity: 0.45;
   cursor: not-allowed;

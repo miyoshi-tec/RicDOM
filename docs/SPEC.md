@@ -597,6 +597,13 @@ s.page.density = 'compact';
 - 使用 CSS クラスを走査して動的 `<style>` タグ生成
 - window の `'ric-theme-change'` イベントを listen して自身の設定を自動同期（nav_bar 等の外部から一斉にテーマを変更できる）
 
+> **v0.3.35〜**: `s.page = create_ui_page(...)` のように state のトップレベルに
+> 置かず、module scope の `const` 等に置いて呼び出した場合、初回 render 時点で
+> `console.warn` する（instance あたり 1 回のみ、throw はしない）。
+> テーマ切替 UI を持たない kiosk アプリ等では `'ric-theme-change'` が一度も
+> 発火しないため、上記の window リスナー経由の警告機構だけでは検知できない
+> silent failure だった穴を埋める。
+
 ##### スタイルスコープ（重要 — 「ページ外で無装飾」を避ける）
 
 **RicUI コンポーネントは必ず `create_ui_page` の中で描く。** 理由は上記の内部動作で、
@@ -634,6 +641,14 @@ s.page.density = 'compact';
 **同じ詳細度なら RicUI 側が勝つ**。RicUI の規則は `.ric-page .ric-button` =
 詳細度 (0,2,0)。独自 CSS で上書きする場合は詳細度 3 以上
 (例: `.ric-page .ric-button.my-active`) にするか、inline style を使う。
+
+例:
+- `.ric-page .ric-button`(0,2,0)を上書きするなら `.your-app .your-button.is-active`
+  のように詳細度 3 以上にするか、`ric_ui/css_templates.js` に一覧がある通り
+  ほぼ全コンポーネントが `.ric-page .ric-xxx`(0,2,0)基準なので同じ考え方で足りる。
+  `:hover` 等の状態修飾がある規則は擬似クラス分でさらに 1 段(0,3,0)高くなる。
+- 一番簡単で確実なのは `style={{...}}` の inline style で上書きすること
+  (詳細度を気にせず常に勝つ)。
 
 #### ui_col / ui_row
 

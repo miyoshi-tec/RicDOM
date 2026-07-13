@@ -229,3 +229,96 @@ describe('ui_page: rest スプレッド', () => {
     assert.equal(n.ctx[1], child);
   });
 });
+
+// =====================================================================
+// 5. state 外配置の検知 (v0.3.35〜、Unizon kiosk consumer 報告)
+//
+//   'ric-theme-change' イベントが一度も発火しない kiosk アプリでは、既存の
+//   window リスナー経由の safe_notify では __notify 欠如を検知できない
+//   (イベントが来ないと safe_notify 自体が呼ばれないため)。
+//   初回 render 時点で __notify の有無を直接チェックして warn する。
+// =====================================================================
+
+describe('ui_page: state 外配置の検知', () => {
+
+  // console.warn をキャプチャするヘルパ (tests/factory_safe_notify.test.js と同じ流儀)
+  const capture_warns = () => {
+    const captured = [];
+    const original = console.warn;
+    console.warn = (...args) => { captured.push(args.join(' ')); };
+    return {
+      captured,
+      restore: () => { console.warn = original; },
+    };
+  };
+
+  test('s.page = create_ui_page() として state に正しく置いた場合、render で warn しない', async () => {
+    const { setup_jsdom, flush } = require('./_helpers/jsdom_env');
+    setup_jsdom();
+    const w = capture_warns();
+    try {
+      const { create_RicDOM } = require('../src/ricdom');
+      const target = document.querySelector('#app');
+      create_RicDOM(target, {
+        page: create_ui_page({ theme: 'light' }),
+        render: (s) => s.page({ ctx: ['hello'] }),
+      });
+      await flush();
+
+      const warned = w.captured.filter(s => s.includes('create_ui_page() instance has no __notify'));
+      assert.equal(warned.length, 0, 'state に正しく置いた正規使用で warn が出てはいけない');
+    } finally {
+      w.restore();
+      delete global.window;
+      delete global.document;
+      delete global.Node;
+      delete global.HTMLElement;
+      delete global.requestAnimationFrame;
+    }
+  });
+
+  test('state 外 (module scope const) で呼んだ場合、初回 render で warn が 1 回出る', () => {
+    const w = capture_warns();
+    try {
+      // state に入れない使い方 — __notify は注入されない
+      const page = create_ui_page();
+      page({ ctx: ['hello'] });
+
+      const warned = w.captured.filter(s => s.includes('create_ui_page() instance has no __notify'));
+      assert.equal(warned.length, 1, 'state 外置きで初回 render に 1 回 warn する');
+      assert.match(warned[0], /state のトップレベルに置いてください/);
+    } finally {
+      w.restore();
+    }
+  });
+
+  test('同じ page インスタンスで複数回 render しても warn は 1 回だけ (spam 防止)', () => {
+    const w = capture_warns();
+    try {
+      const page = create_ui_page();
+      page({ ctx: ['a'] });
+      page({ ctx: ['b'] });
+      page({ ctx: ['c'] });
+
+      const warned = w.captured.filter(s => s.includes('create_ui_page() instance has no __notify'));
+      assert.equal(warned.length, 1, '複数回 render しても warn は 1 回だけ');
+    } finally {
+      w.restore();
+    }
+  });
+
+  test('warn が出ても render 自体は throw せず正常に VDOM を返す', () => {
+    const w = capture_warns();
+    try {
+      const page = create_ui_page();
+      const node = page({ ctx: ['hello'] });
+
+      assert.equal(node.tag, 'div');
+      assert.equal(node.class, 'ric-page');
+      assert.equal(node.ctx[0].tag, 'style');
+      assert.equal(node.ctx[1], 'hello');
+    } finally {
+      w.restore();
+    }
+  });
+});

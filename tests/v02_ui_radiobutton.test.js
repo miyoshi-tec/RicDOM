@@ -91,6 +91,39 @@ describe('ui_radiobutton: options の正規化', () => {
   });
 });
 
+// =====================================================================
+// ラベル span の flex 中央寄せ（v0.3.35〜、アイコン縦ズレ修正）
+//
+//   .ric-radio は inline-flex; align-items:center だが、内側の span が
+//   デフォルトの inline のままだとアイコン(vertical-align 依存)とテキストが
+//   ベースライン基準で並び中央からズレる。ric-radio__label class を付けて
+//   display:inline-flex にすることで解消する（展示ビューア / Unizon kiosk の
+//   2 consumer が独立に同じ !important 回避策を書いていた）。
+// =====================================================================
+
+describe('ui_radiobutton: ラベル span の class (アイコン整列)', () => {
+
+  test('文字列ラベルでも span に ric-radio__label class が付く', () => {
+    const node = ui_radiobutton({ options: ['viewer'] });
+    const span = node.ctx[0].ctx[1];
+    assert.equal(span.class, 'ric-radio__label');
+  });
+
+  test('VDOM ラベル（アイコン）でも span に ric-radio__label class が付く', () => {
+    const icon = { tag: 'svg', class: 'ric-icon' };
+    const node = ui_radiobutton({ options: [{ value: 'list', label: icon }] });
+    const span = node.ctx[0].ctx[1];
+    assert.equal(span.class, 'ric-radio__label');
+  });
+
+  test('配列ラベル（アイコン + 文字列）でも span に ric-radio__label class が付く', () => {
+    const icon = { tag: 'svg', class: 'ric-icon' };
+    const node = ui_radiobutton({ options: [{ value: 'list', label: [icon, ' List'] }] });
+    const span = node.ctx[0].ctx[1];
+    assert.equal(span.class, 'ric-radio__label');
+  });
+});
+
 describe('ui_radiobutton: checked', () => {
 
   test('value に一致するラジオの checked が 1（numeric）', () => {
