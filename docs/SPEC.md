@@ -492,6 +492,17 @@ render(s) {
 - `requestAnimationFrame` ベースのバッチング
 - 同一フレーム内の複数 state 変更 → 1回の再描画
 - `render_scheduled` フラグで重複防止
+- **`setTimeout(200ms)` バックストップ併用（v0.3.36〜）**: `requestAnimationFrame`
+  は hidden タブ・kiosk の全画面遷移直後・Electron の backgroundThrottling 等で
+  発火しないことがある。schedule 時に rAF とバックストップの両方を張り、先に
+  発火した方が描画する（フラグガードで他方は no-op）。健常時は rAF が先に
+  走り（~16ms）バックストップは `clearTimeout` される＝挙動は従来と変わらない。
+  rAF が飛んだ場合もバックストップがフラグを解いて描画するため、再描画が
+  永久停止することは構造的に起きない（hidden タブでは `setTimeout` 自体も
+  ブラウザに throttle され 1 秒以上になりうるが、いずれ必ず発火してフラグが
+  解けることは保証される）。`render_now()` のようにスケジューラを経由せず
+  外部から直接描画した場合は、保留中の rAF/バックストップを解除してから
+  描画する（二重描画防止）。
 
 `render_now()` と `next_render()` は対になる API（v0.3.32〜）。`render_now()` は
 **強制・同期**（呼んだ瞬間に rAF を待たず `do_render` する）。`next_render()` は

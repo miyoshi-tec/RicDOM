@@ -761,27 +761,64 @@ const patch_children_by_position = (prev_children, next_children, parent_el, pre
 };
 
 // =====================================================================
-// 描画スケジューラ（requestAnimationFrame ベース）
+// 描画スケジューラ（requestAnimationFrame ベース + setTimeout バックストップ）
 // =====================================================================
 
-// インスタンスごとに rAF ベースの描画スケジューラを生成する
-// 同一フレーム内の多重スケジュールを防ぎ、描画を1回にまとめる
+// rAF は hidden タブ・kiosk の全画面遷移・Electron の backgroundThrottling 等で
+// 発火しないことがある。旧実装はフラグ解除が rAF コールバック内の 1 本道だった
+// ため、一度でも rAF が飛ぶとフラグが永久に立ちっぱなしになり再描画が完全停止
+// する silent failure があった (v0.3.36 で修正、Unizon kiosk consumer 報告)。
+//
+// 対策: schedule 時に rAF と setTimeout(200ms) の両方を張り、先に発火した方が
+// 描画する（フラグガードで他方は no-op）。200ms は「健常な rAF (~16ms) の描画
+// タイミングを邪魔せず、かつ詰まったときの復旧が体感できる速さ」として選定。
+// 健常時は rAF が先に走りバックストップは clearTimeout される。rAF が飛んだ
+// 場合もバックストップがフラグを解いて描画するため、永久停止は構造的に起きない
+// (hidden タブでは setTimeout 自体もブラウザに throttle され 1 秒以上になり
+// うるが、「いずれ必ず発火してフラグが解ける」ことは保証される)。
+//
+// インスタンスごとに生成し、同一フレーム内の多重スケジュールを防ぎ、描画を
+// 1回にまとめる。
 const create_render_scheduler = (do_render) => {
-  // let が必要な数少ないケース：rAF コールバック内でリセットするため
+  // let が必要な数少ないケース：rAF / バックストップのどちらかで解除するため
   let render_scheduled = false;
+  let raf_id = null;
+  let backstop_id = null;
+
+  // rAF / バックストップ共通の実行体。先に来た方が描画し、
+  // 後から来た方は render_scheduled ガードで no-op になる。
+  const run = () => {
+    if (!render_scheduled) return; // 相方が処理済み、または外部で描画済み（render_now 等）
+    render_scheduled = false;
+    raf_id = null;
+    if (backstop_id !== null) { clearTimeout(backstop_id); backstop_id = null; }
+    do_render();
+  };
 
   const schedule_render = () => {
     // すでにスケジュール済みなら何もしない（同一フレーム内の重複登録を防ぐ）
     if (render_scheduled) return;
     render_scheduled = true;
-
-    requestAnimationFrame(() => {
-      render_scheduled = false; // フラグをリセットしてから描画する
-      do_render();
-    });
+    raf_id = requestAnimationFrame(run);
+    backstop_id = setTimeout(run, 200);
   };
 
-  return { schedule_render };
+  // render_now() のように schedule_render を経由せず外部から直接 do_render した
+  // 直後に呼ぶ。保留中の rAF / バックストップを解除し、後追いで run() が発火して
+  // 二重描画するのを防ぐ（cancelAnimationFrame は環境によって存在しないことが
+  // あるため typeof で確認する。無くても render_scheduled ガードにより二重描画
+  // 自体は防げるので、あくまで zombie timer の掃除としての位置づけ）。
+  const cancel_pending = () => {
+    if (!render_scheduled) return;
+    render_scheduled = false;
+    if (raf_id !== null) {
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf_id);
+      raf_id = null;
+    }
+    if (backstop_id !== null) { clearTimeout(backstop_id); backstop_id = null; }
+  };
+
+  return { schedule_render, cancel_pending };
 };
 
 // =====================================================================
@@ -1087,7 +1124,7 @@ const create_RicDOM = (target, raw_state = {}) => {
   // 描画スケジューラの設定
   // ---------------------------------------------------------------
 
-  const { schedule_render } = create_render_scheduler(() => {
+  const { schedule_render, cancel_pending } = create_render_scheduler(() => {
     if (!is_destroyed) do_render();
   });
 
@@ -1164,6 +1201,10 @@ const create_RicDOM = (target, raw_state = {}) => {
   const instance_force_render = () => {
     // destroy() 後は何もしない（is_destroyed フラグで無視）
     if (is_destroyed) return;
+    // schedule_render 経由の rAF / バックストップが保留中なら解除する。
+    // これをしないと、この直後の do_render とは別に後追いで run() が発火し
+    // 二重描画してしまう（v0.3.36〜）。
+    cancel_pending();
     do_render();
   };
 
