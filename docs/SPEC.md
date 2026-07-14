@@ -513,6 +513,12 @@ state を変える責任を持つ）。headless E2E で `el.click()` → `await 
 → DOM を assert、という流れなら setTimeout マジックナンバーなしに rAF バッチ経路
 そのままで完了を待てる（UnizonTool 要望）。
 
+**保証範囲**: resolve するのは `do_render` の **DOM commit 完了直後**
+（VDOM 構築 + DOM patch 適用まで）で、browser の layout/paint commit は
+保証しない。focus / scroll / `getBoundingClientRect` など layout 確定が
+前提の操作には後述の「Operational facts — render flush の 2 rAF ルール」を
+使うこと。
+
 ### NOOP_PROXY
 
 エラー時の安全なフォールバック。全ての get/set/apply/delete が自身を返す。
@@ -1608,6 +1614,12 @@ DOM 反映前提の操作は 2 rAF wait が確実。
 注: 値変更だけ (= `el.value` 等を state 経由で更新) は `bind_input` などの helper
 を使えば RicDOM が patch するので明示 wait は不要。2 rAF wait が要るのは
 「**新規 DOM 要素** にアクセスしたい」場面のみ。
+
+注: 上記は rAF が正常に発火する前提。hidden タブ・kiosk の全画面遷移直後・
+Electron の backgroundThrottling 等 rAF が発火しない環境では、do_render は
+「レンダースケジューラ」節の `setTimeout(200ms)` バックストップ経由で走る
+(v0.3.36〜)。そうした環境も含めて「render 完了 (DOM commit) だけ知りたい」
+場合は `next_render()` (上記) の方が確実。
 
 ### テーマユーティリティ
 
