@@ -519,6 +519,14 @@ state を変える責任を持つ）。headless E2E で `el.click()` → `await 
 前提の操作には後述の「Operational facts — render flush の 2 rAF ルール」を
 使うこと。
 
+**使い分け**: state を変えた直後で render が予約済みと分かっている場面は
+`await next_render()`（観測）。「今の state が DOM 反映済みであること」の
+保証が欲しいだけで render が予約されているか分からない場面は `render_now()`
+（強制・同期。未反映なら反映され、反映済みなら同一ツリーの差分ゼロ描画で
+実害はない）。`next_render()` を予約の有無が不明な場面で使うと、予約が
+無かった場合に永久に resolve しない。タイムアウトで包む前に `render_now()`
+への切り替えを検討すること（Potopeta の flaky テスト決定論化事例より）。
+
 ### NOOP_PROXY
 
 エラー時の安全なフォールバック。全ての get/set/apply/delete が自身を返す。

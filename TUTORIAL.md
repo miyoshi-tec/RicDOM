@@ -644,6 +644,9 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
 - **新しい DOM の layout/paint 確定後に測る/触る (focus・scroll・
   `getBoundingClientRect` 等)** → 上記の 2 rAF recipe。`next_render()` は
   DOM commit 直後に resolve するだけで、layout/paint の確定までは保証しません。
+- **「今の state が反映済み」の保証が欲しいだけ (render が予約されているか
+  不明)** → `handle.render_now()`（強制・同期）。`next_render()` は render
+  予約が無いと永久に resolve しない点に注意してください。
 
 ### async 境界の整理
 
