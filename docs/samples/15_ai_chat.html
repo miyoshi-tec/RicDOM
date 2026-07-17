@@ -226,8 +226,8 @@ function buildConfigPanel(s) {
 }
 
 // ── チャット送信 (OpenAI 互換 /chat/completions を SSE streaming) ──
-// 19 は全モードを OpenAI 互換として扱うので、15_ai_chat の per-provider 分岐は不要で
-// 単一コードパス。delta は choices[0].delta.content。
+// 全モードを OpenAI 互換として扱うので per-provider 分岐は不要で単一コードパス。
+// delta は choices[0].delta.content。
 async function streamChat({ baseURL, model, apiKey, messages, onChunk }) {
   const headers = { 'content-type': 'application/json' };
   if (apiKey) headers.authorization = 'Bearer ' + apiKey;
@@ -258,7 +258,7 @@ async function streamChat({ baseURL, model, apiKey, messages, onChunk }) {
   }
 }
 
-// ── 送信処理 (15_ai_chat と同じ流儀。重い messages 配列は s.ignore に置く) ──
+// ── 送信処理 (重い messages 配列は s.ignore に置く) ──
 async function send(s) {
   const ac = activeCfg(s);
   const text = s.input.trim();

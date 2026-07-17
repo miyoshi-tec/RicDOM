@@ -513,6 +513,20 @@ state を変える責任を持つ）。headless E2E で `el.click()` → `await 
 → DOM を assert、という流れなら setTimeout マジックナンバーなしに rAF バッチ経路
 そのままで完了を待てる（UnizonTool 要望）。
 
+**保証範囲**: resolve するのは `do_render` の **DOM commit 完了直後**
+（VDOM 構築 + DOM patch 適用まで）で、browser の layout/paint commit は
+保証しない。focus / scroll / `getBoundingClientRect` など layout 確定が
+前提の操作には後述の「Operational facts — render flush の 2 rAF ルール」を
+使うこと。
+
+**使い分け**: state を変えた直後で render が予約済みと分かっている場面は
+`await next_render()`（観測）。「今の state が DOM 反映済みであること」の
+保証が欲しいだけで render が予約されているか分からない場面は `render_now()`
+（強制・同期。未反映なら反映され、反映済みなら同一ツリーの差分ゼロ描画で
+実害はない）。`next_render()` を予約の有無が不明な場面で使うと、予約が
+無かった場合に永久に resolve しない。タイムアウトで包む前に `render_now()`
+への切り替えを検討すること（Potopeta の flaky テスト決定論化事例より）。
+
 ### NOOP_PROXY
 
 エラー時の安全なフォールバック。全ての get/set/apply/delete が自身を返す。
@@ -1609,6 +1623,12 @@ DOM 反映前提の操作は 2 rAF wait が確実。
 を使えば RicDOM が patch するので明示 wait は不要。2 rAF wait が要るのは
 「**新規 DOM 要素** にアクセスしたい」場面のみ。
 
+注: 上記は rAF が正常に発火する前提。hidden タブ・kiosk の全画面遷移直後・
+Electron の backgroundThrottling 等 rAF が発火しない環境では、do_render は
+「レンダースケジューラ」節の `setTimeout(200ms)` バックストップ経由で走る
+(v0.3.36〜)。そうした環境も含めて「render 完了 (DOM commit) だけ知りたい」
+場合は `next_render()` (上記) の方が確実。
+
 ### テーマユーティリティ
 
 #### create_theme / create_density / create_font_size
@@ -1754,6 +1774,16 @@ ui_tweak_row({
   min: 0, max: 100,   // type 固有パラメータ
 })
 ```
+
+#### number 行: フォーカス中は「編集優先」（v0.3.37〜）
+
+`type: 'number'` の行はフォーカス中、state 側の値変更が表示に反映されない
+（VDOM から `value` キーを落として書き戻しを止めるため）。これは number input の
+`value` が RicDOM コアの `FORCE_REAPPLY_DOM_KEYS` 対象で、prev=next でも毎 render
+再代入されることによる編集中バッファ破壊（badInput 状態で `.value` が `''` を
+返す瞬間に再代入が走ると入力中の桁が丸ごと消える）を防ぐための挙動。blur すると
+`min`/`max` があれば clamp した確定値を書き戻し、次の render から通常の
+controlled 表示（state → 表示の同期）に復帰する。
 
 ### ui_tweak_folder
 

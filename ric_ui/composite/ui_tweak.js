@@ -107,18 +107,60 @@ const ui_tweak_row = ({
   }
 
   if (t === 'number') {
-    return wrap(ui_input({
+    // ── フォーカス中の value 書き戻し抑止 ──────────────────────
+    // number input は controlled (value は RicDOM コアの FORCE_REAPPLY_DOM_KEYS)
+    // なので、prev=next の VDOM でも毎 render el.value が再代入される。
+    // ブラウザの number input が badInput 状態 (例: "0." の入力途中) のとき
+    // el.value は '' を返すため、この再代入が編集中バッファを潰し、確定させたい
+    // 桁が丸ごと消える（例: "0.3" と打っているつもりが "30" になる）。
+    // 対策: フォーカス中はこの行の vdom から value キー自体を落とす
+    // （undefined を渡すと el.value = 'undefined' になるので厳禁、キーを省く）。
+    // VDOM から key が消えると patch は el.removeAttribute('value') するだけで
+    // （src/ricdom.js の patch_attributes、prev_extra にあり next_extra に無い
+    // キーの削除パス）、.value プロパティ = 編集中バッファには触れない。
+    // 「自分の行がフォーカス中か」は label 由来のキーを onfocus で input 要素に
+    // マーカーとして付け、render 時に document.activeElement と突き合わせて判定する
+    // （同一 label の行が 2 つあると衝突するのは ui_tweak_row の radiobutton name
+    //  と同じ既知の制約 — 回避したい場合は label を変える）。
+    const edit_key = 'tweak_num__' + label;
+    const is_editing = typeof document !== 'undefined'
+      && document.activeElement != null
+      && document.activeElement.__ric_tweak_editing === edit_key;
+
+    // ui_input() は呼び出しごとに新規 plain object を返す（内部で共有・キャッシュ
+    // されていない）ため、戻り値を直接 delete で mutate しても他行・他 render の
+    // vdom に影響しない。
+    const input_vdom = ui_input({
       type: 'number',
       value: value ?? '',
       disabled,
       ...(min  != null ? { min  } : {}),
       ...(max  != null ? { max  } : {}),
       ...(step != null ? { step } : {}),
+      onfocus: (e) => { e.target.__ric_tweak_editing = edit_key; },
+      onblur: (e) => {
+        delete e.target.__ric_tweak_editing;
+        // 編集中の残骸（badInput で読めない状態）は直近の確定値へフォールバックし、
+        // min/max があれば clamp して確定値を書き戻す（controlled 表示へ復帰）。
+        const parsed = parseFloat(e.target.value);
+        let final_v = isNaN(parsed) ? value : parsed;
+        if (min != null && final_v < min) final_v = min;
+        if (max != null && final_v > max) final_v = max;
+        e.target.value = String(final_v ?? '');
+        // clamp 等で確定値が get() 時点の値と変わっていれば反映する
+        // （read-only 行 = has_set なしのときは表示整形のみで済ませる）。
+        if (has_set && final_v !== value) set(final_v);
+      },
       ...(has_set ? { oninput: (e) => {
         const v = parseFloat(e.target.value);
         if (!isNaN(v)) set(v);
       }} : {}),
-    }));
+    });
+
+    // フォーカス中は value キーを落として controlled 書き戻しを止める
+    if (is_editing) delete input_vdom.value;
+
+    return wrap(input_vdom);
   }
 
   if (t === 'range') {
