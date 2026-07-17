@@ -466,6 +466,10 @@ const params = {
 s.tw = create_ui_tweak_panel({ data: params });
 ```
 
+> **NOTE**: 数値行 (`type: 'number'`) はフォーカス中「編集優先」になり、blur するまで
+> state 側の変更が表示に反映されません（入力途中の値を再描画が潰さないための挙動、
+> blur で `min`/`max` があれば clamp される）。詳細は SPEC.md の ui_tweak 節を参照。
+
 > **サンプル**: より完全な例は `docs/samples/07_tweak_splitter.html` を参照してください。
 
 ---

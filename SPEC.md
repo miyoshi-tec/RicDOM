@@ -1775,6 +1775,16 @@ ui_tweak_row({
 })
 ```
 
+#### number 行: フォーカス中は「編集優先」（v0.3.37〜）
+
+`type: 'number'` の行はフォーカス中、state 側の値変更が表示に反映されない
+（VDOM から `value` キーを落として書き戻しを止めるため）。これは number input の
+`value` が RicDOM コアの `FORCE_REAPPLY_DOM_KEYS` 対象で、prev=next でも毎 render
+再代入されることによる編集中バッファ破壊（badInput 状態で `.value` が `''` を
+返す瞬間に再代入が走ると入力中の桁が丸ごと消える）を防ぐための挙動。blur すると
+`min`/`max` があれば clamp した確定値を書き戻し、次の render から通常の
+controlled 表示（state → 表示の同期）に復帰する。
+
 ### ui_tweak_folder
 
 ネイティブ `<details>` ベース。RicDOM の差分エンジンは vdom 属性が変わらない限り

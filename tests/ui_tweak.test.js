@@ -3,8 +3,10 @@
 // ui_tweak black-box テスト
 // create_ui_tweak_panel / ui_tweak_panel / ui_tweak_folder / ui_tweak_row の
 // 公開 API のみを対象とする。返される RicDOM VDOM ツリーを直接検査する。
+// ただし number 行のフォーカス中 value 書き戻しガード (下の describe) は
+// document.activeElement を要するため実 DOM (jsdom) 経由で検証する。
 
-const { describe, it } = require('node:test');
+const { describe, it, test, beforeEach } = require('node:test');
 const assert = require('node:assert');
 
 const {
@@ -493,5 +495,305 @@ describe('create_ui_tweak_panel (factory)', () => {
     const root2 = inst();
     const inputs2 = find_by_tag(root2, 'input').filter(n => n.type === 'number');
     assert.strictEqual(inputs2[0].disabled, true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// number 行: フォーカス中の value 書き戻しガード (v0.3.37〜)
+//
+// 報告元: 歯車DXFジェネレーター consumer
+//   number input は FORCE_REAPPLY_DOM_KEYS (src/ricdom.js) の対象で、prev=next
+//   でも毎 render el.value が再代入される。badInput 状態 ("0." 入力途中等) では
+//   el.value が '' を返すため、この再代入で編集中バッファが潰れ小数点がドロップ
+//   する (実ブラウザ再現: 全選択 → 0 . 3 と打つと "0.3" でなく "30")。
+//
+// jsdom は number input の badInput サニタイズ (ユーザー操作での "0." → '' 変換)
+// を再現しないため、ここでは「"0." そのもの」ではなく、ui_tweak.js に実装した
+// ガード機構 (フォーカス中は vdom から value キーを落とす / blur で確定・clamp)
+// を直接検証する。実ブラウザでの最終再現確認は別途行う。
+// ─────────────────────────────────────────────────────────────
+describe('ui_tweak_row (number): フォーカス中の value 書き戻しガード', () => {
+  const { setup_jsdom, flush } = require('./_helpers/jsdom_env');
+
+  beforeEach(setup_jsdom);
+
+  test('フォーカス中の再 render では el.value が書き戻されない（編集値が保持される）', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    const handle = create_RicDOM('#app', {
+      n: 5,
+      tick: 0,
+      render: (s) => {
+        void s.tick; // 再 render トリガー用（n は変えない）
+        return ui_tweak_row({
+          label: 'num', type: 'number',
+          get: () => s.n, set: (v) => { s.n = v; },
+        });
+      },
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+    assert.strictEqual(inp.value, '5');
+
+    // フォーカス → onfocus ハンドラでマーカーが付く
+    inp.focus();
+    inp.onfocus({ target: inp });
+    assert.strictEqual(document.activeElement, inp);
+
+    // ユーザーが編集中（まだ oninput 経由で state に反映されていない値を模す）。
+    // ※ jsdom は number input の badInput サニタイズ（"0." → '' 化）は再現する
+    //   ("0." は不正な浮動小数点文字列なので代入時点で '' になる) が、実ブラウザの
+    //   「入力途中の内部編集バッファ」は再現しないため、ここでは代入直後にまだ
+    //   state に届いていない有効な値 ('3') で「書き戻されないこと」を検証する。
+    inp.value = '3';
+
+    // state.n は 5 のまま、無関係な tick だけ変えて再 render
+    handle.tick++;
+    await flush();
+
+    assert.strictEqual(inp.value, '3',
+      'フォーカス中は VDOM の value 供給が止まり、編集中バッファが保持される');
+  });
+
+  test('非フォーカス時は従来通り state 値が再 render で反映される（controlled 維持）', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    const handle = create_RicDOM('#app', {
+      n: 5,
+      render: (s) => ui_tweak_row({
+        label: 'num2', type: 'number',
+        get: () => s.n, set: (v) => { s.n = v; },
+      }),
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+    assert.strictEqual(inp.value, '5');
+
+    // フォーカスしていない状態で DOM 側が drift しても、
+    // state 変更 → 再 render で state 側の値が勝つ（FORCE_REAPPLY 継続）
+    inp.value = '999';
+    handle.n = 7;
+    await flush();
+
+    assert.strictEqual(inp.value, '7',
+      '非フォーカス時は controlled のまま state 値が再代入される');
+  });
+
+  test('blur で min/max clamp され、確定値で set が呼ばれる', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    const handle = create_RicDOM('#app', {
+      n: 5,
+      render: (s) => ui_tweak_row({
+        label: 'num3', type: 'number', min: 0, max: 10,
+        get: () => s.n, set: (v) => { s.n = v; },
+      }),
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '999'; // 範囲外
+    inp.onblur({ target: inp });
+
+    assert.strictEqual(inp.value, '10', 'blur で clamp 後の確定値が書き戻される');
+    assert.strictEqual(handle.n, 10, 'clamp された値で set が呼ばれる');
+  });
+
+  test('blur 後の再 render では value 供給が復帰する（controlled へ復帰）', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    const handle = create_RicDOM('#app', {
+      n: 5,
+      render: (s) => ui_tweak_row({
+        label: 'num4', type: 'number',
+        get: () => s.n, set: (v) => { s.n = v; },
+      }),
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '9';
+    inp.onblur({ target: inp });
+    await flush();
+
+    assert.strictEqual(handle.n, 9, 'blur で確定値が set される');
+    assert.strictEqual(inp.value, '9');
+
+    // マーカーが外れているので、以降は再び state 主導で value が供給される
+    handle.n = 20;
+    await flush();
+
+    assert.strictEqual(inp.value, '20',
+      'blur 後は controlled に復帰し、以降の再 render で state 値が反映される');
+  });
+
+  test('set 省略（read-only）の number 行は blur で表示整形のみ行い set は呼ばれない', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    let n = 5;
+    create_RicDOM('#app', {
+      tick: 0,
+      render: (s) => {
+        void s.tick;
+        return ui_tweak_row({
+          label: 'num5', type: 'number', min: 0, max: 10,
+          get: () => n, // set なし = read-only
+        });
+      },
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '999';
+    inp.onblur({ target: inp });
+
+    assert.strictEqual(inp.value, '10', 'read-only でも clamp 後の表示整形は行われる');
+    assert.strictEqual(n, 5, 'set が無いので元データは変化しない');
+  });
+
+  test('min のみ指定: 下限は clamp、上限は無制限で確定値がそのまま反映される', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    const handle = create_RicDOM('#app', {
+      n: 5,
+      render: (s) => ui_tweak_row({
+        label: 'num_minonly', type: 'number', min: 0,
+        get: () => s.n, set: (v) => { s.n = v; },
+      }),
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '-5';
+    inp.onblur({ target: inp });
+    assert.strictEqual(inp.value, '0', 'min 未満は min に clamp される');
+    assert.strictEqual(handle.n, 0);
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '99999';
+    inp.onblur({ target: inp });
+    assert.strictEqual(inp.value, '99999', 'max 未指定なので上限クランプは効かない');
+    assert.strictEqual(handle.n, 99999);
+  });
+
+  test('max のみ指定: 上限は clamp、下限は無制限で確定値がそのまま反映される', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    const handle = create_RicDOM('#app', {
+      n: 5,
+      render: (s) => ui_tweak_row({
+        label: 'num_maxonly', type: 'number', max: 10,
+        get: () => s.n, set: (v) => { s.n = v; },
+      }),
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '999';
+    inp.onblur({ target: inp });
+    assert.strictEqual(inp.value, '10', 'max 超過は max に clamp される');
+    assert.strictEqual(handle.n, 10);
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '-999';
+    inp.onblur({ target: inp });
+    assert.strictEqual(inp.value, '-999', 'min 未指定なので下限クランプは効かない');
+    assert.strictEqual(handle.n, -999);
+  });
+
+  test('get() が null/undefined を返す行でも blur で crash せず、フォールバック表示になる', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    let n = null;
+    const set_n = (v) => { n = v; };
+    create_RicDOM('#app', {
+      tick: 0,
+      render: (s) => {
+        void s.tick;
+        return ui_tweak_row({
+          label: 'num_null', type: 'number',
+          get: () => n, set: set_n,
+        });
+      },
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = ''; // badInput 相当（未入力で blur）
+    assert.doesNotThrow(() => inp.onblur({ target: inp }));
+
+    assert.strictEqual(inp.value, '', 'parse 不能かつ get() が null → 直近値(null) にフォールバックし表示は空文字');
+    assert.strictEqual(n, null, '値に変化がないので set は呼ばれない（元の null のまま）');
+  });
+
+  test('フォーカス中でも oninput の set() は独立して state に届く', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    const handle = create_RicDOM('#app', {
+      n: 5,
+      render: (s) => ui_tweak_row({
+        label: 'num_live', type: 'number',
+        get: () => s.n, set: (v) => { s.n = v; },
+      }),
+    });
+
+    await flush();
+    const inp = document.querySelector('input[type=number]');
+
+    // value 書き戻しガードが有効な「フォーカス中」でも、oninput 配線はガードとは
+    // 独立した仕組みなので、入力のたびに set() は通常通り呼ばれる。
+    inp.focus();
+    inp.onfocus({ target: inp });
+    inp.value = '42';
+    inp.oninput({ target: inp });
+
+    assert.strictEqual(handle.n, 42, 'フォーカス中でも oninput 経由で state に反映される');
+  });
+
+  test('同一 label の number 行が 2 つあっても blur 処理は crash しない（既知制約: 整列は保証しない）', async () => {
+    const { create_RicDOM } = require('../src/ricdom');
+
+    create_RicDOM('#app', {
+      a: 1,
+      b: 2,
+      render: (s) => ({
+        tag: 'div',
+        ctx: [
+          ui_tweak_row({ label: 'dup', type: 'number', get: () => s.a, set: (v) => { s.a = v; } }),
+          ui_tweak_row({ label: 'dup', type: 'number', get: () => s.b, set: (v) => { s.b = v; } }),
+        ],
+      }),
+    });
+
+    await flush();
+    const inputs = Array.from(document.querySelectorAll('input[type=number]'));
+    assert.strictEqual(inputs.length, 2);
+
+    inputs[0].focus();
+    inputs[0].onfocus({ target: inputs[0] });
+    inputs[0].value = '7';
+    assert.doesNotThrow(() => inputs[0].onblur({ target: inputs[0] }));
   });
 });
