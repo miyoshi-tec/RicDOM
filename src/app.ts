@@ -1,16 +1,17 @@
 // RicDOM 2 — createApp (v1 の create_RicDOM 後継)
 //
-// v1 との主な相違点 (設計書 + タスク指示に基づく意図的な変更、詳細は最終報告に記載):
-//   - target 探索のリトライ (v1 は最大 20 秒ポーリング) を廃止。target は呼び出し時点で
-//     同期的に解決できる必要があり、解決できなければ「無効 target」として NOOP App を返す
-//     (タスク指示: 「target 解決済みなら同期初回描画。無効 target は console.error + 型付き
-//     NOOP App を返す」を文字通り実装)。
+// v1 との主な相違点、および Phase 1 → Phase 1b で確定した仕様 (設計書 §12 参照):
+//   - `createApp(target, state, render)` の 3 引数。v1 の「state の中に render を同梱する」
+//     形は TS で `S` の推論が自己参照になり render 内の `s` が `any` に落ちるため、
+//     render を独立した第 3 引数にした。canon は 1 つ (state 同梱オーバーロードは持たない)。
+//   - target が未解決のとき: v1 の 20 秒ポーリングは持たず、`DOMContentLoaded` を 1 回だけ
+//     待って再解決する。それでも無ければ console.error + 型付き NOOP。
 //   - 複数 createApp() 呼び出し間での state 共有 (v1 の WeakMap 経由の shared state) は
 //     持たない。1 createApp = 1 独立 state。設計書にこの機能への言及が無いため実装しない。
-//   - `render` は state の他プロパティとは別枠で管理する (v1 踏襈: 代入は同期描画、
+//   - `render` は state の他プロパティとは別枠で管理する (v1 踏襲: 代入は同期描画、
 //     Proxy の 1 段目/2 段目追跡ルールの対象外)。
 
-import type { App, AppState, RicNode, UsePart } from './types.js';
+import type { App, RenderFn, RicNode, UsePart } from './types.js';
 import { buildDomNode, patchChildren } from './dom.js';
 import { createRenderScheduler } from './scheduler.js';
 import { createReactiveState } from './reactivity.js';
@@ -21,7 +22,7 @@ import { createReactiveState } from './reactivity.js';
 
 // ターゲットを関数にすることで apply トラップが使える (NOOP_APP() のような誤用でも壊れない)。
 // モジュールスコープの単一インスタンスとして保持する (get のたびに新規生成すると
-// メモリリークするため、自分自身を返す設計。v1 踏襈)。
+// メモリリークするため、自分自身を返す設計。v1 踏襲)。
 const noopFunction = (): unknown => NOOP_INSTANCE;
 const NOOP_INSTANCE: object = new Proxy(noopFunction, {
   get: () => NOOP_INSTANCE,
@@ -31,7 +32,7 @@ const NOOP_INSTANCE: object = new Proxy(noopFunction, {
 });
 
 /**
- * 無効な target・state に対して返す「型付き NOOP App」。
+ * 無効な target・state・render に対して返す「型付き NOOP App」。
  * 実体は v1 と同じ universal proxy だが、戻り値の型は `App<S>` を満たすため、
  * 呼び出し側の TypeScript コードは分岐なしに `app.count` や `app.renderNow()` を
  * そのまま書ける (throw しない・グルーコードを連鎖破壊しない、という v1 の哲学 A9 を
@@ -55,39 +56,19 @@ const resolveTargetElement = (target: string | Element): Element | null => {
 // createApp
 // =====================================================================
 //
-// 公開シグネチャはタスク指示どおり「単一の state 引数に render を同梱する」形にしたいが、
-// `S & { render(state: S): RicNode }` のように型パラメータ S が自分自身の一部 (render の
-// 引数) を参照する単一ジェネリック関数だと、TypeScript は object リテラル引数から S を
-// 正しく推論できず S が制約の `object` に丸められてしまう (実装前に空の .ts で実証済み。
-// Omit<T,'render'> を自己参照させる変種でも同様に失敗する)。
-// そのため、外部向けには「render あり / render 省略」の 2 つのオーバーロードとして
-// 宣言する (render ありのオーバーロードを先に書くことで、render を持つ引数はそちらが
-// 優先的にマッチする)。実装本体 (createAppImpl) は緩い型で書き、オーバーロードから
-// 委譲する。
-//
-// 既知の制約: render あり オーバーロードでは、外側 (`app.count` 等) の型は正しく推論
-// されるが、render コールバック自身の引数 `s` は `any` になる (推論を成立させるための
-// トレードオフ)。厳密な補完が欲しい場合は `render: (s: MyState) => {...}` のように
-// 明示的に注釈すればよい。設計書に記載の無い純粋な TypeScript 型推論上の制約であり、
-// 「未決定は v1 踏襲」の対象外 (v1 に型は無いため)。
+// 単一シグネチャ (canon は 1 つ、設計書 §12): render を第 3 引数として独立させることで
+// `S` は `state` 引数から素直に推論され、`render` コールバック内の `s` パラメータも
+// (v1 の「state に render を同梱する」形で起きていた自己参照問題無しに) 完全に型付く。
 
-/** render を含む state を渡すシグネチャ (通常の使い方) */
-export function createApp<T extends { render: (state: any) => RicNode }>(
-  target: string | Element,
-  state: T,
-): App<Omit<T, 'render'>>;
-/** render を省略するシグネチャ (v1 踏襈: 後から `app.render = fn` で設定する) */
-export function createApp<T extends object>(target: string | Element, state: T): App<T>;
-export function createApp(target: string | Element, state: object): App<object> {
-  return createAppImpl(target, state);
-}
+export const createApp = <S extends object>(target: string | Element, state: S, render: RenderFn<S>): App<S> =>
+  createAppImpl(target, state, render);
 
-const createAppImpl = <S extends object>(target: string | Element, state: AppState<S>): App<S> => {
+const createAppImpl = <S extends object>(target: string | Element, state: S, render: RenderFn<S>): App<S> => {
   // ── 引数バリデーション (throw しない: console.error + NOOP App、設計書 §3.6) ──
   if (typeof target !== 'string' && !isDomElement(target)) {
     console.error(
       'RicDOM: createApp の第 1 引数は CSS セレクタ文字列または DOM 要素です。\n' +
-        "✅ 例: createApp('#app', { count: 0, render: (s) => ({ tag: 'div', children: [s.count] }) })",
+        "✅ 例: createApp('#app', { count: 0 }, (s) => ({ tag: 'div', children: [s.count] }))",
     );
     return createNoopApp<S>();
   }
@@ -97,30 +78,86 @@ const createAppImpl = <S extends object>(target: string | Element, state: AppSta
     return createNoopApp<S>();
   }
 
-  const renderFnCandidate = (state as { render?: unknown }).render;
-  if (renderFnCandidate !== undefined && typeof renderFnCandidate !== 'function') {
+  if (typeof render !== 'function') {
     console.error(
-      'RicDOM: state.render は関数である必要があります。\n' +
-        "✅ 例: { count: 0, render: (s) => ({ tag: 'div', children: [s.count] }) }",
+      'RicDOM: createApp の第 3 引数 render は関数である必要があります。\n' +
+        "✅ 例: createApp('#app', { count: 0 }, (s) => ({ tag: 'div', children: [s.count] }))",
     );
     return createNoopApp<S>();
   }
 
   const targetEl = resolveTargetElement(target);
-  if (!targetEl) {
-    console.error(`RicDOM: target "${String(target)}" が見つかりません。`);
-    return createNoopApp<S>();
+  if (targetEl) return createResolvedApp<S>(targetEl, state, render);
+
+  // target が (型上は妥当だが) 今この瞬間には見つからない。
+  // `<head>` 内 script などで body がまだパースされていない典型ケースだけを、
+  // DOMContentLoaded を 1 回だけ待って救う (v1 の 20 秒ポーリングは持たない、設計書 §12)。
+  if (typeof document !== 'undefined' && document.readyState === 'loading') {
+    return createDeferredApp<S>(target, state, render);
   }
 
-  // ── ここから有効な target が確定した状態 ──────────────────────
+  console.error(`RicDOM: target "${String(target)}" が見つかりません。`);
+  return createNoopApp<S>();
+};
 
+// =====================================================================
+// target 未解決時の一時ハンドル (DOMContentLoaded を 1 回だけ待つ)
+// =====================================================================
+//
+// DOMContentLoaded 発火まで実 DOM が無いため、state の読み書きだけを素の object に対して
+// 許可する「間接 Proxy」を返す (get/set は常に最新の委譲先 (`inner`) に転送する)。
+// DOMContentLoaded 発火時に target が見つかれば、その時点までに行われた state の変更を
+// 引き継いだまま通常の App (createResolvedApp) に切り替わり、同期初回描画が走る。
+// 見つからなければ console.error を出し、以降は型付き NOOP として振る舞う。
+const createDeferredApp = <S extends object>(target: string | Element, bufferState: S, render: RenderFn<S>): App<S> => {
+  let inner: App<S> | null = null;
+
+  const finalize = (): void => {
+    if (inner) return; // 二重発火の防御 (once: true だが念のため)
+    const resolved = resolveTargetElement(target);
+    if (resolved) {
+      inner = createResolvedApp<S>(resolved, bufferState, render);
+    } else {
+      console.error(`RicDOM: target "${String(target)}" が見つかりません (DOMContentLoaded 後も解決できませんでした)。`);
+      inner = createNoopApp<S>();
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', finalize, { once: true });
+
+  return new Proxy(bufferState as Record<PropertyKey, unknown>, {
+    get(target_, prop, receiver) {
+      if (inner) return Reflect.get(inner as object, prop);
+      if (prop === 'render') return render;
+      if (prop === 'renderNow' || prop === 'unmount') return () => {}; // まだ描画対象が無い
+      if (prop === 'nextRender') return () => new Promise<void>(() => {}); // 解決するまで resolve しない
+      if (prop === 'use') return (part: UsePart) => part; // Phase 1: 骨のみ (登録先が無い)
+      if (prop === 'refs') return new Map<string, Element>();
+      return Reflect.get(target_, prop, receiver);
+    },
+    set(target_, prop, value) {
+      if (inner) return Reflect.set(inner as object, prop, value);
+      return Reflect.set(target_, prop, value);
+    },
+    deleteProperty(target_, prop) {
+      if (inner) return Reflect.deleteProperty(inner as object, prop);
+      return Reflect.deleteProperty(target_, prop);
+    },
+  }) as App<S>;
+};
+
+// =====================================================================
+// 解決済み target からの本実装
+// =====================================================================
+
+const createResolvedApp = <S extends object>(targetEl: Element, state: S, initialRender: RenderFn<S>): App<S> => {
   let isDestroyed = false;
   let prevTree: RicNode = null;
-  let currentRenderFn = (renderFnCandidate as ((s: S) => RicNode) | undefined) ?? null;
+  let currentRenderFn: RenderFn<S> = initialRender;
   const refsMap = new Map<string, Element>();
   const registeredParts = new Set<UsePart>();
 
-  // nextRender() 用の保留 Promise (呼ばれるまで作らない、v1 踏襈)
+  // nextRender() 用の保留 Promise (呼ばれるまで作らない、v1 踏襲)
   let pendingResolve: (() => void) | null = null;
   let pendingPromise: Promise<void> | null = null;
 
@@ -135,7 +172,6 @@ const createAppImpl = <S extends object>(target: string | Element, state: AppSta
 
   const doRender = (): void => {
     if (isDestroyed) return;
-    if (!currentRenderFn) return; // render 未設定時はスキップ (v1 踏襈)
 
     const nextTree = currentRenderFn(appHandle);
 
@@ -164,14 +200,15 @@ const createAppImpl = <S extends object>(target: string | Element, state: AppSta
     if (!isDestroyed) doRender();
   });
 
-  // state 本体 (render を除く) は浅い Proxy でラップする (設計書 §3.3)
+  // state 本体は浅い Proxy でラップする (設計書 §3.3)。render はここには含まれない
+  // (render/renderNow/nextRender/use/unmount/refs は下の予約キー経由で appHandle が扱う)。
   const reactiveState = createReactiveState(state as unknown as Record<string, unknown>, scheduleRender);
 
   // ── API 実装 ──────────────────────────────────────────────
 
   const apiRenderNow = (): void => {
     if (isDestroyed) return;
-    cancelPending(); // 保留中の rAF/バックストップを解除し、二重描画を防ぐ (v1 踏襈)
+    cancelPending(); // 保留中の rAF/バックストップを解除し、二重描画を防ぐ (v1 踏襲)
     doRender();
   };
 
@@ -184,7 +221,7 @@ const createAppImpl = <S extends object>(target: string | Element, state: AppSta
     return pendingPromise;
   };
 
-  // Phase 1 では「登録して notify 関数を渡すだけの骨」(タスク指示)。
+  // Phase 1 では「登録して notify 関数を渡すだけの骨」。
   // 正式な部品契約 (portal ホスト・dispose の統合等) は Phase 2 で実装する (設計書 §3.4)。
   const apiUse = <T extends UsePart>(part: T): T => {
     if (isDestroyed) return part;
@@ -211,7 +248,7 @@ const createAppImpl = <S extends object>(target: string | Element, state: AppSta
 
   const appHandle = new Proxy(reactiveState, {
     get(target, prop, receiver) {
-      if (prop === 'render') return currentRenderFn ?? undefined;
+      if (prop === 'render') return currentRenderFn;
       if (prop === 'renderNow') return apiRenderNow;
       if (prop === 'nextRender') return apiNextRender;
       if (prop === 'use') return apiUse;
@@ -221,10 +258,10 @@ const createAppImpl = <S extends object>(target: string | Element, state: AppSta
     },
     set(target, prop, value) {
       if (prop === 'render') {
-        if (value === undefined || value === null || typeof value === 'function') {
-          currentRenderFn = (value as ((s: S) => RicNode) | null | undefined) ?? null;
-          // render の (再) 設定は同期描画する (FOUC 防止、v1 の shared_proxy.render 挙動踏襈)
-          if (currentRenderFn) doRender();
+        if (typeof value === 'function') {
+          currentRenderFn = value as RenderFn<S>;
+          // render の (再) 設定は同期描画する (FOUC 防止、v1 の shared_proxy.render 挙動踏襲)
+          doRender();
           return true;
         }
         console.error('RicDOM: render は関数である必要があります。');
@@ -242,8 +279,8 @@ const createAppImpl = <S extends object>(target: string | Element, state: AppSta
     },
   }) as App<S>;
 
-  // render_fn 省略時は初回描画をスキップする (v1 踏襈: handle.render = fn で後設定するまで待つ)
-  if (currentRenderFn) doRender();
+  // 生成時に同期初回描画する (v1 踏襲)
+  doRender();
 
   return appHandle;
 };

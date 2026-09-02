@@ -9,12 +9,9 @@ describe('renderNow()', () => {
   it('同期的に再描画する (rAF を待たない)', async () => {
     setupApp();
     let renderCount = 0;
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => {
-        renderCount++;
-        return { tag: 'div', children: [String(s.n)] };
-      },
+    const handle = createApp('#app', { n: 1 }, (s) => {
+      renderCount++;
+      return { tag: 'div', children: [String(s.n)] };
     });
     const afterInit = renderCount;
 
@@ -26,12 +23,9 @@ describe('renderNow()', () => {
   it('renderNow 後にバックストップが発火しても二重描画にならない', async () => {
     setupApp();
     let renderCount = 0;
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => {
-        renderCount++;
-        return { tag: 'div', children: [String(s.n)] };
-      },
+    const handle = createApp('#app', { n: 1 }, (s) => {
+      renderCount++;
+      return { tag: 'div', children: [String(s.n)] };
     });
     const afterInit = renderCount;
 
@@ -47,10 +41,7 @@ describe('renderNow()', () => {
 describe('nextRender()', () => {
   it('state 変化後 await すると resolve し、DOM は新しい値になっている', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', children: [String(s.n)] }),
-    });
+    const handle = createApp('#app', { n: 1 }, (s) => ({ tag: 'div', children: [String(s.n)] }));
     handle.n = 2;
     await handle.nextRender();
     expect(app.querySelector('div')!.textContent).toBe('2');
@@ -58,7 +49,7 @@ describe('nextRender()', () => {
 
   it('render 予約が無ければ resolve しない', async () => {
     setupApp();
-    const handle = createApp('#app', { render: () => ({ tag: 'div', children: ['x'] }) });
+    const handle = createApp('#app', {}, () => ({ tag: 'div', children: ['x'] }));
 
     const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), 30));
     const result = await Promise.race([handle.nextRender(), timeout]);
@@ -67,10 +58,7 @@ describe('nextRender()', () => {
 
   it('複数箇所からの同時 await は同じ Promise を共有し、1 回の render で全員 resolve する', async () => {
     setupApp();
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', children: [String(s.n)] }),
-    });
+    const handle = createApp('#app', { n: 1 }, (s) => ({ tag: 'div', children: [String(s.n)] }));
     const p1 = handle.nextRender();
     const p2 = handle.nextRender();
     expect(p1).toBe(p2);
@@ -81,10 +69,7 @@ describe('nextRender()', () => {
 
   it('renderNow() による強制描画でも resolve する', async () => {
     setupApp();
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', children: [String(s.n)] }),
-    });
+    const handle = createApp('#app', { n: 1 }, (s) => ({ tag: 'div', children: [String(s.n)] }));
     const p = handle.nextRender();
     handle.n = 2;
     handle.renderNow();
@@ -93,10 +78,7 @@ describe('nextRender()', () => {
 
   it('resolve 後の再呼び出しは次の render を待つ新しい Promise になる', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', children: [String(s.n)] }),
-    });
+    const handle = createApp('#app', { n: 1 }, (s) => ({ tag: 'div', children: [String(s.n)] }));
     const p1 = handle.nextRender();
     handle.n = 2;
     await p1;

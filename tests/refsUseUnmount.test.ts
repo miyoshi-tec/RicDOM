@@ -8,9 +8,7 @@ import type { UsePart } from '../src/types.js';
 describe('refs', () => {
   it('ref 名で DOM 要素を取得できる (data-ricdom-ref 属性)', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      render: () => ({ tag: 'div', children: [{ tag: 'input', ref: 'nameInput' }] }),
-    });
+    const handle = createApp('#app', {}, () => ({ tag: 'div', children: [{ tag: 'input', ref: 'nameInput' }] }));
     await flush();
     const el = handle.refs.get('nameInput');
     expect(el).toBeInstanceOf(HTMLElement);
@@ -20,10 +18,10 @@ describe('refs', () => {
 
   it('render ごとに refs が再収集される', async () => {
     setupApp();
-    const handle = createApp('#app', {
-      show: true,
-      render: (s) => ({ tag: 'div', children: [s.show ? { tag: 'input', ref: 'x' } : null] }),
-    });
+    const handle = createApp('#app', { show: true }, (s) => ({
+      tag: 'div',
+      children: [s.show ? { tag: 'input', ref: 'x' } : null],
+    }));
     await flush();
     expect(handle.refs.get('x')).toBeTruthy();
 
@@ -36,7 +34,7 @@ describe('refs', () => {
 describe('use() (Phase 1: 骨のみ)', () => {
   it('登録した part の onUse が notify 関数付きで呼ばれる', () => {
     setupApp();
-    const handle = createApp('#app', { render: () => ({ tag: 'div' }) });
+    const handle = createApp('#app', {}, () => ({ tag: 'div' }));
 
     let receivedNotify: (() => void) | undefined;
     const part: UsePart = {
@@ -52,9 +50,7 @@ describe('use() (Phase 1: 骨のみ)', () => {
   it('use() 経由の notify で再描画がトリガーされる', async () => {
     const app = setupApp();
     let n = 0;
-    const handle = createApp('#app', {
-      render: () => ({ tag: 'div', children: [String(n)] }),
-    });
+    const handle = createApp('#app', {}, () => ({ tag: 'div', children: [String(n)] }));
     const part: UsePart = {
       onUse: (ctx) => {
         n = 1;
@@ -70,10 +66,7 @@ describe('use() (Phase 1: 骨のみ)', () => {
 describe('unmount()', () => {
   it('unmount 後は state 変更で再描画されない', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', children: [String(s.n)] }),
-    });
+    const handle = createApp('#app', { n: 1 }, (s) => ({ tag: 'div', children: [String(s.n)] }));
     await flush();
     handle.unmount();
 
@@ -84,7 +77,7 @@ describe('unmount()', () => {
 
   it('unmount 後は onDispose が呼ばれる', () => {
     setupApp();
-    const handle = createApp('#app', { render: () => ({ tag: 'div' }) });
+    const handle = createApp('#app', {}, () => ({ tag: 'div' }));
     let disposed = false;
     handle.use({ onDispose: () => { disposed = true; } });
     handle.unmount();
@@ -93,9 +86,7 @@ describe('unmount()', () => {
 
   it('unmount は refs をクリアする', async () => {
     setupApp();
-    const handle = createApp('#app', {
-      render: () => ({ tag: 'div', children: [{ tag: 'input', ref: 'x' }] }),
-    });
+    const handle = createApp('#app', {}, () => ({ tag: 'div', children: [{ tag: 'input', ref: 'x' }] }));
     await flush();
     expect(handle.refs.get('x')).toBeTruthy();
     handle.unmount();

@@ -8,9 +8,7 @@ import { flush, setupApp } from './_helpers/dom.js';
 describe('island: true', () => {
   it('island 要素は children を build しない', async () => {
     const app = setupApp();
-    createApp('#app', {
-      render: () => ({ tag: 'div', island: true, children: [{ tag: 'span', children: ['ignored'] }] }),
-    });
+    createApp('#app', {}, () => ({ tag: 'div', island: true, children: [{ tag: 'span', children: ['ignored'] }] }));
     await flush();
     const div = app.querySelector('div')!;
     // island の children はそもそも build されないので span は存在しない
@@ -19,13 +17,10 @@ describe('island: true', () => {
 
   it('island 要素に外部から挿入した DOM は再描画後も保持される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      n: 0,
-      render: (s) => ({
-        tag: 'div',
-        children: [String(s.n), { tag: 'div', ref: 'mount', island: true }],
-      }),
-    });
+    const handle = createApp('#app', { n: 0 }, (s) => ({
+      tag: 'div',
+      children: [String(s.n), { tag: 'div', ref: 'mount', island: true }],
+    }));
     await flush();
     const mount = handle.refs.get('mount')! as HTMLElement;
     const manual = document.createElement('p');
@@ -40,10 +35,7 @@ describe('island: true', () => {
 
   it('island 要素自身の属性は通常どおり patch される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      cls: 'a',
-      render: (s) => ({ tag: 'div', class: s.cls, island: true }),
-    });
+    const handle = createApp('#app', { cls: 'a' }, (s) => ({ tag: 'div', class: s.cls, island: true }));
     await flush();
     expect(app.querySelector('div')!.className).toBe('a');
     handle.cls = 'b';
@@ -53,10 +45,10 @@ describe('island: true', () => {
 
   it('island でない通常要素は children 省略時「空として管理」される (子を除去する)', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      show: true,
-      render: (s) => ({ tag: 'div', children: [s.show ? { tag: 'span', children: ['x'] } : null] }),
-    });
+    const handle = createApp('#app', { show: true }, (s) => ({
+      tag: 'div',
+      children: [s.show ? { tag: 'span', children: ['x'] } : null],
+    }));
     await flush();
     expect(app.querySelector('span')).not.toBeNull();
 

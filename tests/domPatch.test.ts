@@ -9,10 +9,7 @@ import { flush, setupApp } from './_helpers/dom.js';
 describe('属性の差分', () => {
   it('boolean 属性 (disabled) の付与・解除', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      on: true,
-      render: (s) => ({ tag: 'button', disabled: s.on, children: ['x'] }),
-    });
+    const handle = createApp('#app', { on: true }, (s) => ({ tag: 'button', disabled: s.on, children: ['x'] }));
     await flush();
     expect(app.querySelector('button')!.hasAttribute('disabled')).toBe(true);
 
@@ -23,10 +20,7 @@ describe('属性の差分', () => {
 
   it('通常属性の追加・変更・削除', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      title: 'a' as string | undefined,
-      render: (s) => ({ tag: 'div', title: s.title }),
-    });
+    const handle = createApp('#app', { title: 'a' as string | undefined }, (s) => ({ tag: 'div', title: s.title }));
     await flush();
     expect(app.querySelector('div')!.getAttribute('title')).toBe('a');
 
@@ -41,10 +35,7 @@ describe('属性の差分', () => {
 
   it('id の差分反映', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      id: 'a',
-      render: (s) => ({ tag: 'div', id: s.id }),
-    });
+    const handle = createApp('#app', { id: 'a' }, (s) => ({ tag: 'div', id: s.id }));
     await flush();
     expect(app.querySelector('div')!.id).toBe('a');
     handle.id = 'b';
@@ -56,10 +47,7 @@ describe('属性の差分', () => {
 describe('style の差分', () => {
   it('style の追加・変更・削除 (全キー再適用)', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      color: 'red',
-      render: (s) => ({ tag: 'div', style: { color: s.color, fontSize: '10px' } }),
-    });
+    const handle = createApp('#app', { color: 'red' }, (s) => ({ tag: 'div', style: { color: s.color, fontSize: '10px' } }));
     await flush();
     const div = app.querySelector('div')!;
     expect(div.style.color).toBe('red');
@@ -72,9 +60,7 @@ describe('style の差分', () => {
 
   it('CSS Custom Property (--*) を setProperty で書き込む', async () => {
     const app = setupApp();
-    createApp('#app', {
-      render: () => ({ tag: 'div', style: { '--ric-color-bg': '#fff' } }),
-    });
+    createApp('#app', {}, () => ({ tag: 'div', style: { '--ric-color-bg': '#fff' } }));
     await flush();
     const div = app.querySelector('div')!;
     expect(div.style.getPropertyValue('--ric-color-bg')).toBe('#fff');
@@ -82,9 +68,12 @@ describe('style の差分', () => {
 
   it('前になくなった style プロパティを削除する', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      showColor: true,
-      render: (s) => ({ tag: 'div', style: s.showColor ? { color: 'red' } : {} }),
+    // 三項演算子の両枝を直接 style に埋め込むと、TS が条件式の型を { color?: undefined } | { color: string }
+    // のように合成してしまい StyleValue と衝突する (render の s が正しく型付くようになった副作用で顕在化)。
+    // 変数に分けて明示的に StyleValue 型を付けることで回避する。
+    const handle = createApp('#app', { showColor: true }, (s) => {
+      const style: Record<string, string | number> = s.showColor ? { color: 'red' } : {};
+      return { tag: 'div', style };
     });
     await flush();
     const div = app.querySelector('div')!;
@@ -98,17 +87,14 @@ describe('style の差分', () => {
 describe('class の差分', () => {
   it('class の 3 形態が同じ結果になる', async () => {
     const app = setupApp();
-    createApp('#app', { render: () => ({ tag: 'div', class: { active: true, hidden: false } }) });
+    createApp('#app', {}, () => ({ tag: 'div', class: { active: true, hidden: false } }));
     await flush();
     expect(app.querySelector('div')!.className).toBe('active');
   });
 
   it('class の変更で className が更新される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      cls: 'a',
-      render: (s) => ({ tag: 'div', class: s.cls }),
-    });
+    const handle = createApp('#app', { cls: 'a' }, (s) => ({ tag: 'div', class: s.cls }));
     await flush();
     expect(app.querySelector('div')!.className).toBe('a');
     handle.cls = 'b c';
@@ -120,10 +106,7 @@ describe('class の差分', () => {
 describe('テキストの差分', () => {
   it('テキストノードの内容変更', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', children: [String(s.n)] }),
-    });
+    const handle = createApp('#app', { n: 1 }, (s) => ({ tag: 'div', children: [String(s.n)] }));
     await flush();
     expect(app.querySelector('div')!.textContent).toBe('1');
     handle.n = 2;
@@ -135,10 +118,10 @@ describe('テキストの差分', () => {
 describe('子要素の追加・削除', () => {
   it('末尾への追加・削除が反映される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      items: ['a', 'b'] as string[],
-      render: (s) => ({ tag: 'ul', children: s.items.map((i: string) => ({ tag: 'li', children: [i] })) }),
-    });
+    const handle = createApp('#app', { items: ['a', 'b'] as string[] }, (s) => ({
+      tag: 'ul',
+      children: s.items.map((i: string) => ({ tag: 'li', children: [i] })),
+    }));
     await flush();
     expect(app.querySelectorAll('li')).toHaveLength(2);
 
@@ -154,10 +137,10 @@ describe('子要素の追加・削除', () => {
 
   it('DOM ノードを再利用する (input のフォーカスが保たれる)', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      label: 'x',
-      render: (s) => ({ tag: 'div', children: [{ tag: 'span', children: [s.label] }, { tag: 'input' }] }),
-    });
+    const handle = createApp('#app', { label: 'x' }, (s) => ({
+      tag: 'div',
+      children: [{ tag: 'span', children: [s.label] }, { tag: 'input' }],
+    }));
     await flush();
     const input = app.querySelector('input')!;
     input.focus();
@@ -172,12 +155,10 @@ describe('子要素の追加・削除', () => {
 describe('SVG namespace', () => {
   it('<svg> 配下の要素は SVG namespace で生成される', async () => {
     const app = setupApp();
-    createApp('#app', {
-      render: () => ({
-        tag: 'svg',
-        children: [{ tag: 'circle', cx: '5', cy: '5', r: '5' }],
-      }),
-    });
+    createApp('#app', {}, () => ({
+      tag: 'svg',
+      children: [{ tag: 'circle', cx: '5', cy: '5', r: '5' }],
+    }));
     await flush();
     const svg = app.querySelector('svg')!;
     const circle = app.querySelector('circle')!;
@@ -187,9 +168,7 @@ describe('SVG namespace', () => {
 
   it('SVG 要素の class は setAttribute 経由で反映される', async () => {
     const app = setupApp();
-    createApp('#app', {
-      render: () => ({ tag: 'svg', children: [{ tag: 'g', class: 'icon' }] }),
-    });
+    createApp('#app', {}, () => ({ tag: 'svg', children: [{ tag: 'g', class: 'icon' }] }));
     await flush();
     const g = app.querySelector('g')!;
     expect(g.getAttribute('class')).toBe('icon');
@@ -199,11 +178,10 @@ describe('SVG namespace', () => {
 describe('FORCE_REAPPLY (checked/scroll)', () => {
   it('checkbox の checked は VDOM 値で毎回上書きされる (ユーザー操作 drift の補正)', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      on: true,
-      other: 0,
-      render: (s) => ({ tag: 'div', children: [{ tag: 'input', type: 'checkbox', checked: s.on }, String(s.other)] }),
-    });
+    const handle = createApp('#app', { on: true, other: 0 }, (s) => ({
+      tag: 'div',
+      children: [{ tag: 'input', type: 'checkbox', checked: s.on }, String(s.other)],
+    }));
     await flush();
     const checkbox = app.querySelector('input')! as HTMLInputElement;
     expect(checkbox.checked).toBe(true);

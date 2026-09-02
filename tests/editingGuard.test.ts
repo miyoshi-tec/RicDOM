@@ -10,11 +10,10 @@ import { flush, setupApp } from './_helpers/dom.js';
 describe('編集中ガード', () => {
   it('フォーカス中の input には value を書き戻さない', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      value: 'server-value',
-      other: 0,
-      render: (s) => ({ tag: 'div', children: [{ tag: 'input', value: s.value }, String(s.other)] }),
-    });
+    const handle = createApp('#app', { value: 'server-value', other: 0 }, (s) => ({
+      tag: 'div',
+      children: [{ tag: 'input', value: s.value }, String(s.other)],
+    }));
     await flush();
     const input = app.querySelector('input') as HTMLInputElement;
     input.focus();
@@ -31,10 +30,7 @@ describe('編集中ガード', () => {
 
   it('blur 後の render では value が同期される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      value: 'server-value',
-      render: (s) => ({ tag: 'input', value: s.value }),
-    });
+    const handle = createApp('#app', { value: 'server-value' }, (s) => ({ tag: 'input', value: s.value }));
     await flush();
     const input = app.querySelector('input') as HTMLInputElement;
     input.focus();
@@ -49,10 +45,7 @@ describe('編集中ガード', () => {
 
   it('フォーカスされていない input には通常どおり value が反映される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      value: 'a',
-      render: (s) => ({ tag: 'input', value: s.value }),
-    });
+    const handle = createApp('#app', { value: 'a' }, (s) => ({ tag: 'input', value: s.value }));
     await flush();
     const input = app.querySelector('input') as HTMLInputElement;
     expect(document.activeElement).not.toBe(input);
@@ -64,11 +57,10 @@ describe('編集中ガード', () => {
 
   it('checked/scrollTop 等 value 以外の FORCE_REAPPLY キーはガードの対象外', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      on: true,
-      other: 0,
-      render: (s) => ({ tag: 'div', children: [{ tag: 'input', type: 'checkbox', checked: s.on }, String(s.other)] }),
-    });
+    const handle = createApp('#app', { on: true, other: 0 }, (s) => ({
+      tag: 'div',
+      children: [{ tag: 'input', type: 'checkbox', checked: s.on }, String(s.other)],
+    }));
     await flush();
     const checkbox = app.querySelector('input') as HTMLInputElement;
     checkbox.focus();

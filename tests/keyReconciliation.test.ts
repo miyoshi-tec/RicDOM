@@ -13,17 +13,20 @@ interface Item {
 describe('key-based reconciliation', () => {
   it('並べ替えで DOM ノードが再利用される (同一参照のまま順序だけ変わる)', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      items: [
-        { id: 'a', label: 'A' },
-        { id: 'b', label: 'B' },
-        { id: 'c', label: 'C' },
-      ] as Item[],
-      render: (s) => ({
+    const handle = createApp(
+      '#app',
+      {
+        items: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' },
+          { id: 'c', label: 'C' },
+        ] as Item[],
+      },
+      (s) => ({
         tag: 'ul',
         children: s.items.map((i: Item) => ({ tag: 'li', key: i.id, children: [i.label] })),
       }),
-    });
+    );
     await flush();
 
     const liA = app.querySelectorAll('li')[0]!;
@@ -45,16 +48,19 @@ describe('key-based reconciliation', () => {
 
   it('中央への挿入で前後のノードが再利用される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      items: [
-        { id: 'a', label: 'A' },
-        { id: 'c', label: 'C' },
-      ] as Item[],
-      render: (s) => ({
+    const handle = createApp(
+      '#app',
+      {
+        items: [
+          { id: 'a', label: 'A' },
+          { id: 'c', label: 'C' },
+        ] as Item[],
+      },
+      (s) => ({
         tag: 'ul',
         children: s.items.map((i: Item) => ({ tag: 'li', key: i.id, children: [i.label] })),
       }),
-    });
+    );
     await flush();
     const liA = app.querySelectorAll('li')[0]!;
     const liC = app.querySelectorAll('li')[1]!;
@@ -75,16 +81,19 @@ describe('key-based reconciliation', () => {
 
   it('削除されたノードは DOM から除去される', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      items: [
-        { id: 'a', label: 'A' },
-        { id: 'b', label: 'B' },
-      ] as Item[],
-      render: (s) => ({
+    const handle = createApp(
+      '#app',
+      {
+        items: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' },
+        ] as Item[],
+      },
+      (s) => ({
         tag: 'ul',
         children: s.items.map((i: Item) => ({ tag: 'li', key: i.id, children: [i.label] })),
       }),
-    });
+    );
     await flush();
 
     handle.items = [{ id: 'b', label: 'B' }];
@@ -97,16 +106,13 @@ describe('key-based reconciliation', () => {
 
   it('key の無い兄弟は position-based と同様に扱われる (混在時の後方互換)', async () => {
     const app = setupApp();
-    const handle = createApp('#app', {
-      show: false,
-      render: (s) => ({
-        tag: 'div',
-        children: [
-          { tag: 'span', key: 'fixed', children: ['fixed'] },
-          s.show ? { tag: 'span', children: ['extra'] } : null,
-        ],
-      }),
-    });
+    const handle = createApp('#app', { show: false }, (s) => ({
+      tag: 'div',
+      children: [
+        { tag: 'span', key: 'fixed', children: ['fixed'] },
+        s.show ? { tag: 'span', children: ['extra'] } : null,
+      ],
+    }));
     await flush();
     expect(app.querySelectorAll('span')).toHaveLength(1);
 

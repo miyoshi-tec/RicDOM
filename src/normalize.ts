@@ -6,6 +6,9 @@
 //   - style は object のみ (v1 は string/array/object の 3 形態、設計書 §3.1 で統一)
 //   - ctx → children
 //   - 島は明示フラグ `island: true` (v1 は「ctx 省略」で暗黙に島だった、設計書 §3.1 判断 e)
+//   - tag は必須 (v1 は `raw_node.tag ?? 'div'` で省略時に暗黙に div 扱いだったが、
+//     v2 では型上必須にし、実行時に tag 欠落なら console.error + 不可視扱いにする。
+//     Phase 1 実装での確定事項、設計書 §12)
 
 import type { RicNode } from './types.js';
 
@@ -108,7 +111,18 @@ export const normalizeNode = (raw: RicNode): NormalizedNode => {
   }
 
   const node = raw as Record<string, unknown>;
-  const tag = typeof node.tag === 'string' ? node.tag : 'div';
+
+  // tag は型上必須 (Phase 1 実装での確定事項、設計書 §12)。TypeScript を経由しない
+  // 利用側 (プレーン JS、any 経由) が型チェックをすり抜けて tag を欠いたノードを渡した
+  // 場合、v1 のように無言で 'div' 扱いにはせず、console.error を出した上で不可視ノード
+  // として扱う (throw しない方針の継承)。
+  if (typeof node.tag !== 'string') {
+    console.error(
+      'RicDOM: ノードに tag がありません (tag は必須です)。\n' + "✅ 例: { tag: 'div', children: [...] }",
+    );
+    return { kind: 'invisible' };
+  }
+  const tag = node.tag;
   const id = typeof node.id === 'string' ? node.id : null;
   const classes = normalizeClass(node.class as ClassValueLike);
   const style = normalizeStyle(node.style as Record<string, string | number> | undefined);

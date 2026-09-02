@@ -2,8 +2,9 @@
 // v1 (tests/normalize_ric_node.test.js, tests/normalize_style.test.js, tests/is_json_equal.test.js) の
 // コア相当を移植。
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isJsonEqual, normalizeChildren, normalizeClass, normalizeNode, normalizeStyle } from '../src/normalize.js';
+import type { RicElementNode } from '../src/types.js';
 
 describe('normalizeNode', () => {
   it('文字列/数値はテキストノードになる', () => {
@@ -18,10 +19,23 @@ describe('normalizeNode', () => {
     expect(normalizeNode([])).toEqual({ kind: 'invisible' });
   });
 
-  it('tag 省略時は div 扱いになる', () => {
-    const n = normalizeNode({});
-    expect(n.kind).toBe('element');
-    expect(n.kind === 'element' && n.tag).toBe('div');
+  describe('tag 欠落 (型上は必須。実行時の防御パス)', () => {
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
+    it('tag が無いノードは console.error を出し、不可視ノードとして扱われる (v1 の暗黙 div 扱いは廃止)', () => {
+      // tag は型上必須 (RicElementNode を満たさない `{}` を直接書くと型エラーになる)。
+      // ここでは「型チェックを経由しない JS 利用側」を模して `as` でノードを偽装し、
+      // 実行時の防御パス (console.error + 不可視) を確認する。
+      const n = normalizeNode({} as RicElementNode);
+      expect(n).toEqual({ kind: 'invisible' });
+      expect(errorSpy).toHaveBeenCalled();
+    });
   });
 
   it('class は string/array/Record<string,boolean> の 3 形態を正規化できる', () => {

@@ -86,11 +86,6 @@ type KnownElementNode = {
   [K in KnownTag]: { tag: K } & BaseNodeProps & TagAttrs<TagElementMap[K]> & EventProps<TagElementMap[K]>;
 }[KnownTag];
 
-/** tag 省略時は 'div' 扱い (v1 継承: `raw_node.tag ?? 'div'`) */
-type DefaultElementNode = { tag?: undefined } & BaseNodeProps &
-  TagAttrs<HTMLDivElement> &
-  EventProps<HTMLDivElement>;
-
 /**
  * 未知タグ (custom element 等)。汎用属性 (HTMLElement 共通のプリミティブ IDL + data-* / aria-*)
  * のみを許可する。ここを `Record<string, unknown>` のような無制限の index signature に
@@ -101,8 +96,15 @@ type DefaultElementNode = { tag?: undefined } & BaseNodeProps &
  */
 type GenericElementNode = { tag: string } & BaseNodeProps & TagAttrs<HTMLElement> & EventProps<HTMLElement>;
 
-/** ノード木の要素表現 (設計書 §3.1 の `Element`) */
-export type RicElementNode = KnownElementNode | DefaultElementNode | GenericElementNode;
+/**
+ * ノード木の要素表現 (設計書 §3.1 の `Element`)。
+ * `tag` は型上必須 (Phase 1 実装での確定事項、設計書 §12)。`{}` のような tag 省略は
+ * 型エラーになる (v1 は `raw_node.tag ?? 'div'` で暗黙に div 扱いだったが、v2 では
+ * 「省略」という無記名の入力を許さず、明示を要求する)。実行時に tag が文字列でない
+ * ノードが渡された場合 (JS 利用側が型チェックをすり抜けた場合) は console.error を出し
+ * 不可視ノードとして扱う (throw しない方針の継承、normalize.ts 参照)。
+ */
+export type RicElementNode = KnownElementNode | GenericElementNode;
 
 /**
  * ノード木の全体表現 (設計書 §3.1 の `Node`)。
@@ -127,19 +129,22 @@ export interface UsePart {
 }
 
 /**
- * createApp に渡す state の形。render は現在の state (S、v1 の shared_proxy 相当で
- * renderNow/refs 等の instance API は含まない) を受け取り木を返す。
- * (タスク指示の型シグネチャ `render(s: S): Node` に合わせる。App<S> を自己参照させると
- * TypeScript が object リテラル引数から S を推論できなくなるため、意図的に `S` とする。)
+ * render 関数の型。現在の state (S、v1 の shared_proxy 相当で renderNow/refs 等の
+ * instance API は含まない) を受け取り木を返す。
+ * `createApp(target, state, render)` の第 3 引数として渡す (Phase 1 実装での確定事項、
+ * 設計書 §12)。render を state から分離することで `S` が `state` 引数から素直に推論され、
+ * render コールバック内の `s` も (無理な自己参照無しに) 完全に型付く。
  */
-export type AppState<S extends object> = S & {
-  render?: (state: S) => RicNode;
-};
+export type RenderFn<S extends object> = (state: S) => RicNode;
 
 /** createApp が返すインスタンスハンドル。state そのもの (Proxy) + 操作 API。 */
 export type App<S extends object> = S & {
-  /** 現在の render 関数 (未設定なら undefined) */
-  render?: (state: S) => RicNode;
+  /**
+   * 現在の render 関数。`createApp` の第 3 引数として渡した関数がここに入る。
+   * 後から `app.render = fn` で差し替えることもできる (v1 踏襲) — 差し替えは
+   * 同期的に再描画をトリガーする。
+   */
+  render: RenderFn<S>;
   /** 保留中の描画があればキャンセルして同期的に即描画する (v1 の render_now 継承) */
   renderNow(): void;
   /**

@@ -83,10 +83,7 @@ describe('createApp 経由の統合テスト: rAF 停止環境でも再描画さ
   it('requestAnimationFrame = () => {} でもバックストップにより DOM が更新される', async () => {
     globalThis.requestAnimationFrame = (() => 0) as typeof requestAnimationFrame;
     const app = setupApp();
-    const handle = createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', children: [String(s.n)] }),
-    });
+    const handle = createApp('#app', { n: 1 }, (s) => ({ tag: 'div', children: [String(s.n)] }));
     expect(app.querySelector('div')!.textContent).toBe('1'); // 初回は同期描画
 
     handle.n = 2;

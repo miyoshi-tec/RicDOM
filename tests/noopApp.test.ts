@@ -18,7 +18,7 @@ describe('createApp: 入力バリデーション', () => {
     setupApp();
     let app: ReturnType<typeof createApp> | undefined;
     expect(() => {
-      app = createApp('#does-not-exist', { render: () => ({ tag: 'div' }) });
+      app = createApp('#does-not-exist', {}, () => ({ tag: 'div' }));
     }).not.toThrow();
     expect(errorSpy).toHaveBeenCalled();
     expect(app).toBeTruthy();
@@ -28,7 +28,7 @@ describe('createApp: 入力バリデーション', () => {
     let app: ReturnType<typeof createApp> | undefined;
     expect(() => {
       // @ts-expect-error -- 意図的に不正な型を渡すテスト
-      app = createApp(123, { render: () => ({ tag: 'div' }) });
+      app = createApp(123, {}, () => ({ tag: 'div' }));
     }).not.toThrow();
     expect(errorSpy).toHaveBeenCalled();
     expect(app).toBeTruthy();
@@ -39,7 +39,7 @@ describe('createApp: 入力バリデーション', () => {
     let app: ReturnType<typeof createApp> | undefined;
     expect(() => {
       // @ts-expect-error -- 意図的に null を渡すテスト
-      app = createApp('#app', null);
+      app = createApp('#app', null, () => ({ tag: 'div' }));
     }).not.toThrow();
     expect(errorSpy).toHaveBeenCalled();
     expect(app).toBeTruthy();
@@ -50,7 +50,18 @@ describe('createApp: 入力バリデーション', () => {
     let app: ReturnType<typeof createApp> | undefined;
     expect(() => {
       // @ts-expect-error -- 意図的に不正な render を渡すテスト
-      app = createApp('#app', { render: 'not-a-function' });
+      app = createApp('#app', {}, 'not-a-function');
+    }).not.toThrow();
+    expect(errorSpy).toHaveBeenCalled();
+    expect(app).toBeTruthy();
+  });
+
+  it('render が未指定の場合、throw せず NOOP App を返す', () => {
+    setupApp();
+    let app: ReturnType<typeof createApp> | undefined;
+    expect(() => {
+      // @ts-expect-error -- 意図的に render を省略するテスト (3 引数が canon、設計書 §12)
+      app = createApp('#app', {});
     }).not.toThrow();
     expect(errorSpy).toHaveBeenCalled();
     expect(app).toBeTruthy();
@@ -58,10 +69,7 @@ describe('createApp: 入力バリデーション', () => {
 
   it('正常な state では従来どおり動く (回帰確認)', async () => {
     const app = setupApp();
-    createApp('#app', {
-      n: 1,
-      render: (s) => ({ tag: 'div', id: 'out', children: [String(s.n)] }),
-    });
+    createApp('#app', { n: 1 }, (s) => ({ tag: 'div', id: 'out', children: [String(s.n)] }));
     await flush();
     expect(app.querySelector('#out')!.textContent).toBe('1');
   });
@@ -77,7 +85,7 @@ describe('NOOP App: 任意アクセスが安全 (throw しない)', () => {
   });
 
   it('プロパティ読み書き・関数呼び出しがすべて安全', () => {
-    const app = createApp('#nope', { render: () => ({ tag: 'div' }) }) as unknown as Record<string, unknown> & {
+    const app = createApp('#nope', {}, () => ({ tag: 'div' })) as unknown as Record<string, unknown> & {
       renderNow: () => void;
       refs: { get: (k: string) => unknown };
     };

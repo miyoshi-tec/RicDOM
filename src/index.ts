@@ -5,7 +5,7 @@
 
 export { createApp, createNoopApp } from './app.js';
 
-export type { RicNode, RicElementNode, App, AppState, UsePart, ClassValue, StyleValue } from './types.js';
+export type { RicNode, RicElementNode, App, RenderFn, UsePart, ClassValue, StyleValue } from './types.js';
 
 // Phase 2 以降で `use()` の正式な部品契約・portal ホストを実装する際に、
 // 差分パッチや正規化ユーティリティをそのまま再利用できるよう、内部モジュールも
