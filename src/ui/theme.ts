@@ -177,6 +177,11 @@ const computeThemeVars = ({ theme, density, fontSize }: ApplyThemeOptions): Them
  * 持てる、設計書 §4)。`color-scheme` を設定するので、要素の子孫にあるネイティブ部品
  * (スクロールバー・select・checkbox・日付ピッカー等) も自動でライト/ダークに追従する
  * (v1 v0.4.2 由来)。
+ *
+ * `data-ricdom-theme` 属性を el に付与する (Phase 3a、設計書 §13 で確定した方式)。
+ * v1 はページ全体のスクロールバー既定スタイルを `.ric-page, .ric-page *` に適用していたが、
+ * v2 に page 部品が無いため、この属性を CSS 側 (`[data-ricdom-theme]`/`[data-ricdom-theme] *`)
+ * のスコープ用マーカーとして使う (cssTemplates.ts 参照)。
  */
 export const applyTheme = (el: Element, opts: ApplyThemeOptions = {}): void => {
   if (!el || typeof (el as HTMLElement).style === 'undefined') {
@@ -189,6 +194,7 @@ export const applyTheme = (el: Element, opts: ApplyThemeOptions = {}): void => {
   // FONT_VARS_* の定義・createTheme の overrides とも同じ形)。setProperty はどちらの
   // 形にも使える (CSS カスタムプロパティ / 通常プロパティ)。
   for (const [key, val] of Object.entries(vars)) style.setProperty(key, val);
+  el.setAttribute('data-ricdom-theme', '');
 };
 
 /**
