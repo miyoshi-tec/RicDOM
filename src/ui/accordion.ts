@@ -111,6 +111,14 @@ export const createAccordion = (options: CreateAccordionOptions = {}): Accordion
               id: panelId(id),
               role: 'region',
               'aria-labelledby': headerId(id),
+              // 閉じたパネルは hidden 属性で a11y ツリーから除外する (§15 追補)。
+              // role="region" 自体は維持したまま a11y ツリーからは消える (hidden の a11y
+              // 上の効果は算出済み display とは独立にブラウザが尊重する)。CSS 側は
+              // `.ric-accordion__body { display: grid; ... }` という author 規則を持つため
+              // UA スタイルシートの `[hidden] { display: none }` には負けず (author が UA に
+              // 優先するカスケード規則)、grid-template-rows のクローズアニメーションは
+              // 従来どおり視覚的に動く。
+              hidden: !isItemOpen,
               children: [{ tag: 'div', class: 'ric-accordion__body-inner', children: Array.isArray(itemChildren) ? itemChildren : [itemChildren ?? null] }],
             },
           ],
