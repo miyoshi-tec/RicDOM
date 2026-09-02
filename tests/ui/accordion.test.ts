@@ -33,6 +33,11 @@ describe('createAccordion: 構造 / ARIA', () => {
     await flush();
 
     expect(app.querySelector('.ric-accordion')!.getAttribute('data-ricdom-role')).toBe('accordion');
+    // UI_ROLE 経由の直書き解消 (docs/API_AUDIT.ja.md 参照)。title は独自の data-ricdom-role を持つ。
+    // arrow は uiIcon() 経由で描画されるため data-ricdom-role は常に uiIcon 自身の 'icon' になる
+    // (icon.ts が rest 展開後に上書きするため、呼び出し側からは指定できない — 意図どおり)。
+    expect(app.querySelector('.ric-accordion__title')!.getAttribute('data-ricdom-role')).toBe('accordion-title');
+    expect(app.querySelector('.ric-accordion__arrow')!.getAttribute('data-ricdom-role')).toBe('icon');
 
     const headers = app.querySelectorAll('.ric-accordion__header');
     expect(headers.length).toBe(2);

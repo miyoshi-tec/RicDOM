@@ -73,6 +73,11 @@ const getFocusables = (root: Element): HTMLElement[] => {
   return hasLayoutEngine(root.ownerDocument) ? all.filter(isVisible) : all;
 };
 
+/**
+ * モーダルダイアログを作る。状態を持つため `app.use(createDialog())` で登録する。
+ *   const dlg = app.use(createDialog());
+ *   dlg({ triggerChildren: ['Open'], title: 'Confirm', children: ['Really?'] })
+ */
 export const createDialog = (): DialogInstance => {
   const id = ++nextDialogId;
   const dialogRoleAttr = `ricdom-dialog-${id}`;
@@ -200,8 +205,7 @@ export const createDialog = (): DialogInstance => {
     const host = guard.ensure();
     if (!host) return null;
 
-    const { triggerChildren, title = '', children = [], actions = [], trigger_variant, open, onClose, width } = props as DialogProps & { trigger_variant?: never };
-    void trigger_variant;
+    const { triggerChildren, title = '', children = [], actions = [], open, onClose, width } = props;
 
     const controlled = open !== undefined;
     if (controlled && 'triggerChildren' in props) {

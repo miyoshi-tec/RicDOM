@@ -56,6 +56,11 @@ export interface AccordionInstance extends Component<AccordionProps> {
 
 let nextAccordionId = 0;
 
+/**
+ * 開閉パネルリストを作る。状態を持つため `app.use(createAccordion())` で登録する。
+ *   const acc = app.use(createAccordion());
+ *   acc({ items: [{ id: 'a', title: 'A', children: [...] }], multi: true })
+ */
 export const createAccordion = (options: CreateAccordionOptions = {}): AccordionInstance => {
   const { defaultOpen = {} } = options;
   const fid = ++nextAccordionId;
@@ -99,9 +104,11 @@ export const createAccordion = (options: CreateAccordionOptions = {}): Accordion
                 guard.host?.notify();
               },
               children: [
-                { tag: 'span', class: 'ric-accordion__title', 'data-ricdom-role': 'accordion-title', children: [title] },
+                { tag: 'span', class: 'ric-accordion__title', 'data-ricdom-role': UI_ROLE.accordionTitle, children: [title] },
                 // 開閉インジケータ: uiIcon の chevron。header--open のとき CSS で 180° 回転。
-                uiIcon(CHEVRON_DOWN, { size: '1em', class: 'ric-accordion__arrow', 'data-ricdom-role': 'accordion-arrow' }),
+                // uiIcon は data-ricdom-role を常に 'icon' で確定させる (icon.ts 参照) ため、
+                // ここに 'data-ricdom-role' を渡しても反映されない — 渡さない (dead prop を作らない)。
+                uiIcon(CHEVRON_DOWN, { size: '1em', class: 'ric-accordion__arrow' }),
               ],
             },
             {

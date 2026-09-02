@@ -54,6 +54,11 @@ export interface TabsInstance extends Component<TabsProps> {
 
 let nextTabsId = 0;
 
+/**
+ * タブ切り替え (controlled/uncontrolled 両対応) を作る。状態を持つため `app.use()` で登録する。
+ *   const tabs = app.use(createTabs());
+ *   tabs({ items: [{ key: 'a', label: 'A', children: [...] }] })
+ */
 export const createTabs = (): TabsInstance => {
   const id = ++nextTabsId;
   const guard: AttachGuard = createAttachGuard('createTabs');
@@ -137,7 +142,7 @@ export const createTabs = (): TabsInstance => {
     const tabBar = {
       tag: 'div',
       class: 'ric-tabs__bar',
-      'data-ricdom-role': 'tabs-bar',
+      'data-ricdom-role': UI_ROLE.tabsBar,
       'data-ricdom-tabs-id': tablistMarker,
       role: 'tablist',
       children: items.map((item) => {

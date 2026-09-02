@@ -37,6 +37,8 @@ describe('createTabs: 構造 / ARIA', () => {
     await flush();
 
     expect(app.querySelector('[role="tablist"]')).not.toBeNull();
+    // UI_ROLE 経由の直書き解消 (docs/API_AUDIT.ja.md 参照): tab bar も data-ricdom-role を持つ。
+    expect(app.querySelector('.ric-tabs__bar')!.getAttribute('data-ricdom-role')).toBe('tabs-bar');
     const tabEls = Array.from(app.querySelectorAll('[role="tab"]')) as HTMLElement[];
     expect(tabEls.length).toBe(3);
     expect(tabEls[0]!.getAttribute('aria-selected')).toBe('true'); // uncontrolled 既定で先頭
