@@ -1,0 +1,55 @@
+{
+  "name": "ricdom",
+  "version": "2.0.0-alpha.0",
+  "description": "Write UI as plain objects. Assign to state. The real DOM updates. No build step, typed, accessible.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Miyoshi Seisakusyo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miyoshi-tec/ricdom.git"
+  },
+  "keywords": [
+    "dom",
+    "ui",
+    "reactive",
+    "proxy",
+    "typescript",
+    "no-build"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "unpkg": "./dist/ricdom.iife.min.js",
+  "jsdelivr": "./dist/ricdom.iife.min.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:browser": "vitest run --browser",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "expect-type": "^1.1.0",
+    "jsdom": "^25.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
