@@ -3,6 +3,8 @@
 // v1 (ric_ui/popup/create_ui_tooltip.js) の移植 + a11y 新規実装 (aria-describedby / Esc)。
 // v1 との相違点は portal の描画先が host.portal になったこと (§3.5) のみ、
 // 位置計算 (top→bottom→right→left の優先順位) は v1 のロジックをそのまま使う。
+// Pos/posToStyle は Phase 3b で `internal/popupPosition.ts` に切り出し、createPopup /
+// createDropdown と共有する (4 方向判定そのものは tooltip 固有なので移植しない)。
 //
 // 使い方:
 //   const tip = app.use(createTooltip());
@@ -10,6 +12,7 @@
 
 import type { RicNode } from '../types.js';
 import { type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { type Pos, posToStyle } from './internal/popupPosition.js';
 
 export type TooltipDir = 'auto' | 'top' | 'bottom' | 'right' | 'left';
 
@@ -17,13 +20,6 @@ export interface TooltipProps {
   content: RicNode;
   children: RicNode | RicNode[];
   dir?: TooltipDir;
-}
-
-interface Pos {
-  top?: number;
-  bottom?: number;
-  left?: number;
-  right?: number;
 }
 
 let nextTooltipId = 0;
@@ -100,17 +96,12 @@ export const createTooltip = (): TooltipInstance => {
 
   inst.renderPortal = (): RicNode => {
     if (!guard.host || !isOpen) return null;
-    const posStyle: Record<string, string> = {};
-    if (pos.top !== undefined) posStyle.top = `${pos.top}px`;
-    if (pos.bottom !== undefined) posStyle.bottom = `${pos.bottom}px`;
-    if (pos.left !== undefined) posStyle.left = `${pos.left}px`;
-    if (pos.right !== undefined) posStyle.right = `${pos.right}px`;
     return {
       tag: 'div',
       class: `ric-tooltip__popup ric-tooltip__popup--${dir}`,
       id: tooltipId,
       role: 'tooltip',
-      style: posStyle,
+      style: posToStyle(pos),
       children: [typeof contentLast === 'string' ? { tag: 'span', children: [contentLast] } : contentLast],
     } as unknown as RicNode;
   };

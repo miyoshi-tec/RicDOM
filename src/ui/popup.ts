@@ -5,12 +5,15 @@
 //   - v1 は label/icon/chevron の 3 モードを持つ汎用ドロップダウン (旧 dropdown/menu 統合) だったが、
 //     設計書 E の記述 (aria-haspopup="menu" / role="menu" / menuitem 自動付与) に合わせて
 //     「トリガー + role=menu の本体」に絞ったメニュー部品として実装し直した
-//     (v1 の label モード相当が必要になったら Phase 3 で Popover 的な別部品として再検討、最終報告に記載)。
+//     (v1 の label/icon モード相当は Phase 3b で `createDropdown` として別部品に分離、
+//     設計書 §13 で確定済みの方針)。
 //   - 矢印キー (↑↓) での項目間移動・Home/End・Esc でトリガーへ復帰を新規実装 (a11y、v1 未対応)。
-//   - 排他制御 (他の popup を閉じる) は v1 の `_popup_registry` (モジュールレベル無制限成長、
-//     負債 B13) を廃止し、`use()` された全インスタンスを app 側の `registeredParts`
-//     経由でたどれるようにはしない (Phase 2 は 1 app 内の複数 popup 排他までは実装しない —
-//     必要になったら host 経由で app レベルのレジストリを持たせる形を Phase 3 で検討)。
+//   - 排他制御 (他の popup を閉じる) は Phase 2 では未実装だったが、Phase 3b で
+//     `internal/exclusiveRegistry.ts` (host.app 単位、v1 の無制限成長するモジュール
+//     レベル `_popup_registry` の後継、B13 解消) を使って実装した。createDropdown と
+//     同じレジストリを共有する (「popup 系」全体で 1 つ開いたら他を閉じる、v1 踏襲)。
+//   - 位置計算 (below/above flip・横 clamp) は `internal/popupPosition.ts` に切り出し、
+//     createDropdown / createTooltip と共有する (Phase 3b、重複を作らない)。
 //
 // 使い方:
 //   const menu = app.use(createPopup());
@@ -19,7 +22,10 @@
 //   任意の座標に開く: menu.openAt(event) / menu.openAt({ x, y })
 
 import type { RicNode } from '../types.js';
-import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard, type Host } from './internal/component.js';
+import { UI_ROLE } from './internal/pureHelpers.js';
+import { clampLeft, computeFlipDir, computeFlipDirAt, type Pos, posToStyle } from './internal/popupPosition.js';
+import { closeOthers, registerExclusive, unregisterExclusive } from './internal/exclusiveRegistry.js';
 
 export interface PopupProps {
   /** トリガーボタンの中身 */
@@ -45,22 +51,6 @@ export interface PopupInstance extends Component<PopupProps> {
 
 let nextPopupId = 0;
 
-interface Pos {
-  top?: number;
-  bottom?: number;
-  left?: number;
-  right?: number;
-}
-
-const posToStyle = (pos: Pos): Record<string, string> => {
-  const style: Record<string, string> = {};
-  if (pos.top !== undefined) style.top = `${pos.top}px`;
-  if (pos.bottom !== undefined) style.bottom = `${pos.bottom}px`;
-  if (pos.left !== undefined) style.left = `${pos.left}px`;
-  if (pos.right !== undefined) style.right = `${pos.right}px`;
-  return style;
-};
-
 const wrapMenuItem = (node: RicNode): RicNode => {
   if (node === null || typeof node !== 'object' || Array.isArray(node)) return node;
   const el = node as unknown as Record<string, unknown>;
@@ -72,7 +62,7 @@ const wrapMenuItem = (node: RicNode): RicNode => {
     // getMenuItems() (矢印キー/Home/End のフォーカス移動) が問い合わせる安定セレクタ。
     // これが無いと handleKeydown が常に items.length===0 で無反応になる (実ブラウザ
     // テストで発見・修正)。
-    'data-ricdom-role': 'popup-item',
+    'data-ricdom-role': UI_ROLE.popupItem,
     class: existingClass ? `ric-popup__item ${existingClass}` : 'ric-popup__item',
   } as unknown as RicNode;
 };
@@ -97,7 +87,7 @@ export const createPopup = (): PopupInstance => {
   const getMenuItems = (): HTMLElement[] => {
     const body = getBodyEl();
     if (!body) return [];
-    return Array.from(body.querySelectorAll<HTMLElement>('[data-ricdom-role="popup-item"]'));
+    return Array.from(body.querySelectorAll<HTMLElement>(`[data-ricdom-role="${UI_ROLE.popupItem}"]`));
   };
 
   // handleAnimEnd は冪等 (isClosing チェック) — 実 animationend と
@@ -122,6 +112,10 @@ export const createPopup = (): PopupInstance => {
     doClose();
     if (restoreFocusEl && typeof restoreFocusEl.focus === 'function') restoreFocusEl.focus();
   };
+
+  // 排他制御 (host.app 単位、internal/exclusiveRegistry.ts、設計書「共通」節)。
+  // createDropdown と同じレジストリを共有し、「popup 系」全体で 1 つ開いたら他を閉じる。
+  const exclusiveSelf = { close: doClose };
 
   const handleKeydown = (ev: KeyboardEvent): void => {
     if (ev.key === 'Escape') {
@@ -158,28 +152,11 @@ export const createPopup = (): PopupInstance => {
     }
   };
 
-  // below/above の判定 (v1 の _make_popup_dir 継承): trigger の下に content_h px 収まるか
-  const computeDir = (rect: DOMRect, contentH: number): 'below' | 'above' => {
-    const spaceBelow = window.innerHeight - rect.bottom;
-    return spaceBelow >= contentH || spaceBelow >= rect.top ? 'below' : 'above';
-  };
-  const computeDirAt = (y: number, contentH: number): 'below' | 'above' => {
-    const spaceBelow = window.innerHeight - y;
-    return spaceBelow >= contentH || spaceBelow >= y ? 'below' : 'above';
-  };
-
   const computePos = (rect: DOMRect, chosenDir: 'below' | 'above'): Pos => ({
     top: chosenDir === 'below' ? rect.bottom + 4 : undefined,
     bottom: chosenDir === 'above' ? window.innerHeight - rect.top + 4 : undefined,
     left: rect.left,
   });
-
-  const clampLeft = (left: number, width: number | undefined): number => {
-    if (width === undefined) return left;
-    const margin = 8;
-    const maxLeft = Math.max(margin, window.innerWidth - width - margin);
-    return Math.min(Math.max(left, margin), maxLeft);
-  };
 
   const computePosAt = (x: number, y: number, chosenDir: 'below' | 'above', measuredWidth: number | undefined): Pos => ({
     top: chosenDir === 'below' ? y + 4 : undefined,
@@ -188,6 +165,7 @@ export const createPopup = (): PopupInstance => {
   });
 
   const beginMeasuredOpen = (initialDir: 'below' | 'above', initialPos: Pos, remeasure: () => void): void => {
+    if (guard.host) closeOthers(guard.host.app, exclusiveSelf);
     dir = initialDir;
     pos = initialPos;
     const canMeasure = typeof requestAnimationFrame !== 'undefined' && typeof document !== 'undefined';
@@ -220,7 +198,7 @@ export const createPopup = (): PopupInstance => {
         const triggerEl = ev.currentTarget as HTMLElement;
         restoreFocusEl = triggerEl;
         const rect = triggerEl.getBoundingClientRect();
-        const initialDir = computeDir(rect, 160);
+        const initialDir = computeFlipDir(rect, 160);
         beginMeasuredOpen(initialDir, computePos(rect, initialDir), () => {
           if (!isOpen || isClosing) {
             isMeasuring = false;
@@ -233,7 +211,7 @@ export const createPopup = (): PopupInstance => {
             return;
           }
           const measuredH = body.offsetHeight;
-          const newDir = computeDir(rect, measuredH);
+          const newDir = computeFlipDir(rect, measuredH);
           if (newDir !== dir) {
             dir = newDir;
             pos = computePos(rect, newDir);
@@ -262,12 +240,16 @@ export const createPopup = (): PopupInstance => {
     ] as unknown as RicNode;
   };
 
-  inst.attach = guard.attach;
+  inst.attach = (host: Host) => {
+    guard.attach(host);
+    registerExclusive(host.app, exclusiveSelf);
+  };
   inst.dispose = (): void => {
     if (escBound && typeof document !== 'undefined') {
       document.removeEventListener('keydown', handleKeydown);
       escBound = false;
     }
+    if (guard.host) unregisterExclusive(guard.host.app, exclusiveSelf);
     guard.dispose();
   };
 
@@ -287,7 +269,7 @@ export const createPopup = (): PopupInstance => {
       return;
     }
     restoreFocusEl = point.target instanceof HTMLElement ? point.target : (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null);
-    const initialDir = computeDirAt(y, 160);
+    const initialDir = computeFlipDirAt(y, 160);
     beginMeasuredOpen(initialDir, computePosAt(x, y, initialDir, undefined), () => {
       if (!isOpen || isClosing) {
         isMeasuring = false;
@@ -301,7 +283,7 @@ export const createPopup = (): PopupInstance => {
       }
       const measuredW = body.offsetWidth;
       const measuredH = body.offsetHeight;
-      const newDir = computeDirAt(y, measuredH);
+      const newDir = computeFlipDirAt(y, measuredH);
       dir = newDir;
       pos = computePosAt(x, y, newDir, measuredW);
       isMeasuring = false;
