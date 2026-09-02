@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Phase 3b: 状態を持つ部品群の移植 (docs/DESIGN.ja.md §10)
+
+- **`createSplitter`** ← v1 `create_ui_splitter`: left/right/top/bottom、ドラッグリサイズ、
+  折り畳み (controlled/uncontrolled)、`onResizeEnd(size)` (v0.3.33 契約継承)。
+  DOM 参照はコアの `ref`/`app.refs` を使う (v1 の `data-ric-role` + `querySelector` を
+  再実装しない)。a11y 新規実装: 仕切り線に `role="separator"` + `aria-orientation` +
+  `aria-valuenow`/`aria-valuemin`/`aria-valuemax` (max 省略時は valuemax も省略)、
+  `tabindex=0`、矢印キーでのリサイズ (APG window splitter)。
+- **`createScrollPane`** ← v1 `create_ui_scroll_pane`: `follow:'bottom'/'top'/'none'` +
+  `threshold` による追従スクロール、`scrollToBottom()`/`scrollToTop()`。
+- **`createCollapseBox`** ← v1 `create_ui_collapse_box`: 複数 instance 対応 (`key` で
+  区別、sparse list animation 用途)。完了検知は `transitionend` +
+  `ANIMATION_FALLBACK_MS`(700ms) setTimeout backstop — height/width は個体ごとに
+  実測値が異なる動的ターゲットなので、値が固定な CSS `@keyframes` ではなく
+  `transition` が正しい選択 (v1 も元々 `transitionend`)。a11y: ヘッドレスな
+  primitive (専用 trigger を持たない) なので `idFor(key)` で consumer 側の trigger が
+  `aria-controls` を引けるようにした (`aria-expanded` は consumer の trigger に置く)。
+- **`createAccordion`** ← v1 `create_ui_accordion`: ヘッダは
+  `<button aria-expanded aria-controls>`、パネルは `role="region"` +
+  `aria-labelledby` (a11y 新規実装)。Enter/Space は `<button>` のネイティブ挙動で無料。
+  `title` に VDOM ノードを渡せる契約は v1 から継承。`multi:false` で排他モード。
+- **`createTabs`** ← v1 `ui_tabs`/`bind_tabs`: v1 は状態を持たない純粋関数 (常に
+  呼び出し側 state 駆動) だったが、v2 は controlled/uncontrolled 両対応にした
+  (`active` 省略で内部状態管理、`bind_tabs` 相当の糖衣が不要になる)。a11y 新規実装:
+  `role="tablist"/"tab"/"tabpanel"`、`aria-selected`、roving tabindex + 矢印キー/
+  Home/End (automatic activation)。`onChange` はモードに関わらず選択のたびに呼ぶ。
+- **`createDropdown`** (新規): v1 `create_ui_popup` の label/icon/chevron モード
+  (旧 dropdown/menu 統合) を、Phase 2 で `createPopup` を menu 専用に絞った際の宿題
+  だった別部品として分離 (設計書 §13 で予告済み)。本体は `role="listbox"` 系ではなく
+  汎用 Popover (`aria-haspopup="dialog"` + `aria-expanded"`)。位置計算・排他制御は
+  `createPopup` と共有 (`internal/popupPosition.ts`/`internal/exclusiveRegistry.ts`)。
+- **`uiInlineMenu`** ← v1 `ui_inline_menu`: portal を持たない純粋関数 (状態なし、
+  `app.use()` 不要)。Phase 3b の a11y 最小追加: `role="menu"`、新規の任意 prop
+  `onClose` (指定時のみ Escape で呼ぶ、省略時は v1 と同じ挙動)。
+- **排他制御の共通化**: `internal/exclusiveRegistry.ts` (host.app 単位、`use()` 登録時に
+  app のレジストリへ追加・dispose で解除)。v1 の `_popup_registry` (モジュールレベル
+  無制限成長、B13) を解消し、`createPopup`/`createDropdown` で共有する。
+- **位置計算の共通化**: `internal/popupPosition.ts` (below/above flip・横 clamp・
+  Pos→style 変換) を `createPopup`/`createDropdown`/`createTooltip` で共有。
+- **§14 追補**: `uiButton`/`uiInput` に `data-ricdom-role` を付与し `UI_ROLE` 列挙に
+  統合。`createDialog` の focus trap に可視要素フィルタ (`offsetParent!==null` または
+  `getClientRects().length>0`) を追加し、`display:none` 等の focusable を Tab 循環から
+  除外 (jsdom はレイアウトを持たないため `document.body` の `getClientRects()` で
+  レイアウトエンジンの有無を検出し、無ければフィルタをスキップして既存挙動を保つ)。
+- **CSS**: v1 css_templates.js から splitter/scroll-pane/collapse-box/accordion/tabs の
+  規則を移植。`createDropdown` 用に新規 `.ric-dropdown__trigger*`/`.ric-dropdown__body`
+  (v1 の `.ric-popup__trigger*` を改名・移植)。開閉アニメ・オーバーレイは `createPopup`
+  用に定義済みの `@keyframes ric-popup-in/out`/`.ric-popup__overlay` を再利用。
+  splitter divider・tabs tab/panel に `:focus-visible` の outline を追加 (a11y 新規)。
+- `examples/composite.html`: IIFE 2 本 + CSS `<link>` だけで Phase 3b の全 7 部品を
+  一覧・操作できるデモ (ビルド不要の証明)。
+- テスト: unit +75 (use() 忘れ検知・ARIA 属性・controlled/uncontrolled・rest スプレッド・
+  dispose を各部品ごとに網羅、`internal/exclusiveRegistry.ts`/`internal/popupPosition.ts`
+  の単体テスト、`createDropdown`⇄`createPopup` の排他制御)、browser +14 (splitter の
+  実ドラッグ・矢印キーリサイズ、tabs の矢印キー/Home/End での実フォーカス移動、
+  collapseBox の開閉での実 height 変化、dropdown の below/above flip、dialog focus trap
+  の可視要素フィルタ、scrollPane の follow:'bottom' 実追従)。
+
 ### Added — Phase 3a: 状態を持たない部品とレイアウトの移植 (docs/DESIGN.ja.md §10)
 
 - **control (純粋関数、`app.use()` 不要)**: `uiTextarea` (`autoResize` オプション、IME 注意の

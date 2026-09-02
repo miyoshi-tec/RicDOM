@@ -6,7 +6,8 @@
 
 Successor to [RicDOM v1](https://github.com/miyoshi-tec/RicDOM). Under construction — see [docs/DESIGN.ja.md](docs/DESIGN.ja.md).
 
-Status: Phase 3a (stateless control/layout/text components) — not yet published.
+Status: Phase 3b (stateful composite components: splitter/scrollPane/collapseBox/
+accordion/tabs/dropdown/inlineMenu) — not yet published.
 
 ```js
 // createApp(target, state, render) — 3 引数 (state から render の s が型付く)
@@ -50,3 +51,8 @@ textareas, checkboxes, radio groups, selects, ranges, color pickers, layout
 
 See [examples/ui.html](examples/ui.html) for a full working demo (dialog + popup +
 toast + tooltip, zero build step).
+
+Composite components (splitter / scrollPane / collapseBox / accordion / tabs /
+dropdown) also register via `app.use()` — same rule, no exceptions. `uiInlineMenu`
+is stateless (open state lives in your own state, like `uiButton`). See
+[examples/composite.html](examples/composite.html) for a full working demo.
