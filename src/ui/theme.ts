@@ -1,0 +1,232 @@
+// ricdom/ui — テーマ (設計書 §4)
+//
+// v1 (ric_ui/context.js の make_css_vars / create_theme / export_theme) を
+// TypeScript + camelCase へ移植したもの。v1 との相違点:
+//   - `make_css_vars(opts)` (文字列を返す) → `applyTheme(el, opts)` (el.style に直接当てる)。
+//     v1 は create_ui_page がこの文字列を受け取って `.ric-page` 要素の style に代入していたが、
+//     v2 には page コンポーネントが無いため、el への適用まで 1 関数で完結させる
+//     (`:root` は使わない。同一ページ内で複数要素が別テーマを持てる、v1 踏襲)。
+//   - density / fontSize は camelCase 化 (v1 は density / font_size)。
+//   - v1 の `create_density` / `create_font_size` / `export_settings` は Phase 2 の
+//     最小移植スコープに含めない (設計書 §4 が明示するのは applyTheme / createTheme /
+//     exportTheme の 3 つ)。必要になった時点で Phase 3 以降に追加を検討する。
+
+export type ThemeName = 'light' | 'dark' | 'teal' | 'cyber' | 'aqua';
+export type DensityName = 'comfortable' | 'compact' | 'tight';
+export type FontSizeName = 'sm' | 'md' | 'lg';
+
+/** CSS カスタムプロパティのキー (`--ric-*`) → 値、または `color-scheme` の素の値 */
+export type ThemeVars = Record<string, string>;
+
+export interface ApplyThemeOptions {
+  theme?: ThemeName | ThemeVars;
+  density?: DensityName | ThemeVars;
+  fontSize?: FontSizeName | ThemeVars;
+}
+
+// ── theme → 色変数 (v1 ric_ui/context.js の COLOR_VARS_* をそのまま移植) ──
+
+const COLOR_VARS_LIGHT: ThemeVars = {
+  '--ric-color-fg': '#111827',
+  '--ric-color-fg-muted': '#6b7280',
+  '--ric-color-bg': '#f9fafb',
+  '--ric-color-control': '#ffffff',
+  '--ric-color-border': '#e5e7eb',
+  '--ric-color-accent': '#2563eb',
+  '--ric-color-accent-fg': '#ffffff',
+  '--ric-tooltip-bg': '#1f2937',
+  '--ric-tooltip-fg': '#f9fafb',
+  '--ric-code-bg': '#f6f8fa',
+  '--ric-code-fg': '#24292f',
+  '--ric-shadow': '0 4px 16px rgba(0,0,0,0.10)',
+  '--ric-radius': '8px',
+  'color-scheme': 'light',
+};
+
+const COLOR_VARS_DARK: ThemeVars = {
+  '--ric-color-fg': '#e5e7eb',
+  '--ric-color-fg-muted': '#9ca3af',
+  '--ric-color-bg': '#111318',
+  '--ric-color-control': '#1a1d24',
+  '--ric-color-border': '#2a2f3a',
+  '--ric-color-accent': '#60a5fa',
+  '--ric-color-accent-fg': '#0f1115',
+  '--ric-tooltip-bg': '#374151',
+  '--ric-tooltip-fg': '#f9fafb',
+  '--ric-code-bg': '#374151',
+  '--ric-code-fg': '#f9fafb',
+  '--ric-shadow': '0 4px 24px rgba(0,0,0,0.50)',
+  '--ric-radius': '8px',
+  'color-scheme': 'dark',
+};
+
+const COLOR_VARS_TEAL: ThemeVars = {
+  '--ric-color-fg': '#0d2b24',
+  '--ric-color-fg-muted': '#46605a',
+  '--ric-color-bg': 'linear-gradient(135deg, #e6f9f0 0%, #f2f9f7 40%, #fef3c7 70%, #fce7f3 100%)',
+  '--ric-color-control': 'rgba(255,255,255,0.9)',
+  '--ric-color-border': '#c5ddd8',
+  '--ric-color-accent': '#007f6d',
+  '--ric-color-accent-fg': '#ffffff',
+  '--ric-tooltip-bg': '#0d2b24',
+  '--ric-tooltip-fg': '#f0fdf9',
+  '--ric-code-bg': '#e6f2ef',
+  '--ric-code-fg': '#0d2b24',
+  '--ric-shadow': '0 4px 16px rgba(0,60,50,0.12)',
+  '--ric-radius': '8px',
+  'color-scheme': 'light',
+};
+
+const COLOR_VARS_CYBER: ThemeVars = {
+  '--ric-color-fg': '#e2e8f0',
+  '--ric-color-fg-muted': '#7aa8c8',
+  '--ric-color-bg':
+    'radial-gradient(ellipse at top left,#5500aa 0%,transparent 50%),radial-gradient(ellipse at top right,#007799 0%,transparent 50%),radial-gradient(ellipse at bottom left,#660033 0%,transparent 50%),radial-gradient(ellipse at bottom right,#003388 0%,transparent 50%),#04070f',
+  '--ric-color-control': 'rgba(10,18,40,0.5)',
+  '--ric-color-border': 'rgba(80,200,255,0.65)',
+  '--ric-color-accent': '#38bdf8',
+  '--ric-color-accent-fg': '#04070f',
+  '--ric-tooltip-bg': 'rgba(4,7,15,0.92)',
+  '--ric-tooltip-fg': '#38bdf8',
+  '--ric-code-bg': 'rgba(4,7,15,0.92)',
+  '--ric-code-fg': '#38bdf8',
+  '--ric-popup-bg': 'rgba(10,18,40,0.4)',
+  '--ric-popup-blur': 'blur(10px)',
+  '--ric-panel-shadow': 'inset 0 1px 0 rgba(255,255,255,0.15), inset 0 0 0 1px rgba(80,200,255,0.5)',
+  '--ric-radius': '0px',
+  '--ric-shadow': '0 0 20px rgba(0,200,255,0.25), inset 0 1px 0 rgba(80,200,255,0.15)',
+  '--ric-duration': '80ms',
+  '--ric-easing': 'linear',
+  'color-scheme': 'dark',
+};
+
+const COLOR_VARS_AQUA: ThemeVars = {
+  '--ric-color-fg': '#1a2c3c',
+  '--ric-color-fg-muted': '#5c7a8a',
+  '--ric-color-bg':
+    'radial-gradient(ellipse at top left,#c0e8f8 0%,transparent 55%),radial-gradient(ellipse at top right,#a0d4f0 0%,transparent 55%),radial-gradient(ellipse at bottom left,#7ab8e8 0%,transparent 55%),radial-gradient(ellipse at bottom right,#90c8e0 0%,transparent 55%),#a0d8f0',
+  '--ric-color-control': 'rgba(255,255,255,0.5)',
+  '--ric-color-border': 'rgba(100,170,210,0.35)',
+  '--ric-color-accent': '#0284c7',
+  '--ric-color-accent-fg': '#ffffff',
+  '--ric-tooltip-bg': 'rgba(20,45,70,0.92)',
+  '--ric-tooltip-fg': '#f0f8ff',
+  '--ric-code-bg': 'rgba(255,255,255,0.55)',
+  '--ric-code-fg': '#1a2c3c',
+  '--ric-popup-bg': 'rgba(255,255,255,0.4)',
+  '--ric-popup-blur': 'blur(10px)',
+  '--ric-panel-shadow': '0 8px 32px rgba(20,80,140,0.08), inset 0 1px 0 rgba(255,255,255,0.75)',
+  '--ric-radius': '20px',
+  '--ric-shadow': '0 4px 20px rgba(20,80,140,0.12), inset 0 1px 0 rgba(255,255,255,0.60)',
+  '--ric-duration': '600ms',
+  '--ric-easing':
+    'linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.069, 1.099 24.3%, 1.105 26%, 1.096 27.9%, 1.053 32.8%, 1.019 38.1%, 0.999 44.2%, 0.995 51.9%, 1.0 62.6%, 1.001 99.9%)',
+  'color-scheme': 'light',
+};
+
+// ── density → 寸法変数 ──
+
+const SIZE_VARS_COMFORTABLE: ThemeVars = { '--ric-gap': '6px', '--ric-pad-x': '14px', '--ric-pad-y': '8px', '--ric-control-h': '36px' };
+const SIZE_VARS_COMPACT: ThemeVars = { '--ric-gap': '4px', '--ric-pad-x': '10px', '--ric-pad-y': '4px', '--ric-control-h': '28px' };
+const SIZE_VARS_TIGHT: ThemeVars = { '--ric-gap': '1px', '--ric-pad-x': '6px', '--ric-pad-y': '1px', '--ric-control-h': '22px' };
+
+// ── fontSize → ベースフォントサイズ ──
+
+const FONT_VARS_SM: ThemeVars = { '--ric-font-size': '12px' };
+const FONT_VARS_MD: ThemeVars = { '--ric-font-size': '14px' };
+const FONT_VARS_LG: ThemeVars = { '--ric-font-size': '16px' };
+
+const resolveColorVars = (theme: ThemeName | ThemeVars | undefined): ThemeVars => {
+  if (theme && typeof theme === 'object') return theme;
+  return theme === 'dark' ? COLOR_VARS_DARK : theme === 'teal' ? COLOR_VARS_TEAL : theme === 'cyber' ? COLOR_VARS_CYBER : theme === 'aqua' ? COLOR_VARS_AQUA : COLOR_VARS_LIGHT;
+};
+
+const resolveSizeVars = (density: DensityName | ThemeVars | undefined): ThemeVars => {
+  if (density && typeof density === 'object') return density;
+  return density === 'tight' ? SIZE_VARS_TIGHT : density === 'compact' ? SIZE_VARS_COMPACT : SIZE_VARS_COMFORTABLE;
+};
+
+const resolveFontVars = (fontSize: FontSizeName | ThemeVars | undefined): ThemeVars => {
+  if (fontSize && typeof fontSize === 'object') return fontSize;
+  return fontSize === 'sm' ? FONT_VARS_SM : fontSize === 'lg' ? FONT_VARS_LG : FONT_VARS_MD;
+};
+
+/**
+ * theme/density/fontSize から実際に適用する CSS 変数一式を計算する
+ * (v1 の make_css_vars 本体。文字列化する直前の object 表現)。
+ */
+const computeThemeVars = ({ theme, density, fontSize }: ApplyThemeOptions): ThemeVars => {
+  const color = resolveColorVars(theme);
+  const size = resolveSizeVars(density);
+  const font = resolveFontVars(fontSize);
+  const vars: ThemeVars = { ...size, ...font, ...color };
+
+  if (!vars['--ric-color-fg-muted']) vars['--ric-color-fg-muted'] = 'color-mix(in srgb, var(--ric-color-fg) 50%, transparent)';
+  if (!vars['--ric-color-border']) vars['--ric-color-border'] = 'color-mix(in srgb, var(--ric-color-fg) 15%, transparent)';
+  if (!vars['--ric-scrollbar-thumb']) vars['--ric-scrollbar-thumb'] = 'color-mix(in srgb, var(--ric-color-fg) 30%, transparent)';
+  if (!vars['--ric-scrollbar-thumb-hover']) vars['--ric-scrollbar-thumb-hover'] = 'color-mix(in srgb, var(--ric-color-fg) 50%, transparent)';
+  if (!vars['--ric-gap-md']) vars['--ric-gap-md'] = 'calc(var(--ric-gap) * 2)';
+  if (!vars['--ric-duration']) vars['--ric-duration'] = '200ms';
+  if (!vars['--ric-easing']) vars['--ric-easing'] = 'ease';
+  return vars;
+};
+
+/**
+ * 要素にテーマ CSS 変数 (`--ric-*` + `color-scheme`) を inline style として当てる
+ * (v1 の make_css_vars 後継。`:root` は使わない — 同一ページ内で複数要素が別テーマを
+ * 持てる、設計書 §4)。`color-scheme` を設定するので、要素の子孫にあるネイティブ部品
+ * (スクロールバー・select・checkbox・日付ピッカー等) も自動でライト/ダークに追従する
+ * (v1 v0.4.2 由来)。
+ */
+export const applyTheme = (el: Element, opts: ApplyThemeOptions = {}): void => {
+  if (!el || typeof (el as HTMLElement).style === 'undefined') {
+    console.error('RicDOM UI: applyTheme の第 1 引数には有効な DOM 要素を渡してください。');
+    return;
+  }
+  const vars = computeThemeVars(opts);
+  const style = (el as HTMLElement).style;
+  // vars のキーは常に `--ric-*` か `color-scheme` のいずれか (COLOR_VARS_*/SIZE_VARS_*/
+  // FONT_VARS_* の定義・createTheme の overrides とも同じ形)。setProperty はどちらの
+  // 形にも使える (CSS カスタムプロパティ / 通常プロパティ)。
+  for (const [key, val] of Object.entries(vars)) style.setProperty(key, val);
+};
+
+/**
+ * ベーステーマに部分上書きしたカスタムテーマオブジェクトを返す (v1 の create_theme 継承)。
+ *   const myTheme = createTheme('teal', { '--ric-color-accent': '#e91e8c' });
+ *   applyTheme(el, { theme: myTheme });
+ */
+export const createTheme = (base: ThemeName | ThemeVars = 'light', overrides: ThemeVars = {}): ThemeVars => ({
+  ...resolveColorVars(base),
+  ...overrides,
+});
+
+// `color-scheme` は `--ric-` プレフィックスを持たない通常の CSS プロパティだが、
+// テーマの一部として export 対象に含める (他の --ric-* と同様、v1 v0.4.2 由来)。
+const isThemeKey = (key: string): boolean => key === 'color-scheme' || key.startsWith('--ric-');
+const DENSITY_PREFIXES = ['--ric-gap', '--ric-pad-', '--ric-control-h'];
+const FONT_PREFIXES = ['--ric-font-'];
+const isDensityVar = (key: string): boolean => DENSITY_PREFIXES.some((p) => key.startsWith(p));
+const isFontVar = (key: string): boolean => FONT_PREFIXES.some((p) => key.startsWith(p));
+
+/**
+ * 要素から現在のテーマ変数をオブジェクトで取り出す (v1 の export_theme 継承)。
+ * density・fontSize 系の変数は除外し、テーマ固有の変数 (色・装飾) のみ返す。
+ *   const saved = exportTheme(document.querySelector('#app'));
+ *   localStorage.setItem('theme', JSON.stringify(saved));
+ *   applyTheme(el, { theme: JSON.parse(localStorage.getItem('theme')!) });
+ */
+export const exportTheme = (el: Element): ThemeVars => {
+  if (!el || typeof (el as HTMLElement).style === 'undefined') {
+    console.error('RicDOM UI: exportTheme には有効な DOM 要素を渡してください。');
+    return {};
+  }
+  const style = (el as HTMLElement).style;
+  const result: ThemeVars = {};
+  for (let i = 0; i < style.length; i++) {
+    const key = style.item(i);
+    if (!key || !isThemeKey(key) || isDensityVar(key) || isFontVar(key)) continue;
+    result[key] = style.getPropertyValue(key).trim();
+  }
+  return result;
+};
