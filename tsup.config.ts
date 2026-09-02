@@ -88,4 +88,20 @@ export default defineConfig([
     clean: false,
     target: 'es2020',
   },
+  {
+    // ricdom-icon CLI (package.json の `bin`)。Node 向け単体 CJS バイナリとして
+    // dist/cli/ricdom-icon.cjs にビルドする (設計書付録 B A17「ヘッドレス CLI」)。
+    // ブラウザ向け IIFE 群とは違う一群 (Node 専用、shebang 付き) なので platform を
+    // 明示し、型宣言は不要 (実行専用のバイナリ)。
+    entry: { 'ricdom-icon': 'src/cli/ricdomIcon.ts' },
+    format: ['cjs'],
+    outDir: 'dist/cli',
+    platform: 'node',
+    target: 'node18',
+    dts: false,
+    sourcemap: false,
+    minify: false,
+    clean: false,
+    banner: { js: '#!/usr/bin/env node' },
+  },
 ]);
