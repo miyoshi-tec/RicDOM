@@ -153,6 +153,15 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - focus trap の可視要素フィルタ (`offsetParent` 判定) は Phase 2 では省略 → **Phase 3 で実ブラウザテスト付きで追加**
 - **コア gzip 5,037B (5KiB 天井)。Phase 3 以降、コアには機能を足さない** (部品側・ui 側で解決する)
 
+## 14. Phase 3a 実装での確定事項 (2026-09-02)
+
+- **`data-ricdom-role` は全部品に付与する** (Phase 2 の `uiButton` / `uiInput` は Phase 3b で追補)。値は `UI_ROLE` 列挙で一元管理
+- bind 系は `bindInput` / `bindTextarea` / `bindCheckbox` / `bindSelect` / `bindRange` の 5 つ。`bindColor` / `bindRadiobutton` は要望が出たら (再検討条件)
+- **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
+- `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
+- CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+- **FACT (docs へ)**: `createApp(target, state, render)` に渡した **元の `state` オブジェクトを直接変更しても再描画されない**。反応するのは戻り値の `app` と render の引数 `s` (= Proxy) だけ。Phase 3a のデモで実際に踏んだ罠 (v1 でも同じ)。TUTORIAL の最初の章と型ドキュメントに明記し、dev モードで検知できる方法があれば Phase 4 で検討 (元オブジェクトの参照を差し替えられないため現時点では docs で対処)
+
 ---
 
 ## 付録
