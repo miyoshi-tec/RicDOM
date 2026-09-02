@@ -9,6 +9,13 @@
     "type": "git",
     "url": "git+https://github.com/miyoshi-tec/ricdom.git"
   },
+  "homepage": "https://github.com/miyoshi-tec/ricdom#readme",
+  "bugs": {
+    "url": "https://github.com/miyoshi-tec/ricdom/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "keywords": [
     "dom",
     "ui",
