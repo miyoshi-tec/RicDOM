@@ -28,6 +28,22 @@ export interface Component<P> {
   renderPortal?(): RicNode;
 }
 
+/**
+ * onanimationend で完了させる処理 (close 後の DOM 除去・open 後の初期フォーカス等) の
+ * フォールバック猶予 (ms)。
+ *
+ * dialog/popup/toast の状態遷移の「完了」を実 CSS アニメーションの animationend に
+ * 委ねている箇所は、consumer が `ricdom-ui.css` を読み込み忘れる (または CSS を独自に
+ * 差し替えてアニメーションを持たない) と、対応するイベントが永久に発火せず処理が
+ * 完了しない (dialog が閉じられない・toast が消えない 等) — 実ブラウザテストで発見した
+ * 実害のあるバグ。コアの描画スケジューラが rAF + setTimeout バックストップの二重化
+ * (v1 FACT A6) を持つのと同じ考え方で、animationend を待つ全箇所に setTimeout の
+ * バックストップを併設する。組み込みテーマの最大 duration (aqua の 600ms) より
+ * 十分長く取り、実アニメーションを踏み台にしない。ハンドラ側は「2 回呼ばれても安全」
+ * (べき等) であることが前提 (dialog/popup/toast 側で保証)。
+ */
+export const ANIMATION_FALLBACK_MS = 700;
+
 export interface AttachGuard {
   readonly host: Host | null;
   attach: (host: Host) => void;

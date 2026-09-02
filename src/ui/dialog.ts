@@ -18,7 +18,7 @@
 //       → 戻り値は null。triggerChildren と併用禁止 (console.error)。
 
 import type { RicNode } from '../types.js';
-import { type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
 
 export type DialogCloseReason = 'overlay' | 'close-button' | 'escape' | 'api';
 
@@ -95,11 +95,31 @@ export const createDialog = (): DialogInstance => {
     (focusables[0] ?? root).focus();
   };
 
-  const handleEntranceAnimationEnd = (ev: AnimationEvent): void => {
-    if (ev.animationName !== 'ric-dlg-in') return;
+  // 実 CSS アニメーション (ric-dlg-in の animationend) を初期フォーカスの合図にするが、
+  // consumer が ricdom-ui.css を読み込み忘れている等でアニメーションが一切走らない
+  // 場合、animationend は永久に発火しない。ANIMATION_FALLBACK_MS 後のタイマーを
+  // 併設し、どちらか早い方でフォーカスする (「2 回呼ばれても安全」にするため
+  // hasFocusedThisOpen で 1 回だけに制限する。既にフォーカス済みなら遅れて発火した
+  // 方は何もしない — 例えばユーザーが既に Tab で移動した先を奪わないため)。
+  let hasFocusedThisOpen = false;
+  const focusFirstElementOnce = (): void => {
+    if (hasFocusedThisOpen) return;
+    hasFocusedThisOpen = true;
     focusFirstElement();
   };
+  const scheduleInitialFocus = (): void => {
+    hasFocusedThisOpen = false;
+    if (typeof setTimeout !== 'undefined') setTimeout(focusFirstElementOnce, ANIMATION_FALLBACK_MS);
+  };
 
+  const handleEntranceAnimationEnd = (ev: AnimationEvent): void => {
+    if (ev.animationName !== 'ric-dlg-in') return;
+    focusFirstElementOnce();
+  };
+
+  // handleExitAnimationEnd は「まだ closing 中なら片付ける」冪等な処理なので、実
+  // animationend と ANIMATION_FALLBACK_MS のフォールバックタイマーの両方から
+  // 安全に呼べる (どちらか早い方が実行され、後発は isClosing が既に false になっていて no-op)。
   const handleExitAnimationEnd = (): void => {
     if (!isClosing) return;
     if (!isControlledLast) isOpenInternal = false;
@@ -114,6 +134,7 @@ export const createDialog = (): DialogInstance => {
     if (isClosing) return;
     isClosing = true;
     guard.host?.notify();
+    if (typeof setTimeout !== 'undefined') setTimeout(handleExitAnimationEnd, ANIMATION_FALLBACK_MS);
   };
 
   const requestClose = (reason: DialogCloseReason): void => {
@@ -178,6 +199,7 @@ export const createDialog = (): DialogInstance => {
         isClosing = false;
         restoreFocusEl = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
         setInert(true);
+        scheduleInitialFocus();
       }
       if (!open && prevControlledOpen && !isClosing) beginClose();
       prevControlledOpen = open;
@@ -212,6 +234,7 @@ export const createDialog = (): DialogInstance => {
       isClosing = false;
       isOpenInternal = true;
       setInert(true);
+      scheduleInitialFocus();
       guard.host?.notify();
     },
     children: triggerChildren,
@@ -274,6 +297,7 @@ export const createDialog = (): DialogInstance => {
     restoreFocusEl = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
     isOpenInternal = true;
     setInert(true);
+    scheduleInitialFocus();
     guard.host?.notify();
   };
   inst.close = (reason: DialogCloseReason = 'api'): void => requestClose(reason);

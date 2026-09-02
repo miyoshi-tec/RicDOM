@@ -19,7 +19,7 @@
 //   任意の座標に開く: menu.openAt(event) / menu.openAt({ x, y })
 
 import type { RicNode } from '../types.js';
-import { type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
 
 export interface PopupProps {
   /** トリガーボタンの中身 */
@@ -69,6 +69,10 @@ const wrapMenuItem = (node: RicNode): RicNode => {
     ...el,
     role: el.role ?? 'menuitem',
     tabIndex: -1,
+    // getMenuItems() (矢印キー/Home/End のフォーカス移動) が問い合わせる安定セレクタ。
+    // これが無いと handleKeydown が常に items.length===0 で無反応になる (実ブラウザ
+    // テストで発見・修正)。
+    'data-ricdom-role': 'popup-item',
     class: existingClass ? `ric-popup__item ${existingClass}` : 'ric-popup__item',
   } as unknown as RicNode;
 };
@@ -96,6 +100,10 @@ export const createPopup = (): PopupInstance => {
     return Array.from(body.querySelectorAll<HTMLElement>('[data-ricdom-role="popup-item"]'));
   };
 
+  // handleAnimEnd は冪等 (isClosing チェック) — 実 animationend と
+  // ANIMATION_FALLBACK_MS のフォールバックタイマーの両方から安全に呼べる。
+  // consumer が ricdom-ui.css を読み込み忘れている等でアニメーションが走らない場合、
+  // animationend が永久に発火せず popup が閉じたまま DOM に残り続けるのを防ぐ。
   const handleAnimEnd = (): void => {
     if (!isClosing) return;
     isOpen = false;
@@ -107,6 +115,7 @@ export const createPopup = (): PopupInstance => {
     if (isClosing || !isOpen) return;
     isClosing = true;
     guard.host?.notify();
+    if (typeof setTimeout !== 'undefined') setTimeout(handleAnimEnd, ANIMATION_FALLBACK_MS);
   };
 
   const closeAndRestoreFocus = (): void => {

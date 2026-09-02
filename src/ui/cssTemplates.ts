@@ -28,8 +28,15 @@ const g = 'var(--ric-gap)';
 const px = 'var(--ric-pad-x)';
 const py = 'var(--ric-pad-y)';
 const ch = 'var(--ric-control-h)';
-const dur = 'var(--ric-duration)';
-const eas = 'var(--ric-easing)';
+// フォールバック値付き: applyTheme が呼ばれる前 (または呼ばれない) でもアニメーションの
+// `animation`/`transition` 宣言自体は有効な値を持つようにする。--ric-duration/--ric-easing
+// が未定義のまま var() をフォールバック無しで使うと、ダイアログ/popup の open/close は
+// 「animationend の発火」に状態遷移の完了 (フォーカス移動・DOM 除去) を委ねているため、
+// アニメーション自体が発火しない = 状態遷移が永久に完了しない、という機能的なバグになる
+// (実ブラウザテストで発見・修正。ANIMATION_FALLBACK_MS の setTimeout backstop はこれの
+// 保険であって、フォールバック無しの var() を許容する理由にはしない)。
+const dur = 'var(--ric-duration, 200ms)';
+const eas = 'var(--ric-easing, ease)';
 const sh = 'var(--ric-shadow)';
 const tb = 'var(--ric-tooltip-bg)';
 const tf = 'var(--ric-tooltip-fg)';

@@ -11,7 +11,7 @@
 //                 toast.show('エラー', { type: 'error', duration: 0 }); // 0 = 自動消去なし
 
 import type { RicNode } from '../types.js';
-import { type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
 
 export type ToastType = 'default' | 'success' | 'error' | 'warning' | 'info';
 
@@ -38,6 +38,10 @@ export const createToast = (): ToastInstance => {
   const items: ToastItem[] = [];
   let nextId = 0;
 
+  // remove は「見つかれば消す」だけの冪等な処理 (2 回目は findIndex が -1 で no-op)。
+  // 実 animationend と ANIMATION_FALLBACK_MS のフォールバックタイマーの両方から
+  // 安全に呼べる。consumer が ricdom-ui.css を読み込み忘れている等でアニメーションが
+  // 走らない場合、animationend が永久に発火せず toast が消えないまま残るのを防ぐ。
   const remove = (id: number): void => {
     const idx = items.findIndex((x) => x.id === id);
     if (idx >= 0) items.splice(idx, 1);
@@ -48,6 +52,7 @@ export const createToast = (): ToastInstance => {
     if (item.closing) return;
     item.closing = true;
     guard.host?.notify();
+    if (typeof setTimeout !== 'undefined') setTimeout(() => remove(item.id), ANIMATION_FALLBACK_MS);
   };
 
   const inst = (() => {
