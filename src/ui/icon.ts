@@ -33,15 +33,13 @@
 
 import type { RicElementNode, RicNode, StyleValue } from '../types.js';
 import { UI_ROLE } from './internal/pureHelpers.js';
+// descriptor の型は `ricdom/icons` の `IconDescriptor` を type-only import してそのまま使う
+// (旧 `UiIconDescriptor` は構造的に同一の重複定義だったため一本化、docs/API_AUDIT.ja.md 参照)。
+// ricdom/ui はコアと同様に icons へも実行時依存を持たない — import type なので esbuild の
+// dead-code elimination で完全に消える。
+import type { IconDescriptor } from '../icons/types.js';
 
-export interface UiIconDescriptor {
-  /** viewBox (既定 '0 0 24 24') */
-  v?: string;
-  /** stroke-width。省略 → 2 (stroke) / 数値 → その太さ (stroke) / null → fill モード */
-  s?: number | null;
-  /** path の d 文字列、または複数 path の文字列配列 */
-  p?: string | string[];
-}
+export type { IconDescriptor };
 
 export interface UiIconOptions {
   size?: number | string;
@@ -53,7 +51,11 @@ export interface UiIconOptions {
   [key: string]: unknown;
 }
 
-export const uiIcon = (descriptor: UiIconDescriptor = {}, opts: UiIconOptions = {}): RicNode => {
+/**
+ * SVG アイコンを descriptor (`{ v?, s?, p }`) から生成する。状態を持たない純粋関数。
+ *   uiIcon(check, { size: 20, label: '完了' })
+ */
+export const uiIcon = (descriptor: IconDescriptor = {}, opts: UiIconOptions = {}): RicNode => {
   const { size = '1em', label, spin = false, strokeWidth, class: cls, style: optStyle, ...rest } = opts;
   const { v = '0 0 24 24', s, p } = descriptor;
   const paths = Array.isArray(p) ? p : p != null ? [p] : [];

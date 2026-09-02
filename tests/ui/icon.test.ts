@@ -4,7 +4,10 @@
 // docs/icons/ 由来の検証済み descriptor (Lucide 'check') をそのまま使う。
 
 import { describe, expect, it } from 'vitest';
+import { expectTypeOf } from 'expect-type';
 import { uiIcon } from '../../src/ui/icon.js';
+import type { IconDescriptor as UiIconDescriptor } from '../../src/ui/icon.js';
+import type { IconDescriptor } from '../../src/icons/types.js';
 
 // v1 icons/src.json の 'check' (Lucide) と同じ path。手書きではなく既存の検証済みデータ。
 const CHECK = { p: 'M20 6 9 17l-5-5' };
@@ -103,5 +106,10 @@ describe('uiIcon', () => {
   it('rest (data-* 等) を透過する', () => {
     const node = uiIcon(CHECK, { 'data-testid': 'icon-check' }) as unknown as TestSvgNode;
     expect(node['data-testid']).toBe('icon-check');
+  });
+
+  it('型テスト: ricdom/ui の IconDescriptor は ricdom/icons の IconDescriptor と同一の型 (旧 UiIconDescriptor を統合、docs/API_AUDIT.ja.md 参照)', () => {
+    expectTypeOf<UiIconDescriptor>().toEqualTypeOf<IconDescriptor>();
+    expect(true).toBe(true);
   });
 });

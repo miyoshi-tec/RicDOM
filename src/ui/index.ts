@@ -44,7 +44,7 @@ export { uiText } from './text.js';
 export type { UiTextProps, UiTextVariant } from './text.js';
 
 export { uiIcon } from './icon.js';
-export type { UiIconDescriptor, UiIconOptions } from './icon.js';
+export type { IconDescriptor, UiIconOptions } from './icon.js';
 
 export { bindInput, bindTextarea, bindCheckbox, bindSelect, bindRange } from './bind.js';
 
