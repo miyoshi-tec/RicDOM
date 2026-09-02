@@ -160,6 +160,13 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
 - `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+## 17. Phase 3d (API 整合レビュー) での確定事項 (2026-09-02)
+
+- 監査結果は `docs/API_AUDIT.ja.md`。命名逸脱 1 (内部関数、許容)、型重複 1 (`IconDescriptor` に一本化済み、`ricdom/ui` → `ricdom/icons` は type-only import)、dead code 2 (削除済み)、公開関数 29 に JSDoc 補完済み。flake 3 連走ゼロ
+- **ソース内の「Phase N」言及 (ファイルヘッダ約 75 箇所) は Phase 4a で全て除去する**。公開リポジトリのコメントは「このコードは何をするか・なぜそうなっているか」を語り、制作履歴は CHANGELOG と git log に置く (監査エージェントは「履歴として有用」と保留したが、v1 で確立した「コメントは次の読者のためのもの」原則を優先)
+- **portal 系部品 (dialog/popup/toast/tooltip/dropdown) の portal ルート要素にも `data-ricdom-role` を付与する** (§14 の全部品方針との整合。DOM 出力の追加変更だが破壊的ではなく、E2E の安定セレクタとして価値がある)。Phase 4a で追補 + テスト
+- `Host.app: App<any>` は §13 の判断を維持 (コード内に理由コメントあり)
+
 ## 16. Phase 3c 実装での確定事項 (2026-09-02)
 
 - `createTweakPanel` は **1 部品** (v1 の create_ui_tweak_panel / ui_tweak_row / folder を統合)。Tier1 `data` / Tier2 `keys` / Tier3 `rows`。v1 の「keys を関数で渡す動的再評価」「keys[k] を vdom 丸ごと差し替え」は Tier3 `rows` で代替できるため持たない
