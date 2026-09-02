@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Phase 3a: 状態を持たない部品とレイアウトの移植 (docs/DESIGN.ja.md §10)
+
+- **control (純粋関数、`app.use()` 不要)**: `uiTextarea` (`autoResize` オプション、IME 注意の
+  JSDoc)、`uiCheckbox`、`uiRadiobutton` (per-option 属性転送 + `ric-radio__label` flex 中央寄せ +
+  name 衝突の既知制約コメント)、`uiSelect`、`uiRange`、`uiColor` (hex/rgba 自動判定)、
+  `uiSeparator`、`uiText` (variant: default/muted/title/label)、`uiIcon` (descriptor
+  `{ v?, s?, p }`、`vertical-align:-0.125em` inline 化、size/spin/label)。v1 (ric_ui/control/*)
+  の camelCase 移植。checked/selected の numeric (`?1:0`) 変換 (v1 B15) は不要 — v2 コアが
+  `checked`/`selected` を常にプロパティ代入するため boolean をそのまま渡せる。`<select>` の
+  value/option 構築順対策もコア側で解決済みなので部品側の細工は不要。
+- **`bindInput` / `bindTextarea` / `bindCheckbox` / `bindSelect` / `bindRange`**: v1 の
+  `bind_*` を camelCase 移植 (state の一段目 Proxy へ双方向バインドする流儀)。v1
+  `bind_textarea` だけ options を value/oninput の後に展開しており上書きできてしまう歪みが
+  あったが、v2 は 5 関数とも「options → 計算済みの value/onchange/oninput の順」に統一。
+- **layout**: `uiCol` / `uiRow` / `uiGrid` / `uiPanel`。v1 の `create_ui_page` に相当する
+  「テーマ適用スコープ用コンポーネント」は v2 に存在しないため移植しない (portal と CSS
+  配布が page に依存しないため、設計書 §13)。`uiPanel` は v1 が持っていたテーマ上書き props
+  (`{theme, density, font_size}`) と状態を持つ `create_ui_panel` ファクトリを持たない
+  (Phase 3a は純粋関数のみが対象、設計書 §13)。
+- **text**: `uiMdPre` (見出し/リスト (ul/ol + start)/引用/テーブル (アライメント対応)/
+  フェンス (``` と ~~~)/hr/インライン (code/link/画像/bold/italic)、`transformText` /
+  `transformImageSrc` フック、危険スキーム href ブロック (javascript:/data:/vbscript:)、
+  hljs があればハイライト)、`uiCodePre` (obj → JSON ハイライト、maxHeight)。
+- **CSS**: v1 css_templates.js から Phase 3a 対象部品の規則を `ricdom-ui.css` に統合。
+  **ページ全体のスクロールバー既定スタイル**を移植: `applyTheme(el)` が `data-ricdom-theme`
+  属性を付与するようにし、`[data-ricdom-theme]` 配下 (自身 + 子孫) に
+  `::-webkit-scrollbar` 系 + `scrollbar-color` を当てる (v1 の `.ric-page, .ric-page *` 相当、
+  v2 に page 部品が無いため属性マーカー方式に置き換え、設計書 §13)。`uiPanel` の disabled
+  見た目 (opacity) も JS 側の inline style 計算をやめ `.ric-panel[inert]` の CSS セレクタに
+  変更。
+- 全部品に `data-ricdom-role` を付与 (E2E/CSS の安定セレクタ、`src/ui/internal/pureHelpers.ts`
+  の `UI_ROLE` で列挙型管理)。
+- `examples/controls.html`: IIFE 2 本 + `<link rel="stylesheet">` だけで全 control/layout/text
+  部品を一覧表示するデモ (ビルド不要の証明)。
+- テスト: unit +151 (各部品の DOM 構造/rest スプレッド契約/隔離契約/`uiMdPre` の記法網羅/
+  `applyTheme` の `data-ricdom-theme` 付与とスクロールバー規則の存在 等)、browser +8
+  (`uiTextarea` の autoResize が実 layout で高さを変える、`uiRadiobutton` のラベル整列
+  (アイコン混在で縦ズレしない)、`[data-ricdom-theme]` 配下の scrollbar-color 適用、
+  `uiMdPre` の `javascript:` リンクが href を持たない)。
+
 ### Added — Phase 2: 部品契約 + portal + テーマ + CSS 配布 (docs/DESIGN.ja.md §10)
 
 - **`app.use(part)` の正式な部品契約 (§3.4)**: `UsePart` に `attach(host)` / `dispose()` /

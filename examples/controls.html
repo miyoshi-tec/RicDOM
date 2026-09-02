@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>RicDOM 2 — controls (control / layout / text、no build step)</title>
+<link rel="stylesheet" href="../dist/ricdom-ui.css">
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; }
+  h1 { font-size: 1.1rem; }
+  h2 { font-size: 0.95rem; margin: 0 0 4px; }
+  section.demo { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<!--
+  利用側はビルド不要 (設計書 G1)。IIFE 2 本 (ricdom → ricdom/ui) + CSS <link> だけで
+  Phase 3a の control/layout/text 部品 (すべて純粋関数、app.use() 不要) が一覧できることの
+  証明 (設計書 §7)。npm install も webpack/vite の設定も不要 — このファイルをブラウザで
+  開くだけで動く。
+-->
+<div id="app"></div>
+
+<script src="../dist/ricdom.iife.min.js"></script>
+<script src="../dist/ricdom-ui.iife.min.js"></script>
+<script>
+  // IIFE ビルドはグローバル `ricdom` / `ricdomUI` として公開される (tsup.config.ts の globalName)。
+  const U = ricdomUI;
+
+  // v1 icons/src.json の 'check'/'trash-2' と同じ path (手書きしない、既存の検証済みデータ)。
+  const ICON_CHECK = { p: 'M20 6 9 17l-5-5' };
+  const ICON_TRASH = { p: ['M3 6h18', 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6', 'M10 11v6', 'M14 11v6', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'] };
+
+  const state = {
+    theme: 'light',
+    name: '山崎',
+    memo: '複数行のメモを\nここに書けます。',
+    agree: true,
+    role: 'editor',
+    lang: 'ja',
+    volume: 40,
+    bg: '#2563eb',
+    overlay: 'rgba(37,99,235,0.35)',
+  };
+
+  // 注意: render の引数 `s` が「反応する」state (createApp が内部で state をラップした
+  // Proxy そのもの) — createApp に渡した外側の `state` 変数を直接書き換えても
+  // 再描画は起きない (Proxy は s 経由の操作だけを検知する、設計書 §3.3)。
+  // themeRow は必ず render から渡された s を受け取り、s.theme を書き換える。
+  const themeRow = (s) =>
+    U.uiRow({
+      children: [
+        U.uiText({ variant: 'label', children: ['テーマ:'] }),
+        ...['light', 'dark', 'teal', 'cyber', 'aqua'].map((t) =>
+          U.uiButton({
+            variant: t === s.theme ? 'primary' : 'default',
+            children: [t],
+            onclick: () => {
+              s.theme = t;
+            },
+          }),
+        ),
+      ],
+    });
+
+  const app = ricdom.createApp(
+    '#app',
+    state,
+    (s) =>
+      U.uiPanel({
+        style: { maxWidth: '720px', margin: '2rem auto' },
+        children: [
+          { tag: 'h1', children: ['RicDOM 2 — Phase 3a controls'] },
+          themeRow(s),
+          U.uiSeparator(),
+
+          U.uiCol({
+            children: [
+              { tag: 'h2', children: ['control'] },
+              U.uiRow({
+                children: [
+                  U.bindInput(s, 'name', { placeholder: '名前' }),
+                  U.uiSelect({ value: s.role, options: ['viewer', 'editor', 'admin'], onchange: (e) => (s.role = e.target.value) }),
+                ],
+              }),
+              U.bindTextarea(s, 'memo', { autoResize: { minRows: 2, maxRows: 6 } }),
+              U.uiRow({
+                children: [
+                  U.bindCheckbox(s, 'agree', { children: ['利用規約に同意する'] }),
+                  U.uiRadiobutton({
+                    name: 'lang',
+                    value: s.lang,
+                    onchange: (e) => (s.lang = e.target.value),
+                    options: [
+                      { value: 'ja', label: [U.uiIcon(ICON_CHECK, { size: 16 }), ' 日本語'] },
+                      { value: 'en', label: 'English' },
+                    ],
+                  }),
+                ],
+              }),
+              U.uiRow({
+                children: [
+                  U.bindRange(s, 'volume', { min: 0, max: 100 }),
+                  U.uiButton({ variant: 'ghost', children: [U.uiIcon(ICON_TRASH, { size: 16, label: '削除' })] }),
+                ],
+              }),
+              U.uiRow({
+                children: [U.uiColor({ value: s.bg, oninput: (e) => (s.bg = e.target.value) }), U.uiColor({ value: s.overlay, oninput: (e) => (s.overlay = e.target.value) })],
+              }),
+            ],
+          }),
+
+          U.uiSeparator(),
+
+          U.uiCol({
+            children: [
+              { tag: 'h2', children: ['layout'] },
+              U.uiGrid({
+                columns: 3,
+                gap: 8,
+                children: [1, 2, 3, 4, 5, 6].map((n) => U.uiPanel({ layout: 'row', children: [String(n)] })),
+              }),
+            ],
+          }),
+
+          U.uiSeparator(),
+
+          U.uiCol({
+            children: [
+              { tag: 'h2', children: ['text'] },
+              U.uiMdPre({
+                children: [
+                  [
+                    '# 見出し',
+                    '',
+                    '**太字**・*斜体*・`code`・[リンク](https://example.com)',
+                    '',
+                    '- 項目 A',
+                    '- 項目 B',
+                    '',
+                    '1. 手順 1',
+                    '2. 手順 2',
+                    '',
+                    '```js',
+                    "console.log('hello');",
+                    '```',
+                  ].join('\n'),
+                ],
+              }),
+              U.uiCodePre({ obj: { theme: s.theme, role: s.role, volume: s.volume } }),
+            ],
+          }),
+        ],
+      }),
+  );
+
+  U.applyTheme(document.getElementById('app'), { theme: state.theme });
+  // theme が変わるたびに applyTheme も呼び直す (render とは別軸の副作用として明示的に)
+  const originalRender = app.render;
+  app.render = (s) => {
+    U.applyTheme(document.getElementById('app'), { theme: s.theme });
+    return originalRender(s);
+  };
+</script>
+</body>
+</html>
