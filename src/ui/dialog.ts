@@ -1,0 +1,283 @@
+// ricdom/ui — createDialog (設計書 §3.4 部品契約 + §5/付録 E a11y)
+//
+// v1 (ric_ui/popup/create_ui_dialog.js) の移植+ a11y の新規実装。v1 との相違点:
+//   - `s.dlg = create_ui_dialog()` (state トップレベル配置で暗黙注入) ではなく
+//     `const dlg = app.use(createDialog())` で明示登録する (設計書 §3.4)。
+//   - portal は v1 の `_page_portal_queue` (page が drain) ではなく、host.portal
+//     (この app 専用の portal 要素) に `renderPortal()` で描画する (設計書 §3.5)。
+//   - a11y を新規実装: role="dialog" + aria-modal + aria-labelledby/describedby、
+//     開いたら最初の focusable にフォーカス、Tab/Shift+Tab の focus trap、Esc で閉じて
+//     起動元へフォーカス復帰、背景を inert (付録 E)。
+//
+// 3 つの使い方 (v1 継承):
+//   (1) uncontrolled + 自動トリガー: dlg({ triggerChildren: ['開く'], title, children, actions })
+//       → 戻り値は trigger ボタンの RicNode。
+//   (2) uncontrolled + 自前トリガー: dlg({ title, children }) (triggerChildren 省略) → 戻り値は null。
+//       dlg.open() / dlg.close() / dlg.isOpen() で外部制御する。
+//   (3) controlled: dlg({ open: s.show, onClose: (reason) => { s.show = false; }, title, children })
+//       → 戻り値は null。triggerChildren と併用禁止 (console.error)。
+
+import type { RicNode } from '../types.js';
+import { type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+
+export type DialogCloseReason = 'overlay' | 'close-button' | 'escape' | 'api';
+
+export interface DialogProps {
+  /** uncontrolled + 自動トリガーのときのボタン中身。省略すると trigger ボタンを出さない。 */
+  triggerChildren?: RicNode | RicNode[];
+  title?: string;
+  children?: RicNode | RicNode[];
+  /** フッターに並べるボタン等 */
+  actions?: RicNode[];
+  /** controlled mode の開閉状態。指定すると controlled になる。 */
+  open?: boolean;
+  /** controlled mode の close 通知。reason で発生源を分岐できる (v1 A18 継承)。 */
+  onClose?: (reason: DialogCloseReason) => void;
+  /** ダイアログ幅 (px 数値 or 任意の CSS 長さ文字列)。省略時は CSS 既定 (min(360px,90vw))。 */
+  width?: number | string;
+}
+
+export interface DialogInstance extends Component<DialogProps> {
+  /** 外部から開く (uncontrolled のみ。controlled では no-op) */
+  open(): void;
+  /** 外部から閉じる (両モード対応。未 open での呼出は no-op)。既定 reason は 'api'。 */
+  close(reason?: DialogCloseReason): void;
+  /** uncontrolled モードで現在表示中か (controlled では常に false、v1 継承) */
+  isOpen(): boolean;
+}
+
+let nextDialogId = 0;
+
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+const getFocusables = (root: Element): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+
+export const createDialog = (): DialogInstance => {
+  const id = ++nextDialogId;
+  const dialogRoleAttr = `ricdom-dialog-${id}`;
+  const titleId = `ricdom-dialog-title-${id}`;
+  const bodyId = `ricdom-dialog-body-${id}`;
+  const guard: AttachGuard = createAttachGuard('createDialog');
+
+  // 内部状態 (v1 継承の短縮名は付けず、素直な名前にする)
+  let isOpenInternal = false; // uncontrolled 用
+  let isClosing = false;
+  let prevControlledOpen: boolean | undefined;
+  let isControlledLast = false;
+  let onCloseLast: ((reason: DialogCloseReason) => void) | undefined;
+  let escBound = false;
+  let inertedSiblings: Element[] = [];
+  let restoreFocusEl: HTMLElement | null = null;
+  let widthLast: number | string | undefined;
+  let titleLast = '';
+  let bodyChildrenLast: RicNode | RicNode[] = [];
+  let actionsLast: RicNode[] = [];
+
+  const getDialogRootEl = (): HTMLElement | null => (typeof document === 'undefined' ? null : document.querySelector(`[data-ricdom-dialog-id="${dialogRoleAttr}"]`));
+
+  const setInert = (on: boolean): void => {
+    if (!guard.host) return;
+    if (on) {
+      const parent = guard.host.portal.parentElement;
+      if (!parent) return;
+      inertedSiblings = Array.from(parent.children).filter((el) => el !== guard.host!.portal && !(el as HTMLElement).inert);
+      for (const el of inertedSiblings) (el as HTMLElement).inert = true;
+    } else {
+      for (const el of inertedSiblings) (el as HTMLElement).inert = false;
+      inertedSiblings = [];
+    }
+  };
+
+  const focusFirstElement = (): void => {
+    const root = getDialogRootEl();
+    if (!root) return;
+    const focusables = getFocusables(root);
+    (focusables[0] ?? root).focus();
+  };
+
+  const handleEntranceAnimationEnd = (ev: AnimationEvent): void => {
+    if (ev.animationName !== 'ric-dlg-in') return;
+    focusFirstElement();
+  };
+
+  const handleExitAnimationEnd = (): void => {
+    if (!isClosing) return;
+    if (!isControlledLast) isOpenInternal = false;
+    isClosing = false;
+    setInert(false);
+    if (restoreFocusEl && typeof restoreFocusEl.focus === 'function') restoreFocusEl.focus();
+    restoreFocusEl = null;
+    guard.host?.notify();
+  };
+
+  const beginClose = (): void => {
+    if (isClosing) return;
+    isClosing = true;
+    guard.host?.notify();
+  };
+
+  const requestClose = (reason: DialogCloseReason): void => {
+    if (isClosing) return;
+    if (!isControlledLast && !isOpenInternal) return; // uncontrolled で未 open は no-op (冪等)
+    if (isControlledLast) {
+      onCloseLast?.(reason);
+    } else {
+      beginClose();
+    }
+  };
+
+  const handleKeydown = (ev: KeyboardEvent): void => {
+    if (ev.key === 'Escape') {
+      requestClose('escape');
+      return;
+    }
+    if (ev.key !== 'Tab') return;
+    const root = getDialogRootEl();
+    if (!root) return;
+    const focusables = getFocusables(root);
+    if (focusables.length === 0) {
+      ev.preventDefault();
+      root.focus();
+      return;
+    }
+    const first = focusables[0]!;
+    const last = focusables[focusables.length - 1]!;
+    const active = document.activeElement;
+    if (ev.shiftKey) {
+      if (active === first || !root.contains(active)) {
+        ev.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || !root.contains(active)) {
+      ev.preventDefault();
+      first.focus();
+    }
+  };
+
+  const inst = ((props: DialogProps = {}): RicNode => {
+    const host = guard.ensure();
+    if (!host) return null;
+
+    const { triggerChildren, title = '', children = [], actions = [], trigger_variant, open, onClose, width } = props as DialogProps & { trigger_variant?: never };
+    void trigger_variant;
+
+    const controlled = open !== undefined;
+    if (controlled && 'triggerChildren' in props) {
+      console.error('RicDOM UI: createDialog は open と triggerChildren を併用できません。controlled mode では triggerChildren は無視されます。');
+    }
+
+    isControlledLast = controlled;
+    onCloseLast = onClose;
+    titleLast = title;
+    bodyChildrenLast = children;
+    actionsLast = actions;
+    widthLast = width;
+
+    if (controlled) {
+      if (open && !prevControlledOpen) {
+        isClosing = false;
+        restoreFocusEl = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
+        setInert(true);
+      }
+      if (!open && prevControlledOpen && !isClosing) beginClose();
+      prevControlledOpen = open;
+    }
+
+    const shouldShow = controlled ? open || isClosing : isOpenInternal;
+
+    if (typeof document !== 'undefined') {
+      if (shouldShow && !escBound) {
+        document.addEventListener('keydown', handleKeydown);
+        escBound = true;
+      }
+      if (!shouldShow && escBound) {
+        document.removeEventListener('keydown', handleKeydown);
+        escBound = false;
+      }
+    }
+
+    if (!controlled) return triggerChildren === undefined ? null : buildTrigger(triggerChildren);
+    return null;
+  }) as DialogInstance;
+
+  const buildTrigger = (triggerChildren: RicNode | RicNode[]): RicNode => ({
+    tag: 'button',
+    class: 'ric-button',
+    onclick: () => {
+      if (isOpenInternal) {
+        beginClose();
+        return;
+      }
+      restoreFocusEl = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
+      isClosing = false;
+      isOpenInternal = true;
+      setInert(true);
+      guard.host?.notify();
+    },
+    children: triggerChildren,
+  });
+
+  inst.renderPortal = (): RicNode => {
+    if (!guard.host) return null;
+    const shouldShow = isControlledLast ? isClosing || prevControlledOpen === true : isOpenInternal;
+    if (!shouldShow) return null;
+
+    return [
+      {
+        tag: 'div',
+        class: `ric-dialog__overlay${isClosing ? ' ric-dialog__overlay--out' : ''}`,
+        onclick: () => requestClose('overlay'),
+      },
+      {
+        tag: 'div',
+        class: `ric-dialog${isClosing ? ' ric-dialog--out' : ''}`,
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-labelledby': titleId,
+        'aria-describedby': bodyId,
+        tabIndex: -1,
+        'data-ricdom-dialog-id': dialogRoleAttr,
+        style: widthLast != null ? { width: `min(${typeof widthLast === 'number' ? `${widthLast}px` : widthLast}, 90vw)` } : {},
+        onanimationend: (ev: AnimationEvent) => {
+          if (isClosing) handleExitAnimationEnd();
+          else handleEntranceAnimationEnd(ev);
+        },
+        children: [
+          {
+            tag: 'div',
+            class: 'ric-dialog__header',
+            children: [
+              { tag: 'span', class: 'ric-dialog__title', id: titleId, children: [titleLast] },
+              { tag: 'button', class: 'ric-dialog__close', 'aria-label': 'Close', onclick: () => requestClose('close-button'), children: ['✕'] },
+            ],
+          },
+          { tag: 'div', class: 'ric-dialog__body', id: bodyId, children: bodyChildrenLast },
+          actionsLast.length ? { tag: 'div', class: 'ric-dialog__footer', children: actionsLast } : null,
+        ],
+      },
+    ] as unknown as RicNode;
+  };
+
+  inst.attach = guard.attach;
+  inst.dispose = (): void => {
+    if (escBound && typeof document !== 'undefined') {
+      document.removeEventListener('keydown', handleKeydown);
+      escBound = false;
+    }
+    setInert(false);
+    guard.dispose();
+  };
+
+  inst.open = (): void => {
+    if (isControlledLast) return;
+    if (isOpenInternal || isClosing) return;
+    restoreFocusEl = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
+    isOpenInternal = true;
+    setInert(true);
+    guard.host?.notify();
+  };
+  inst.close = (reason: DialogCloseReason = 'api'): void => requestClose(reason);
+  inst.isOpen = (): boolean => isOpenInternal;
+
+  return inst;
+};
