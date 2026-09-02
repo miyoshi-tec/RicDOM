@@ -2,9 +2,8 @@
 //
 // v1 (ric_ui/control/*.js, ric_ui/layout/*.js) では各ファイルが同じ 4 行の
 // class 連結ロジックをコピペしていた。v2 でも uiButton/uiInput (Phase 2) は
-// 同じコピペを踏襲しているが、Phase 3a で対象部品が一気に増えるため、ここで
-// 1 箇所にまとめる (button.ts/input.ts の重複は Phase 2 の既存コードなので
-// 本 Phase では触らない。最終報告に「§14 候補」として記載)。
+// 同じコピペを踏襲していたが、Phase 3b で button.ts/input.ts もここに合流させた
+// (§14 の追補: 「uiButton/uiInput に data-ricdom-role を付与し、UI_ROLE 列挙に統合」)。
 
 import type { ClassValue } from '../../types.js';
 
@@ -19,11 +18,17 @@ export const mergeClass = (base: string, extra: ClassValue | undefined): string 
 
 /**
  * 部品種別ごとの `data-ricdom-role` 値 (E2E/CSS の安定セレクタ、設計書付録 A14 継承)。
- * `src/app.ts`/`src/ui/injectStyles.ts`/`src/ui/popup.ts` 等が内部マーカーとして既に
- * 使っている 'portal'/'popup-item'/'styles' と値がぶつからないよう、状態を持たない
- * 部品専用の名前空間として列挙する。
+ * `src/app.ts`/`src/ui/injectStyles.ts` が内部マーカーとして使っている
+ * 'portal'/'styles' と値がぶつからないよう、部品名前空間として列挙する。
+ *
+ * Phase 3a では「状態を持たない部品」専用だったが、Phase 3b の §14 追補で
+ * uiButton/uiInput (Phase 2 実装) と、状態を持つ部品 (splitter/scrollPane/
+ * collapseBox/accordion/tabs/dropdown/popup) の内部マーカーもここに統合し、
+ * 「全部品で一貫」させた (popup.ts の 'popup-item' 直書きもここに移動)。
  */
 export const UI_ROLE = {
+  button: 'button',
+  input: 'input',
   textarea: 'textarea',
   checkbox: 'checkbox',
   radiogroup: 'radiogroup',
@@ -39,6 +44,37 @@ export const UI_ROLE = {
   panel: 'panel',
   mdPre: 'md-pre',
   codePre: 'code-pre',
+  // ── Phase 3b: 状態を持つ部品 ──
+  popupItem: 'popup-item',
+  scrollPane: 'scroll-pane',
+  splitter: 'splitter',
+  splitterSide: 'splitter-side',
+  splitterMain: 'splitter-main',
+  splitterDivider: 'splitter-divider',
+  splitterToggle: 'splitter-toggle',
+  collapseBox: 'collapse-box',
+  accordion: 'accordion',
+  accordionItem: 'accordion-item',
+  accordionHeader: 'accordion-header',
+  accordionBody: 'accordion-body',
+  tabs: 'tabs',
+  tabsTab: 'tabs-tab',
+  tabsPanel: 'tabs-panel',
+  dropdown: 'dropdown',
+  dropdownTrigger: 'dropdown-trigger',
+  inlineMenu: 'inline-menu',
 } as const;
 
 export type UiRole = (typeof UI_ROLE)[keyof typeof UI_ROLE];
+
+// dev/prod 切り替え (src/reactivity.ts の isDevMode と同じ考え方: モジュール読み込み時に
+// キャッシュせず都度読む。IIFE 配布版は tsup の define で 'production' を焼き込むため
+// dead-code elimination で消える)。ricdom/ui はコアに実行時依存が無い (設計書 §13) ので、
+// コア側の isDevMode を import せずここに複製する。
+export const isDevMode = (): boolean => {
+  try {
+    return typeof process === 'undefined' || typeof process.env === 'undefined' || process.env.NODE_ENV !== 'production';
+  } catch {
+    return true;
+  }
+};

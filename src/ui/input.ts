@@ -6,6 +6,7 @@
 // `el.value = ''` が確実に走るよう、FORCE_REAPPLY 対象キーであることを尊重する)。
 
 import type { ClassValue, RicElementNode, RicNode } from '../types.js';
+import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export interface UiInputProps {
   placeholder?: string;
@@ -17,19 +18,12 @@ export interface UiInputProps {
   [key: string]: unknown;
 }
 
-const mergeClass = (base: string, extra: ClassValue | undefined): string => {
-  if (!extra) return base;
-  if (typeof extra === 'string') return `${base} ${extra}`;
-  if (Array.isArray(extra)) return [base, ...extra].join(' ');
-  const truthy = Object.keys(extra).filter((k) => extra[k]);
-  return [base, ...truthy].join(' ');
-};
-
 export const uiInput = ({ placeholder, value = '', type = 'text', disabled = false, class: extraClass, ...rest }: UiInputProps = {}): RicNode =>
   ({
     ...rest,
     tag: 'input',
     class: mergeClass('ric-input', extraClass),
+    'data-ricdom-role': UI_ROLE.input,
     type,
     value, // 常に含める (空文字でも FORCE_REAPPLY で反映されるよう)
     ...(placeholder ? { placeholder } : {}),

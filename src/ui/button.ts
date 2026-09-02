@@ -9,6 +9,7 @@
 // (rest を最後に置くと class: 'ric-button foo' が rest.class='foo' で上書きされてしまう)。
 
 import type { ClassValue, RicElementNode, RicNode } from '../types.js';
+import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export type UiButtonVariant = 'default' | 'primary' | 'ghost';
 
@@ -21,20 +22,13 @@ export interface UiButtonProps {
   [key: string]: unknown;
 }
 
-const mergeClass = (base: string, extra: ClassValue | undefined): string => {
-  if (!extra) return base;
-  if (typeof extra === 'string') return `${base} ${extra}`;
-  if (Array.isArray(extra)) return [base, ...extra].join(' ');
-  const truthy = Object.keys(extra).filter((k) => extra[k]);
-  return [base, ...truthy].join(' ');
-};
-
 export const uiButton = ({ children = [], variant = 'default', disabled = false, class: extraClass, ...rest }: UiButtonProps = {}): RicNode => {
   const baseClass = variant === 'default' ? 'ric-button' : `ric-button ric-button--${variant}`;
   return {
     ...rest,
     tag: 'button',
     class: mergeClass(baseClass, extraClass),
+    'data-ricdom-role': UI_ROLE.button,
     ...(disabled ? { disabled: true } : {}),
     children,
   } as RicElementNode;

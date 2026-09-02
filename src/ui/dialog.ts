@@ -50,7 +50,28 @@ let nextDialogId = 0;
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const getFocusables = (root: Element): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+// 可視要素フィルタ (§14 追補): `disabled` / `tabindex="-1"` は上記セレクタで既に除外済みだが、
+// `display:none` の祖先を持つ・`visibility:hidden` 等で「セレクタは通るが実際には
+// フォーカスできない」要素は focus trap がそのまま踏んでしまう (実ブラウザで
+// Tab 循環が見えない要素で止まる/飛ばない不具合になる)。`offsetParent !== null` は
+// 大半のケースを安価に判定できるが `position:fixed` の要素は offsetParent が常に
+// null になる (仕様上の既知の癖) ため、`getClientRects().length > 0` の OR で
+// 救う (fixed 配置の focusable を誤って弾かない)。
+const isVisible = (el: HTMLElement): boolean => el.offsetParent !== null || el.getClientRects().length > 0;
+
+// jsdom はレイアウトエンジンを持たず、あらゆる要素が (実際には見えていても)
+// offsetParent=null・getClientRects()=[] を返す。isVisible をそのまま適用すると
+// 既存の jsdom 単体テスト (tests/ui/dialog.test.ts) が「フォーカス可能要素が
+// 1 つも無い」判定になり壊れる。`document.body` 自身の getClientRects() が
+// 空かどうかでレイアウトエンジンの有無を検出し、無ければ (jsdom) フィルタを
+// スキップして v1/Phase 2 と同じ挙動を保つ。可視要素フィルタの実効果は
+// tests/browser/ (実ブラウザ、レイアウトあり) でのみ検証できる。
+const hasLayoutEngine = (doc: Document | null): boolean => !!doc?.body && doc.body.getClientRects().length > 0;
+
+const getFocusables = (root: Element): HTMLElement[] => {
+  const all = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  return hasLayoutEngine(root.ownerDocument) ? all.filter(isVisible) : all;
+};
 
 export const createDialog = (): DialogInstance => {
   const id = ++nextDialogId;
