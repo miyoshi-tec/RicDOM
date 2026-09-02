@@ -117,15 +117,45 @@ export type RicNode = string | number | null | false | undefined | RicElementNod
 // =====================================================================
 
 /**
- * 状態を持つ部品の最小契約 (Phase 1 では骨のみ)。
- * Phase 2 で `app.use(createDialog())` の正式な部品契約を実装する際、
- * ここに portal ホストや dispose 等が足される (設計書 §3.4)。
+ * `app.use(part)` が part に渡すホストコンテキスト (設計書 §3.4)。
+ * `{ notify(): void; portal: Element; app: App }` 相当。
+ * portal は「この app に 1 つ」の portal 要素 (§3.5、`createApp` の第 4 引数
+ * `portalTo` を指定しなければ自動生成される)。
+ */
+export interface Host {
+  /** 再描画を要求する (state への代入と同じスケジューラを共有する) */
+  notify(): void;
+  /** この app の portal 要素。`use()` された部品はここへ描画する。 */
+  portal: Element;
+  /**
+   * この part を登録した app インスタンス。
+   * `App<S>` の `S` は part 側からは未知なので `App<any>` で受ける (`UsePart`/`Component<P>`
+   * は特定の state 型に依存しない汎用部品契約であるため。state を読みたい場合は
+   * render 側で `dlg(props)` の props 経由で明示的に渡す設計、v1 踏襲)。
+   */
+  app: App<any>;
+}
+
+/**
+ * `app.use(part)` に渡す部品の契約 (設計書 §3.4、Phase 2 で正式化)。
+ * 状態を持つ部品 (dialog/popup/toast/tooltip 等、`ricdom/ui` の `Component<P>` はこれを実装する)
+ * はこのインターフェースを実装し、`app.use()` を経由して初めて `notify`/`portal` を受け取る。
+ * **`use()` を経由しない呼び出しは host が無いため、部品側が「初回だけ console.error して
+ * 何も描画しない」ことで検知する** (v1 の `__notify` 暗黙注入と違い、置き場所を間違えようが
+ * ない構造。設計書 §3.4 / B1 の解消)。
  */
 export interface UsePart {
-  /** app.use() に登録された瞬間に呼ばれる。再描画をトリガーする notify を受け取る。 */
-  onUse?: (ctx: { notify: () => void }) => void;
-  /** app.unmount() 等で登録解除される際に呼ばれる (Phase 2 で dispose 契約と統合予定) */
-  onDispose?: () => void;
+  /** app.use() に登録された瞬間に呼ばれる。host (notify/portal/app) を受け取る。 */
+  attach?: (host: Host) => void;
+  /** app.unmount() 等で登録解除される際に呼ばれる。以後 attach 済みでも再度呼ばれない。 */
+  dispose?: () => void;
+  /**
+   * app の render サイクルごとに 1 回呼ばれ、portal 要素に描画すべき現在の内容を返す。
+   * 未実装 (portal を使わない part) なら無視される。
+   * v1 の `_page_portal_queue` (push/drain のグローバルバッファ) の後継 — page への
+   * 依存を排除し、「自分の app の portal」に描画先が閉じる (設計書 §3.5 / B2 の解消)。
+   */
+  renderPortal?: () => RicNode;
 }
 
 /**
@@ -159,3 +189,12 @@ export type App<S extends object> = S & {
   /** ref 名 → DOM 要素。render 後に再収集される */
   readonly refs: ReadonlyMap<string, Element>;
 };
+
+/**
+ * `createApp` の第 4 引数 (省略可)。
+ * `portalTo`: portal の描画先を任意の要素に差し替える (設計書 §3.5、v1 の `portal_to` 要望を吸収)。
+ * 省略時は `createApp` が target 直下に `<div data-ricdom-role="portal">` を自動生成する。
+ */
+export interface CreateAppOptions {
+  portalTo?: Element;
+}

@@ -11,7 +11,7 @@
 //   - `render` は state の他プロパティとは別枠で管理する (v1 踏襲: 代入は同期描画、
 //     Proxy の 1 段目/2 段目追跡ルールの対象外)。
 
-import type { App, RenderFn, RicNode, UsePart } from './types.js';
+import type { App, CreateAppOptions, Host, RenderFn, RicElementNode, RicNode, UsePart } from './types.js';
 import { buildDomNode, patchChildren } from './dom.js';
 import { createRenderScheduler } from './scheduler.js';
 import { createReactiveState } from './reactivity.js';
@@ -59,11 +59,22 @@ const resolveTargetElement = (target: string | Element): Element | null => {
 // 単一シグネチャ (canon は 1 つ、設計書 §12): render を第 3 引数として独立させることで
 // `S` は `state` 引数から素直に推論され、`render` コールバック内の `s` パラメータも
 // (v1 の「state に render を同梱する」形で起きていた自己参照問題無しに) 完全に型付く。
+// 第 4 引数 `options` (省略可、Phase 2 で追加) は portal の描画先を差し替える
+// `portalTo` のみを持つ (設計書 §3.5)。
 
-export const createApp = <S extends object>(target: string | Element, state: S, render: RenderFn<S>): App<S> =>
-  createAppImpl(target, state, render);
+export const createApp = <S extends object>(
+  target: string | Element,
+  state: S,
+  render: RenderFn<S>,
+  options?: CreateAppOptions,
+): App<S> => createAppImpl(target, state, render, options);
 
-const createAppImpl = <S extends object>(target: string | Element, state: S, render: RenderFn<S>): App<S> => {
+const createAppImpl = <S extends object>(
+  target: string | Element,
+  state: S,
+  render: RenderFn<S>,
+  options: CreateAppOptions | undefined,
+): App<S> => {
   // ── 引数バリデーション (throw しない: console.error + NOOP App、設計書 §3.6) ──
   if (typeof target !== 'string' && !isDomElement(target)) {
     console.error(
@@ -87,13 +98,13 @@ const createAppImpl = <S extends object>(target: string | Element, state: S, ren
   }
 
   const targetEl = resolveTargetElement(target);
-  if (targetEl) return createResolvedApp<S>(targetEl, state, render);
+  if (targetEl) return createResolvedApp<S>(targetEl, state, render, options);
 
   // target が (型上は妥当だが) 今この瞬間には見つからない。
   // `<head>` 内 script などで body がまだパースされていない典型ケースだけを、
   // DOMContentLoaded を 1 回だけ待って救う (v1 の 20 秒ポーリングは持たない、設計書 §12)。
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
-    return createDeferredApp<S>(target, state, render);
+    return createDeferredApp<S>(target, state, render, options);
   }
 
   console.error(`RicDOM: target "${String(target)}" が見つかりません。`);
@@ -109,14 +120,19 @@ const createAppImpl = <S extends object>(target: string | Element, state: S, ren
 // DOMContentLoaded 発火時に target が見つかれば、その時点までに行われた state の変更を
 // 引き継いだまま通常の App (createResolvedApp) に切り替わり、同期初回描画が走る。
 // 見つからなければ console.error を出し、以降は型付き NOOP として振る舞う。
-const createDeferredApp = <S extends object>(target: string | Element, bufferState: S, render: RenderFn<S>): App<S> => {
+const createDeferredApp = <S extends object>(
+  target: string | Element,
+  bufferState: S,
+  render: RenderFn<S>,
+  options: CreateAppOptions | undefined,
+): App<S> => {
   let inner: App<S> | null = null;
 
   const finalize = (): void => {
     if (inner) return; // 二重発火の防御 (once: true だが念のため)
     const resolved = resolveTargetElement(target);
     if (resolved) {
-      inner = createResolvedApp<S>(resolved, bufferState, render);
+      inner = createResolvedApp<S>(resolved, bufferState, render, options);
     } else {
       console.error(`RicDOM: target "${String(target)}" が見つかりません (DOMContentLoaded 後も解決できませんでした)。`);
       inner = createNoopApp<S>();
@@ -131,7 +147,10 @@ const createDeferredApp = <S extends object>(target: string | Element, bufferSta
       if (prop === 'render') return render;
       if (prop === 'renderNow' || prop === 'unmount') return () => {}; // まだ描画対象が無い
       if (prop === 'nextRender') return () => new Promise<void>(() => {}); // 解決するまで resolve しない
-      if (prop === 'use') return (part: UsePart) => part; // Phase 1: 骨のみ (登録先が無い)
+      // target 未解決の間は portal が存在しないため attach() を呼べない。
+      // part はそのまま返す (NOOP 流儀) — 解決後に呼び直してもらう必要がある
+      // (DOMContentLoaded 待ちのごく短い窓のみの制約、設計書に言及なし・Phase 2 で残る既知の穴)。
+      if (prop === 'use') return (part: UsePart) => part;
       if (prop === 'refs') return new Map<string, Element>();
       return Reflect.get(target_, prop, receiver);
     },
@@ -150,12 +169,44 @@ const createDeferredApp = <S extends object>(target: string | Element, bufferSta
 // 解決済み target からの本実装
 // =====================================================================
 
-const createResolvedApp = <S extends object>(targetEl: Element, state: S, initialRender: RenderFn<S>): App<S> => {
+// portal の描画先を自前生成する場合、target 直下の末尾に置く「島」の目印ノード
+// (設計書 §3.5)。island: true なので子孫は build/patch されず、portal 要素自身の
+// 中身は下記の portal 専用パッチサイクルが別途管理する。tag/attrs が render 毎に
+// 同一形状で再生成されるため、通常の位置ベース reconciliation で「動かない 1 要素」
+// として扱われ、同じ DOM ノードが使い回される (再生成・破棄されない)。
+const PORTAL_SENTINEL: RicElementNode = {
+  tag: 'div',
+  island: true,
+  'data-ricdom-role': 'portal',
+} as RicElementNode;
+
+const isPortalSentinelEl = (el: Element): boolean => el.getAttribute('data-ricdom-role') === 'portal';
+
+const createResolvedApp = <S extends object>(
+  targetEl: Element,
+  state: S,
+  initialRender: RenderFn<S>,
+  options: CreateAppOptions | undefined,
+): App<S> => {
   let isDestroyed = false;
-  let prevTree: RicNode = null;
   let currentRenderFn: RenderFn<S> = initialRender;
   const refsMap = new Map<string, Element>();
   const registeredParts = new Set<UsePart>();
+
+  // portal の描画先 (設計書 §3.5)。`portalTo` 指定時はそれを直接使う (target の子として
+  // 管理しない = target 側の children 配列には登場しない)。省略時は target 直下の末尾に
+  // 自前生成し、target の子要素リストの一部として (末尾固定の島として) 管理する。
+  const ownPortal = options?.portalTo === undefined;
+  const externalPortalEl = options?.portalTo;
+  let portalEl: Element | null = ownPortal ? null : (externalPortalEl as Element);
+
+  // 「target 直下の children 配列」としての prev/next。ownPortal のときは
+  // [mainTree, PORTAL_SENTINEL] の 2 要素、そうでなければ [mainTree] の 1 要素として扱う。
+  // これにより既存の position/key-based reconciliation (dom.ts) をそのまま再利用でき、
+  // portal 用の特別なパッチ経路を dom.ts 側に持たせる必要が無い。
+  let prevTargetChildren: RicNode[] = [];
+  let prevPortalChildren: RicNode[] = [];
+  let isFirstRender = true;
 
   // nextRender() 用の保留 Promise (呼ばれるまで作らない、v1 踏襲)
   let pendingResolve: (() => void) | null = null;
@@ -170,23 +221,49 @@ const createResolvedApp = <S extends object>(targetEl: Element, state: S, initia
     }
   };
 
+  // 登録済み part から今フレームの portal 内容を集める (v1 の _page_portal_queue.drain 後継、
+  // ただし push キューではなく「毎 render 時に現在の内容を尋ねる」プル方式。
+  // page への依存が無いので「drain されず溜まり続ける」silent failure が構造的に起きない)。
+  const collectPortalChildren = (): RicNode[] => {
+    const out: RicNode[] = [];
+    for (const part of registeredParts) {
+      if (typeof part.renderPortal === 'function') out.push(part.renderPortal());
+    }
+    return out;
+  };
+
   const doRender = (): void => {
     if (isDestroyed) return;
 
     const nextTree = currentRenderFn(appHandle);
+    const nextTargetChildren: RicNode[] = ownPortal ? [nextTree, PORTAL_SENTINEL] : [nextTree];
 
-    if (prevTree === null) {
-      // 初回描画: DOM を全量構築する
-      targetEl.innerHTML = '';
-      const domEl = buildDomNode(nextTree, targetEl.namespaceURI);
-      if (domEl) targetEl.appendChild(domEl);
-    } else {
-      // 2 回目以降: 差分更新 (ルートノードを単一の子ノードとして扱う)
-      patchChildren([prevTree], [nextTree], targetEl);
+    if (isFirstRender) {
+      targetEl.innerHTML = ''; // 初回のみ target 内の既存内容を丸ごと引き取る (v1 踏襲)
+      isFirstRender = false;
+    }
+    patchChildren(prevTargetChildren, nextTargetChildren, targetEl);
+    prevTargetChildren = nextTargetChildren;
+
+    if (ownPortal && portalEl === null) {
+      // PORTAL_SENTINEL に対応する実 DOM 要素を 1 度だけ特定してキャッシュする
+      // (以後は同じ島ノードが使い回されるので再検索不要)。
+      for (const child of targetEl.children) {
+        if (isPortalSentinelEl(child)) {
+          portalEl = child;
+          break;
+        }
+      }
+      flushPendingAttach(); // portal 確定前に use() された part があれば、ここで初めて attach する
     }
 
     registerRefs(targetEl);
-    prevTree = nextTree;
+
+    if (portalEl) {
+      const nextPortalChildren = collectPortalChildren();
+      patchChildren(prevPortalChildren, nextPortalChildren, portalEl);
+      prevPortalChildren = nextPortalChildren;
+    }
 
     if (pendingResolve) {
       const resolve = pendingResolve;
@@ -221,23 +298,48 @@ const createResolvedApp = <S extends object>(targetEl: Element, state: S, initia
     return pendingPromise;
   };
 
-  // Phase 1 では「登録して notify 関数を渡すだけの骨」。
-  // 正式な部品契約 (portal ホスト・dispose の統合等) は Phase 2 で実装する (設計書 §3.4)。
+  // 正式な部品契約 (設計書 §3.4)。host ({ notify, portal, app }) を渡すのはここだけ —
+  // render 内で `use()` を経由せず直接呼ばれた part は host を受け取れないため、
+  // 部品側 (ricdom/ui の Component<P>) が「初回だけ console.error して何も描画しない」
+  // ことで検知できる (v1 の __notify 暗黙注入と違い、置き場所を間違えようがない)。
   const apiUse = <T extends UsePart>(part: T): T => {
     if (isDestroyed) return part;
+    if (registeredParts.has(part)) return part; // 二重登録は no-op (べき等)
     registeredParts.add(part);
-    if (typeof part.onUse === 'function') part.onUse({ notify: scheduleRender });
+    if (portalEl) {
+      // portalTo 指定時は最初から確定しているのでここに来る。自前 portal の場合も
+      // 初回 render 後 (通常は createApp() の戻り値を受け取った時点で既に完了している) なら。
+      const host: Host = { notify: scheduleRender, portal: portalEl, app: appHandle };
+      part.attach?.(host);
+      // 登録直後に renderPortal() の内容を portal へ反映する (part が自分から
+      // host.notify() を呼ばなくても、use() した時点の内容は次の描画で拾われる)。
+      scheduleRender();
+    } else {
+      // 自前 portal がまだ実 DOM に解決していない (初回 render 前) 場合のみここに来る。
+      // 初回 render 直後 (flushPendingAttach) にまとめて attach する。
+      pendingAttachParts.add(part);
+    }
     return part;
+  };
+
+  // portal 要素の解決前 (初回 render 前) に use() された part を保留し、初回 render 後に
+  // まとめて attach する (createApp は生成時に同期初回描画するため、この配列は基本的に
+  // 「render 関数の外、createApp 呼び出し直後に use() された」ごく短い間しか使われない)。
+  const pendingAttachParts = new Set<UsePart>();
+  const flushPendingAttach = (): void => {
+    if (pendingAttachParts.size === 0 || !portalEl) return;
+    const host: Host = { notify: scheduleRender, portal: portalEl, app: appHandle };
+    for (const part of pendingAttachParts) part.attach?.(host);
+    pendingAttachParts.clear();
   };
 
   const apiUnmount = (): void => {
     if (isDestroyed) return;
     isDestroyed = true;
     cancelPending();
-    for (const part of registeredParts) {
-      if (typeof part.onDispose === 'function') part.onDispose();
-    }
+    for (const part of registeredParts) part.dispose?.();
     registeredParts.clear();
+    pendingAttachParts.clear();
     refsMap.clear();
   };
 

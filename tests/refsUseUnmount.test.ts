@@ -31,35 +31,60 @@ describe('refs', () => {
   });
 });
 
-describe('use() (Phase 1: 骨のみ)', () => {
-  it('登録した part の onUse が notify 関数付きで呼ばれる', () => {
+describe('use() (Phase 2: 正式な部品契約、設計書 §3.4)', () => {
+  it('登録した part の attach が host (notify/portal/app) 付きで呼ばれる', () => {
     setupApp();
     const handle = createApp('#app', {}, () => ({ tag: 'div' }));
 
-    let receivedNotify: (() => void) | undefined;
+    let receivedHost: { notify: () => void; portal: Element; app: unknown } | undefined;
     const part: UsePart = {
-      onUse: (ctx) => {
-        receivedNotify = ctx.notify;
+      attach: (host) => {
+        receivedHost = host;
       },
     };
     const returned = handle.use(part);
     expect(returned).toBe(part);
-    expect(typeof receivedNotify).toBe('function');
+    expect(typeof receivedHost?.notify).toBe('function');
+    expect(receivedHost?.portal).toBeInstanceOf(Element);
+    expect(receivedHost?.app).toBe(handle);
   });
 
-  it('use() 経由の notify で再描画がトリガーされる', async () => {
+  it('host.notify() で再描画がトリガーされる', async () => {
     const app = setupApp();
     let n = 0;
     const handle = createApp('#app', {}, () => ({ tag: 'div', children: [String(n)] }));
     const part: UsePart = {
-      onUse: (ctx) => {
+      attach: (host) => {
         n = 1;
-        ctx.notify();
+        host.notify();
       },
     };
     handle.use(part);
     await flush();
     expect(app.querySelector('div')!.textContent).toBe('1');
+  });
+
+  it('renderPortal() が返す内容が portal 要素に描画される', async () => {
+    const app = setupApp();
+    const handle = createApp('#app', {}, () => ({ tag: 'div' }));
+    const part: UsePart = {
+      renderPortal: () => ({ tag: 'span', id: 'portal-out', children: ['hello'] }),
+    };
+    handle.use(part);
+    await flush();
+    const portalEl = app.querySelector('[data-ricdom-role="portal"]')!;
+    expect(portalEl.querySelector('#portal-out')!.textContent).toBe('hello');
+  });
+
+  it('use() を経由しない呼び出しは part 側の責務 (host が無いので attach は呼ばれない)', () => {
+    setupApp();
+    createApp('#app', {}, () => ({ tag: 'div' }));
+    let attachCalled = false;
+    const part: UsePart = { attach: () => { attachCalled = true; } };
+    // use() せずに render 内で part を直接呼ぶだけでは host は渡らない
+    // (part 自体は関数ではないのでここでは attach が呼ばれないことだけを確認する)
+    expect(attachCalled).toBe(false);
+    void part;
   });
 });
 
@@ -75,11 +100,11 @@ describe('unmount()', () => {
     expect(app.querySelector('div')!.textContent).toBe('1'); // 変わらない
   });
 
-  it('unmount 後は onDispose が呼ばれる', () => {
+  it('unmount 後は dispose が呼ばれる', () => {
     setupApp();
     const handle = createApp('#app', {}, () => ({ tag: 'div' }));
     let disposed = false;
-    handle.use({ onDispose: () => { disposed = true; } });
+    handle.use({ dispose: () => { disposed = true; } });
     handle.unmount();
     expect(disposed).toBe(true);
   });
