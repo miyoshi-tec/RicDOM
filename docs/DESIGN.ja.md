@@ -130,6 +130,16 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 
 **Phase 0 完了 (2026-09-02)。以降は Phase 1 (コア) へ。**
 
+## 12. Phase 1 実装での確定事項 (2026-09-02、実装からのフィードバック)
+
+- 型名は **`RicNode` / `RicElementNode`** (設計書の `Node` / `Element` は DOM のグローバル型と衝突するため改名)
+- **`createApp(target, state, render)` の 3 引数**に変更。v1 の「state の中に render を置く」形は TS で `S` の推論が自己参照になり render 内の `s` が `any` に落ちるため。render を分離すると `S` が state から素直に推論され、render 内も完全に型付く。v1 からの移行は機械的 (`render` プロパティを第 3 引数へ)
+- target が未解決のとき: v1 の 20 秒ポーリングは持たず、**`DOMContentLoaded` を 1 回だけ待って再解決** (それでも無ければ console.error + 型付き NOOP)。`<head>` 内 script の典型ケースだけを救う、予測可能な挙動
+- 複数 `createApp` 間の state 共有 (v1 の WeakMap 共有) は**持たない**。必要なら state オブジェクトを外で作って各 app に渡す (明示的)
+- HTML/SVG で同名タグ (`a` / `title` / `script` / `style`) は HTML 側の属性型を採用 (SVG 側は `svg` 配下でも HTML 型で受ける。実害が出たら再検討)
+- `tag` は型上**必須** (`{}` は型エラー)。実行時に tag 欠落なら console.error + 不可視扱い (v1 踏襲)
+- gzip 目標: IIFE **4.6KB** (Phase 1 実測、≤5KB 達成)
+
 ---
 
 ## 付録
