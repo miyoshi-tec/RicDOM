@@ -5,250 +5,201 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0-alpha.0] — not yet published
 
-### Added — Phase 3c: tweak panel + アイコン同梱データ/CLI (docs/DESIGN.ja.md §10/§15)
+Initial alpha of ricdom 2, a from-scratch TypeScript successor to
+[RicDOM v1](https://github.com/miyoshi-tec/RicDOM). Not source-compatible with v1 — see
+[Breaking changes from v1](#breaking-changes-from-v1) below if migrating an existing app.
 
-- **§15 追補**: `createAccordion` の閉じたパネルに `hidden` 属性を付与し a11y ツリーから
-  除外 (`role="region"` は維持)。CSS の `.ric-accordion__body { display: grid; ... }`
-  (author スタイル) が UA スタイルシートの `[hidden] { display: none }` に優先するため、
-  grid-template-rows のクローズアニメーションは従来どおり視覚的に動く。
-- **`createTweakPanel`** ← v1 `ui_tweak.js` (`create_ui_tweak_panel`/`ui_tweak_panel`/
-  `ui_tweak_row`/`ui_tweak_folder`): dat.GUI 風のパラメータ調整パネル。Tier1 (`data` を
-  渡すだけで型推論して行を自動生成: number/range/checkbox/text/select/radiobutton/
-  color、ネストした plain object は folder)、Tier2 (`keys` で type/min/max/step/
-  options/open を部分上書き)、Tier3 (`rows` に自前の `RicNode` を追加)、`width`。
-  行部品は Phase 3a の `uiInput`/`uiRange`/`uiCheckbox`/`uiSelect`/`uiRadiobutton`/
-  `uiColor` を再利用 (重複実装しない)。folder は v1 のネイティブ `<details>` を廃止し、
-  `createAccordion` と同じ `<button aria-expanded aria-controls>` + `role="region"` +
-  `hidden` パターンに変更 (開閉状態は部品が `path` — データのキー鎖を `.` 区切りに
-  したもの — をキーに JS state として保持)。number 行の「編集中ガード」は v1 の
-  onfocus マーカー方式を廃止し、コアの編集中ガード (`shouldSkipValueReapply`) に
-  一般化されたことで部品側は素直に `value` を渡すだけになった (blur 時の min/max
-  clamp + `set()` の書き戻しは部品固有の責務として残す)。radiobutton 行は a11y 上
-  `<fieldset><legend>` で構成 (`<label>` は複数 labelable descendant を持てないため、
-  v1 の `<label>` 相当は number/range/text/select/color 行にのみ適用)。radiobutton の
-  name 衝突の既知制約 (`label` 文字列由来のため、同一 label の行が 2 つあると
-  同一グループに merge される) は v1 から移植。
-- **`ricdom/icons` サブパス (新規)**: v1 `docs/icons/icons.json` の同梱 36 descriptor
-  (`{ v?, s?, p }`) を個別の named export に (`import { check, chevronDown } from
-  'ricdom/icons'`、tree-shakable — 1 アイコン 1 リテラルなので使わないアイコンは
-  バンドルされない)。名前は Lucide 由来のケバブケースを camelCase に変換
-  (`chevron-down` → `chevronDown`、`trash-2` → `trash2`)。元のケバブケース名は
-  `ICON_NAMES` (camelCase→kebab) と `ICONS_BY_NAME` (kebab→descriptor) で引ける。
-  IIFE は作らない (ビルド不要ユーザーは CLI で descriptor を取得してコピーする、
-  「使う分だけ」哲学の継続)。`svgToDescriptor(svg)` を同サブパスから export (v1
-  `docs/icons/svg_to_descriptor.js` の TS 化、circle/rect/polygon/line/ellipse →
-  path 変換込み)。
-- **`ricdom-icon` CLI** (`package.json` の `bin`、`dist/cli/ricdom-icon.cjs`):
-  v1 `scripts/icon.js` の機能パリティ。同梱名は即返し、無ければ Lucide を
-  `https.get` で取得して `svgToDescriptor` で path 化。`--json` / `--search TERM` /
-  `--names` / `-h`。stdout は純粋出力・ログは stderr、`const ICONS = {...}` ブロック
-  出力 + Lucide (ISC) 帰属コメント。ロジック本体 (`src/cli/ricdomIconLib.ts`) と
-  エントリポイント (`src/cli/ricdomIcon.ts`) を分離し、`resolveAll` にテスト用の
-  `lucideFetcher` 差し替え口を追加 (ネットワーク不要で「不明な名前 → errors[]」の
-  分岐を検証できる、v1 には無かったテスタビリティ改善)。
-- **帰属**: `THIRD_PARTY_NOTICES.md` (v1 `docs/icons/ATTRIBUTION.md` を移植) をリポジトリ
-  直下に新設し、`LICENSE` 末尾から参照。`contrast` descriptor の宣言箇所に Lucide 由来
-  である旨のコメントを付与 (他 35 個は RicDOM オリジナル)。
-- `uiIcon` の JSDoc を更新: descriptor の入手手段を「`ricdom/icons` から import」
-  「`npx ricdom-icon <name>`」の 2 択に明記 (手書き禁止は継続)。
-- `examples/tweak.html`: IIFE 2 本 + CSS `<link>` だけで `createTweakPanel` の
-  Tier1/2/3 とパラメータの即時反映 (隣の図形が変化する) を確認できるデモ。
-- テスト: unit +67 (`createAccordion` の hidden 属性、`createTweakPanel` の Tier1 型推論
-  全種・Tier2 上書き・Tier3・folder 開閉 (path ベース)・blur clamp・radiobutton name
-  制約・a11y 結合、`ricdom/icons` の 36 descriptor 検証・名前対応表、`svgToDescriptor`
-  の全図形変換、CLI の `buildBlock`/`buildJson`/`resolveAll`/`loadBundled`)、browser +6
-  (tweak の number 行で小数点を打っている最中に別 state の再描画が走っても入力が
-  潰れないことの実証 — v1 v0.3.37 のバグが v2 のコア規則で構造的に消えていることの
-  回帰テスト、tweak の folder 開閉での実 `hidden` 切り替えとフォーカス可能性、
-  `uiIcon` が `ricdom/icons` の descriptor を実 DOM に描く)。
+### Added — Core (`ricdom`)
 
-### Added — Phase 3b: 状態を持つ部品群の移植 (docs/DESIGN.ja.md §10)
+- `createApp(target, state, render, options?)`: resolves `target` (CSS selector or
+  `Element`) and performs a synchronous first render. An unresolved selector is retried
+  once after `DOMContentLoaded`; if it still cannot be resolved, or any argument is
+  invalid, `createApp` logs `console.error` and returns a type-safe NOOP `App` instead of
+  throwing.
+- Node representation: `{ tag, class, style, children, ref, key, island, ...attrs }`,
+  fully typed by tag name (`RicElementNode`). `tag` is required at the type level.
+- Diffing: position-based and key-based reconciliation, `FORCE_REAPPLY` for
+  `value`/`checked`/`selected`/`scrollTop`/`scrollLeft`, an editing guard that exempts a
+  focused input/textarea/select's `value` from `FORCE_REAPPLY`, `<select>` value/option
+  construction-order handling, SVG namespace inheritance, `data-ricdom-ref` for named
+  element references.
+- Islands: `island: true` elements are built once and never diffed again — an explicit
+  opt-out from ricdom's diffing for externally-managed subtrees (e.g. a `<canvas>` driven
+  by your own render loop).
+- Reactivity: a shallow `Proxy` over `state` (top level, plus one level into
+  object-valued properties). `state.ignore` is never tracked. In non-production builds,
+  assigning through an untracked (two-or-more-levels-deep) path logs `console.warn`
+  explaining the shallow-copy pattern, without changing the assignment's effect.
+- Scheduler: every render request arms both `requestAnimationFrame` and a
+  `setTimeout(200ms)` backstop; whichever fires first renders, covering environments where
+  rAF does not fire reliably (backgrounded tabs, Electron background throttling, kiosk
+  transitions).
+- `app.renderNow()` (synchronous, forced) and `app.nextRender()` (a `Promise` that
+  resolves on the next *scheduled* render's completion — it does not resolve if nothing is
+  pending).
+- `app.refs`: a `ReadonlyMap<string, Element>` of every `ref`-named element in the last
+  render.
+- `app.use(part)`: registers a stateful component (see below), returning it unchanged.
+- `app.unmount()`: disposes all registered parts and stops future renders/timers.
+- Component contract (`app.use(part)`): `UsePart` (`attach(host)` / `dispose()` /
+  `renderPortal()`), where `Host = { notify(), portal, app }` is only ever handed to a
+  part through `use()` — a part called without going through `use()` has no way to
+  request a render or a place to portal into, and detects this itself (see
+  `ricdom/ui`, below).
+- Portals: `createApp` auto-generates a `<div data-ricdom-role="portal">` as the last
+  child of `target` (an `island: true`, stably-keyed sentinel node, so it is never
+  mis-diffed even when the rest of the tree's visible/invisible shape varies render to
+  render) and, each render, collects every registered part's `renderPortal()` output into
+  it. `options.portalTo` replaces the auto-generated portal with an element you supply.
+  Each `createApp` instance owns exactly one portal — there is no cross-app portal
+  registry.
+- Build: tsup produces ESM (`dist/index.js`), CJS (`dist/index.cjs`), and an IIFE
+  (`dist/ricdom.iife.min.js`, global `ricdom`) plus a single `.d.ts`. Consumers never need
+  a build step. Core gzip size: **5,030B**, under the 5,120B budget.
+- Tests: Vitest (jsdom) unit tests, type-level tests (`expect-type`/`@ts-expect-error`),
+  and real-browser tests (`@vitest/browser` + Playwright/Chromium) covering rAF-backstop
+  rendering, `<select>` construction order, the editing guard against real `badInput`, and
+  IIFE-build smoke tests. GitHub Actions CI runs typecheck → unit → browser → build on
+  every push/PR.
 
-- **`createSplitter`** ← v1 `create_ui_splitter`: left/right/top/bottom、ドラッグリサイズ、
-  折り畳み (controlled/uncontrolled)、`onResizeEnd(size)` (v0.3.33 契約継承)。
-  DOM 参照はコアの `ref`/`app.refs` を使う (v1 の `data-ric-role` + `querySelector` を
-  再実装しない)。a11y 新規実装: 仕切り線に `role="separator"` + `aria-orientation` +
-  `aria-valuenow`/`aria-valuemin`/`aria-valuemax` (max 省略時は valuemax も省略)、
-  `tabindex=0`、矢印キーでのリサイズ (APG window splitter)。
-- **`createScrollPane`** ← v1 `create_ui_scroll_pane`: `follow:'bottom'/'top'/'none'` +
-  `threshold` による追従スクロール、`scrollToBottom()`/`scrollToTop()`。
-- **`createCollapseBox`** ← v1 `create_ui_collapse_box`: 複数 instance 対応 (`key` で
-  区別、sparse list animation 用途)。完了検知は `transitionend` +
-  `ANIMATION_FALLBACK_MS`(700ms) setTimeout backstop — height/width は個体ごとに
-  実測値が異なる動的ターゲットなので、値が固定な CSS `@keyframes` ではなく
-  `transition` が正しい選択 (v1 も元々 `transitionend`)。a11y: ヘッドレスな
-  primitive (専用 trigger を持たない) なので `idFor(key)` で consumer 側の trigger が
-  `aria-controls` を引けるようにした (`aria-expanded` は consumer の trigger に置く)。
-- **`createAccordion`** ← v1 `create_ui_accordion`: ヘッダは
-  `<button aria-expanded aria-controls>`、パネルは `role="region"` +
-  `aria-labelledby` (a11y 新規実装)。Enter/Space は `<button>` のネイティブ挙動で無料。
-  `title` に VDOM ノードを渡せる契約は v1 から継承。`multi:false` で排他モード。
-- **`createTabs`** ← v1 `ui_tabs`/`bind_tabs`: v1 は状態を持たない純粋関数 (常に
-  呼び出し側 state 駆動) だったが、v2 は controlled/uncontrolled 両対応にした
-  (`active` 省略で内部状態管理、`bind_tabs` 相当の糖衣が不要になる)。a11y 新規実装:
-  `role="tablist"/"tab"/"tabpanel"`、`aria-selected`、roving tabindex + 矢印キー/
-  Home/End (automatic activation)。`onChange` はモードに関わらず選択のたびに呼ぶ。
-- **`createDropdown`** (新規): v1 `create_ui_popup` の label/icon/chevron モード
-  (旧 dropdown/menu 統合) を、Phase 2 で `createPopup` を menu 専用に絞った際の宿題
-  だった別部品として分離 (設計書 §13 で予告済み)。本体は `role="listbox"` 系ではなく
-  汎用 Popover (`aria-haspopup="dialog"` + `aria-expanded"`)。位置計算・排他制御は
-  `createPopup` と共有 (`internal/popupPosition.ts`/`internal/exclusiveRegistry.ts`)。
-- **`uiInlineMenu`** ← v1 `ui_inline_menu`: portal を持たない純粋関数 (状態なし、
-  `app.use()` 不要)。Phase 3b の a11y 最小追加: `role="menu"`、新規の任意 prop
-  `onClose` (指定時のみ Escape で呼ぶ、省略時は v1 と同じ挙動)。
-- **排他制御の共通化**: `internal/exclusiveRegistry.ts` (host.app 単位、`use()` 登録時に
-  app のレジストリへ追加・dispose で解除)。v1 の `_popup_registry` (モジュールレベル
-  無制限成長、B13) を解消し、`createPopup`/`createDropdown` で共有する。
-- **位置計算の共通化**: `internal/popupPosition.ts` (below/above flip・横 clamp・
-  Pos→style 変換) を `createPopup`/`createDropdown`/`createTooltip` で共有。
-- **§14 追補**: `uiButton`/`uiInput` に `data-ricdom-role` を付与し `UI_ROLE` 列挙に
-  統合。`createDialog` の focus trap に可視要素フィルタ (`offsetParent!==null` または
-  `getClientRects().length>0`) を追加し、`display:none` 等の focusable を Tab 循環から
-  除外 (jsdom はレイアウトを持たないため `document.body` の `getClientRects()` で
-  レイアウトエンジンの有無を検出し、無ければフィルタをスキップして既存挙動を保つ)。
-- **CSS**: v1 css_templates.js から splitter/scroll-pane/collapse-box/accordion/tabs の
-  規則を移植。`createDropdown` 用に新規 `.ric-dropdown__trigger*`/`.ric-dropdown__body`
-  (v1 の `.ric-popup__trigger*` を改名・移植)。開閉アニメ・オーバーレイは `createPopup`
-  用に定義済みの `@keyframes ric-popup-in/out`/`.ric-popup__overlay` を再利用。
-  splitter divider・tabs tab/panel に `:focus-visible` の outline を追加 (a11y 新規)。
-- `examples/composite.html`: IIFE 2 本 + CSS `<link>` だけで Phase 3b の全 7 部品を
-  一覧・操作できるデモ (ビルド不要の証明)。
-- テスト: unit +75 (use() 忘れ検知・ARIA 属性・controlled/uncontrolled・rest スプレッド・
-  dispose を各部品ごとに網羅、`internal/exclusiveRegistry.ts`/`internal/popupPosition.ts`
-  の単体テスト、`createDropdown`⇄`createPopup` の排他制御)、browser +14 (splitter の
-  実ドラッグ・矢印キーリサイズ、tabs の矢印キー/Home/End での実フォーカス移動、
-  collapseBox の開閉での実 height 変化、dropdown の below/above flip、dialog focus trap
-  の可視要素フィルタ、scrollPane の follow:'bottom' 実追従)。
+### Added — `ricdom/ui`
 
-### Added — Phase 3a: 状態を持たない部品とレイアウトの移植 (docs/DESIGN.ja.md §10)
-
-- **control (純粋関数、`app.use()` 不要)**: `uiTextarea` (`autoResize` オプション、IME 注意の
-  JSDoc)、`uiCheckbox`、`uiRadiobutton` (per-option 属性転送 + `ric-radio__label` flex 中央寄せ +
-  name 衝突の既知制約コメント)、`uiSelect`、`uiRange`、`uiColor` (hex/rgba 自動判定)、
-  `uiSeparator`、`uiText` (variant: default/muted/title/label)、`uiIcon` (descriptor
-  `{ v?, s?, p }`、`vertical-align:-0.125em` inline 化、size/spin/label)。v1 (ric_ui/control/*)
-  の camelCase 移植。checked/selected の numeric (`?1:0`) 変換 (v1 B15) は不要 — v2 コアが
-  `checked`/`selected` を常にプロパティ代入するため boolean をそのまま渡せる。`<select>` の
-  value/option 構築順対策もコア側で解決済みなので部品側の細工は不要。
-- **`bindInput` / `bindTextarea` / `bindCheckbox` / `bindSelect` / `bindRange`**: v1 の
-  `bind_*` を camelCase 移植 (state の一段目 Proxy へ双方向バインドする流儀)。v1
-  `bind_textarea` だけ options を value/oninput の後に展開しており上書きできてしまう歪みが
-  あったが、v2 は 5 関数とも「options → 計算済みの value/onchange/oninput の順」に統一。
-- **layout**: `uiCol` / `uiRow` / `uiGrid` / `uiPanel`。v1 の `create_ui_page` に相当する
-  「テーマ適用スコープ用コンポーネント」は v2 に存在しないため移植しない (portal と CSS
-  配布が page に依存しないため、設計書 §13)。`uiPanel` は v1 が持っていたテーマ上書き props
-  (`{theme, density, font_size}`) と状態を持つ `create_ui_panel` ファクトリを持たない
-  (Phase 3a は純粋関数のみが対象、設計書 §13)。
-- **text**: `uiMdPre` (見出し/リスト (ul/ol + start)/引用/テーブル (アライメント対応)/
-  フェンス (``` と ~~~)/hr/インライン (code/link/画像/bold/italic)、`transformText` /
-  `transformImageSrc` フック、危険スキーム href ブロック (javascript:/data:/vbscript:)、
-  hljs があればハイライト)、`uiCodePre` (obj → JSON ハイライト、maxHeight)。
-- **CSS**: v1 css_templates.js から Phase 3a 対象部品の規則を `ricdom-ui.css` に統合。
-  **ページ全体のスクロールバー既定スタイル**を移植: `applyTheme(el)` が `data-ricdom-theme`
-  属性を付与するようにし、`[data-ricdom-theme]` 配下 (自身 + 子孫) に
-  `::-webkit-scrollbar` 系 + `scrollbar-color` を当てる (v1 の `.ric-page, .ric-page *` 相当、
-  v2 に page 部品が無いため属性マーカー方式に置き換え、設計書 §13)。`uiPanel` の disabled
-  見た目 (opacity) も JS 側の inline style 計算をやめ `.ric-panel[inert]` の CSS セレクタに
-  変更。
-- 全部品に `data-ricdom-role` を付与 (E2E/CSS の安定セレクタ、`src/ui/internal/pureHelpers.ts`
-  の `UI_ROLE` で列挙型管理)。
-- `examples/controls.html`: IIFE 2 本 + `<link rel="stylesheet">` だけで全 control/layout/text
-  部品を一覧表示するデモ (ビルド不要の証明)。
-- テスト: unit +151 (各部品の DOM 構造/rest スプレッド契約/隔離契約/`uiMdPre` の記法網羅/
-  `applyTheme` の `data-ricdom-theme` 付与とスクロールバー規則の存在 等)、browser +8
-  (`uiTextarea` の autoResize が実 layout で高さを変える、`uiRadiobutton` のラベル整列
-  (アイコン混在で縦ズレしない)、`[data-ricdom-theme]` 配下の scrollbar-color 適用、
-  `uiMdPre` の `javascript:` リンクが href を持たない)。
-
-### Added — Phase 2: 部品契約 + portal + テーマ + CSS 配布 (docs/DESIGN.ja.md §10)
-
-- **`app.use(part)` の正式な部品契約 (§3.4)**: `UsePart` に `attach(host)` / `dispose()` /
-  `renderPortal()` を実装。`host` は `{ notify, portal, app }`。`use()` を経由せず
-  render 内で直接呼ばれた部品は host を受け取れないため、部品側が「初回だけ
-  `console.error` して何も描画しない」ことで検知する (v1 の `__notify` 暗黙注入と違い、
-  置き場所を間違えようがない構造)。
-- **portal 層 (§3.5)**: `createApp` が target 直下の末尾に `<div data-ricdom-role="portal">`
-  を自動生成し、render サイクルごとに登録済み part の `renderPortal()` を集めて
-  差分パッチする (v1 の `_page_portal_queue` の後継、page への依存なし)。第 4 引数
-  `createApp(target, state, render, { portalTo })` で描画先を任意要素に差し替え可能
-  (v1 の `portal_to` 要望を吸収)。複数 `createApp` は複数の独立した portal を持つ。
-- **`ricdom/ui` サブパス (§4/§6)**: `applyTheme` / `createTheme` / `exportTheme`
-  (v1 の `make_css_vars`/`create_theme`/`export_theme` を camelCase 移植、`:root` 不使用)。
-  `buildStylesheet()` / `injectStyles()` による CSS 1 枚配布 (per-instance の使用クラス
-  収集を廃止)。`Component<P>` 型 (呼び出し `(props)=>RicNode` + `attach(host)` + `dispose()`)。
-- **`createDialog`**: `role="dialog"` + `aria-modal` + `aria-labelledby`/`describedby`、
-  開いたら最初の focusable にフォーカス、Tab/Shift+Tab の focus trap、Esc で閉じて
-  起動元へフォーカス復帰、背景 (portal の兄弟要素) を `inert`、`onClose(reason)`
-  ('overlay'/'close-button'/'escape'/'api')、controlled/uncontrolled、`width` オプション。
-- **`createPopup`**: トリガーに `aria-haspopup="menu"` + `aria-expanded`、本体
-  `role="menu"`、子に `role="menuitem"` を自動付与、矢印キー/Home/End での項目間移動、
-  Esc でトリガーへ復帰、外クリックで閉じる、`openAt({x,y}|MouseEvent)`、上下 flip +
-  横 clamp の 2 段階実測 (v1 継承)。v1 の label/icon/chevron モードは持たず menu に絞る。
-- **`createToast`**: `role="status"` (`aria-live="polite"`)、`type:"error"` は
-  `role="alert"`、`show(msg, { type, duration })`、`duration:0` で自動消去なし、
-  フォーカスを奪わない。
-- **`createTooltip`**: `aria-describedby` でトリガーと結び、hover/focus で表示、Esc で消える。
-- **`uiButton` / `uiInput`**: 状態を持たない純粋関数部品 (props → RicNode)。rest スプレッド
-  契約 (v1 A15 継承)。
-- ビルド: `dist/ui.js`/`dist/ui.cjs` (`ricdom/ui` サブパス) + `dist/ricdom-ui.iife.min.js`
-  (グローバル `ricdomUI`) + `dist/ricdom-ui.css` (`scripts/build-css.mjs` が生成)。
-  `examples/ui.html`: IIFE 2 本 + `<link rel="stylesheet">` だけで動くデモ。
-- dialog/popup/toast の open/close 状態遷移の完了を実 CSS `animationend` に委ねている
-  箇所すべてに `setTimeout` backstop (700ms) を併設 (コアの rAF+setTimeout バックストップ
-  二重化と同じ考え方、v1 FACT A6)。CSS 未読み込み等でアニメーションが一切走らない場合でも
-  「閉じられない」が起きない構造にする (実ブラウザテストで発見・修正)。
+- **Theming**: `applyTheme(el, { theme, density, fontSize })` writes `--ric-*` CSS custom
+  properties (and the native `color-scheme` property, so native controls — scrollbars,
+  `<select>`, checkboxes, date pickers — follow light/dark automatically) as inline style
+  on any element — themes are per-element, not global, so multiple differently-themed
+  mounts can coexist on one page. Five bundled themes (`light`/`dark`/`teal`/`cyber`/
+  `aqua`), three densities, three font sizes, or a fully custom `Record<string,string>`.
+  `createTheme(base, overrides)` and `exportTheme(el)` round-trip a theme for persistence.
+  `applyTheme` also marks its element `data-ricdom-theme`, which scopes the page-wide
+  scrollbar styling described below.
+- **CSS distribution**: one stylesheet (`ricdom-ui.css`) covers every component — no
+  per-instance CSS collection to route through correctly. Load it via `<link>` or, for a
+  build-free `<script>`-only page, `injectStyles()` (idempotent, warns once if a
+  stateful component is used before either has happened).
+- **Component contract**: `Component<P>` (`(props) => RicNode` + `attach(host)` +
+  `dispose()` + optional `renderPortal()`), the `ricdom/ui`-side shape of the core's
+  `UsePart`. Every stateful component below detects being called without `app.use()` and
+  logs one `console.error` (not spammed on every call) instead of doing anything silently
+  wrong.
+- **Stateless controls** (plain functions, no `app.use()` needed): `uiButton`, `uiInput`,
+  `uiTextarea` (`autoResize`), `uiCheckbox`, `uiRadiobutton`, `uiSelect`, `uiRange`,
+  `uiColor` (hex/`rgba()` auto-detected), `uiSeparator`, `uiText` (`variant`), `uiIcon`
+  (see Icons, below). All follow a rest-spread contract: extra props merge onto the
+  rendered root without being able to override the component's own computed attributes,
+  and (where a component wraps an inner element, like `uiCheckbox`'s `<input>`) the props
+  that belong to that inner element never leak into the outer wrapper's rest spread.
+- **`bindInput`/`bindTextarea`/`bindCheckbox`/`bindSelect`/`bindRange`**: two-way-binding
+  sugar over a state property, e.g. `bindInput(s, 'name', options)`. Caller-supplied
+  `options` is always applied before the computed `value`/`on*` handlers, so it can never
+  silently override the binding.
+- **Layout**: `uiCol`, `uiRow`, `uiGrid` (`columns`/`rows` accept a number, a raw CSS
+  track string, or `'auto-fit 200px'`/`'auto-fill 120px'` shorthand), `uiPanel`
+  (`layout: 'col' | 'row'`, `disabled` sets the native `inert` attribute).
+- **Text**: `uiMdPre` (a practical Markdown subset — headings, bold/italic, inline code,
+  fenced code blocks with `` ``` ``/`~~~`, ordered lists with a `start` attribute,
+  bulleted lists, blockquotes, aligned tables, horizontal rules, links, images —
+  `transformText`/`transformImageSrc` hooks, and a blocklist, not a whitelist, for
+  dangerous `href` schemes so custom protocols like `app://` still work), `uiCodePre`
+  (code or `JSON.stringify`'d object display, always dark-themed, optional
+  `window.hljs`-powered syntax highlighting if present).
+- **Stateful dialog/popup/toast/tooltip/dropdown** (`app.use()` required): `createDialog`
+  (modal, `role="dialog"` + `aria-modal`, focus trap, `Escape`-to-close with focus
+  restoration, background `inert`, controlled/uncontrolled modes, optional auto-rendered
+  trigger), `createPopup` (`role="menu"` dropdown menu with arrow-key/Home/End navigation
+  and automatic `role="menuitem"` wrapping, plus `openAt({x,y})` for non-trigger-anchored
+  opening), `createToast` (`role="status"`/`role="alert"` queue, never steals focus),
+  `createTooltip` (`aria-describedby`, hover/focus-triggered, viewport-aware direction),
+  `createDropdown` (a generic Popover — `aria-haspopup="dialog"` — for label/icon-mode
+  triggers whose body semantics are entirely up to the caller; shares position-flip and
+  exclusive-open logic with `createPopup`). All animate open/close on real CSS events
+  (`animationend`) with a 700ms `setTimeout` fallback, so a state transition always
+  eventually completes even if `ricdom-ui.css` never loaded.
+- **Stateful composite components** (`app.use()` required): `createSplitter`
+  (drag-to-resize two-pane layout, `role="separator"` + `aria-valuenow/min/max`, arrow-key
+  resizing, collapsible), `createScrollPane` (auto-follow-to-bottom/top scroll region for
+  chat/log UIs, with a `threshold` for "is the user currently looking elsewhere"),
+  `createCollapseBox` (an animated open/close container primitive; supports multiple
+  simultaneous keyed instances for sparse-list animation; completion is detected via
+  `transitionend` with a 700ms `setTimeout` fallback, since a dynamic per-instance
+  height/width cannot be expressed as a fixed `@keyframes` animation), `createAccordion`
+  (`<button aria-expanded aria-controls>` header + `role="region"` panel, closed panels
+  get `hidden` to drop out of the accessibility tree while keeping their CSS open/close
+  transition working), `createTabs` (`role="tablist"/"tab"/"tabpanel"`, roving tabindex,
+  arrow-key/Home/End navigation, controlled or uncontrolled active-tab state).
+- **`uiInlineMenu`**: a lightweight, portal-free absolutely-positioned popover (a plain
+  function — no `app.use()`), for cases where a full `createPopup` instance per row would
+  be too heavy (e.g. an ellipsis menu on every row of a long list). Warns in development
+  if its parent element isn't a positioned ancestor.
+- **`createTweakPanel`**: a dat.GUI-style parameter panel. Pass `data` alone for full
+  auto-generated rows (row type inferred from each value's type — booleans → checkbox,
+  numbers → number input, hex/`rgba()` strings → color picker, nested plain objects →
+  collapsible folders); `keys` partially overrides individual rows (type/min/max/step/
+  options/label/open); `rows` appends hand-built `RicNode`s after the generated ones. The
+  editing guard (core) means typing a decimal into a number row survives an unrelated
+  re-render mid-keystroke without being clobbered.
+- **`ricdom/icons`**: 36 bundled icon descriptors (`{ v?, s?, p }`) as individual,
+  tree-shakable named exports (`import { check, chevronDown } from 'ricdom/icons'`),
+  Lucide-style kebab-case names converted to camelCase (`chevron-down` → `chevronDown`).
+  `ICON_NAMES` (camelCase → kebab) and `ICONS_BY_NAME` (kebab → descriptor) provide the
+  reverse/direct lookups. `svgToDescriptor(svg)` converts an arbitrary SVG's
+  `circle`/`rect`/`polygon`/`line`/`ellipse`/`path` shapes into descriptor path data.
+  `IconDescriptor` (used by `ricdom/icons`) and `uiIcon`'s descriptor parameter (
+  `ricdom/ui`) are the same type — `ricdom/ui` imports it type-only, with zero runtime
+  dependency on `ricdom/icons`.
+- **`ricdom-icon` CLI** (`npx ricdom-icon <name> [--json] [--search TERM] [--names]`):
+  returns a bundled descriptor instantly, or fetches and converts one from Lucide if not
+  bundled — the tool a no-bundler consumer uses to get an icon's path data without ever
+  hand-writing it. stdout carries only the requested data; diagnostics go to stderr.
+- **`data-ricdom-role`** is set on every component's rendered root — including the portal
+  root of `createDialog`/`createPopup`/`createToast`/`createTooltip`/`createDropdown` —
+  as a stable selector for E2E tests and CSS overrides, independent of class names or DOM
+  structure. See [SPEC.md §11](docs/SPEC.md#11-data-ricdom-role-registry) for the full
+  list of values.
+- Build: `dist/ui.js`/`dist/ui.cjs` (`ricdom/ui` subpath, ESM+CJS+`.d.ts`) and
+  `dist/ricdom-ui.iife.min.js` (global `ricdomUI`) — `ricdom/ui` has **zero runtime
+  dependency on `ricdom`** (only type-only imports of `RicNode`/`App`/`Host`), so the two
+  IIFE builds are a logical pairing, not a bundler-level dependency.
 
 ### Fixed
 
-- portal の島ノードに `key` を持たせ、render のトップレベルが invisible (`null`/`false`)
-  を返す render とそうでない render が交互に起きたときの index ズレによる portal DOM
-  ノードの誤った再生成を防ぐ (`ricdom/ui` の dialog 実装中に発見)。
-
-### Added — Phase 1b (docs/DESIGN.ja.md §12)
-
-- `createApp(target, state, render)` を 3 引数に変更。v1 の「state に render を同梱する」
-  形のオーバーロードは削除 (canon は 1 つ)。render を独立させたことで `S` が `state` から
-  素直に推論され、render コールバック内の `s` も完全に型付く。`app.render = fn` による
-  後付け設定は維持 (v1 踏襲)。
-- target が未解決のとき: v1 の 20 秒ポーリングは廃止し、`DOMContentLoaded` を 1 回だけ待って
-  再解決する。それでも見つからなければ `console.error` + 型付き NOOP。
-- `tag` を型上必須に変更 (`{}` は型エラー)。v1 は tag 省略時に暗黙で `div` 扱いだったが、
-  実行時に tag が欠落したノードが渡された場合は `console.error` + 不可視ノード扱いにする。
-- 実ブラウザテスト (`@vitest/browser` + Playwright/chromium) を追加。rAF 停止環境でのバック
-  ストップ描画・`<select>` の value/option 構築順・編集中ガード (実 DOM の badInput 込み)・
-  IIFE ビルド smoke の 4 件を最初の回帰テストとして `tests/browser/` に実装。
-- GitHub Actions CI (`CI`): typecheck → jsdom テスト → Playwright インストール →
-  ブラウザテスト → build を push/PR ごとに実行。
-
-### Added — Phase 1: コア (docs/DESIGN.ja.md §10)
-
-- `createApp(target, state, render)`: v1 `create_RicDOM` の後継。target 解決済みなら
-  同期初回描画、無効な target/state/render は `console.error` + 型付き NOOP App を
-  返す (throw しない)。
-- ノード表現: `{ tag, class, style, children, ref, key, island, ...attrs }`。`ctx` → `children`
-  に改称。タグ名から属性型を導く TypeScript 型 (`RicElementNode`)。
-- 差分パッチ: position-based + key-based reconciliation、`FORCE_REAPPLY`
-  (value/checked/selected/scrollTop/scrollLeft)、select の value/option 構築順対策、
-  SVG namespace 継承、`data-ricdom-ref` 安定セレクタ。
-- 編集中ガード (コアの規則に一般化): `document.activeElement` である
-  input/textarea/select には `value` を FORCE_REAPPLY しない。
-- 島: 明示フラグ `island: true` の要素は子孫を一切 build/patch しない。
-- リアクティビティ: 浅い Proxy (トップレベル + 1 段目)。`ignore` 配下は追跡しない。
-  dev ビルドでは 2 段目以降への代入を検知して `console.warn` する
-  (production では無効。`process.env.NODE_ENV` で分岐)。
-- スケジューラ: `requestAnimationFrame` + `setTimeout(200ms)` バックストップの二重化。
-- `app.renderNow()` (強制・同期) / `app.nextRender()` (観測・Promise、render 予約が無ければ
-  resolve しない) の対。
-- `app.refs`: `ref: 'name'` → `app.refs.get('name')`。
-- `app.use(part)`: 部品登録の骨組み (Phase 2 で正式な部品契約になる)。
-- `app.unmount()`: インスタンス破棄、以降の再描画・タイマーを停止。
-- ビルド: tsup で ESM (`dist/index.js`) / CJS (`dist/index.cjs`) / IIFE
-  (`dist/ricdom.iife.min.js`、グローバル `ricdom`) + 型宣言を生成。利用側はビルド不要。
-- テスト: Vitest (jsdom) + 型テスト (expect-type / `@ts-expect-error`)。
+- A portal sentinel node lacking a stable `key` could be misdiffed as a different element
+  when the surrounding render's top-level visibility toggled between a node and
+  `null`/`false` across renders (the sentinel's array index would shift), causing the
+  cached portal DOM reference to become detached from the live document while later
+  `renderPortal()` patches kept targeting it. Fixed by giving the portal sentinel a fixed
+  `key`, which routes it through key-based (not position-based) reconciliation.
 
 ### Changed
 
-- ライセンスを MIT に設定 (v1 の非商用条項付き独自ライセンスから継承しない、新規プロジェクト
-  として仕切り直し)。
+- License: MIT, for the whole v2 codebase, from the first commit — a clean slate that
+  does not inherit v1's noncommercial-with-exceptions license.
+
+### Breaking changes from v1
+
+If you're migrating an existing [RicDOM v1](https://github.com/miyoshi-tec/RicDOM) app,
+expect all of the following to require code changes — there is no source compatibility:
+
+- **Naming**: snake_case → camelCase everywhere (`create_RicDOM` → `createApp`,
+  `create_ui_dialog` → `createDialog`, `ctx` → `children`, `data-ric-role` →
+  `data-ricdom-role`, …).
+- **`createApp(target, state, render)`** takes `render` as a required third argument,
+  never nested inside `state`.
+- **Stateful components require `app.use()`.** v1's implicit wiring (assigning a
+  factory's return value to a specific place in `state` silently activated a hidden Proxy
+  trap) does not exist in v2 — every stateful component (dialog/popup/toast/tooltip/
+  dropdown/splitter/scrollPane/collapseBox/accordion/tabs/tweak panel) must be registered
+  via `app.use(create...())` first.
+- **`style` is object-only.** v1's string/array/object style forms are reduced to one:
+  a plain `Record<string, string | number>`.
+- **Islands are explicit**: `island: true`, not "omit `children`."
+- **Portals are per-app**, not routed through a page component — there is no v2
+  equivalent of v1's `create_ui_page`. `applyTheme(el)` applies directly to any element;
+  CSS ships as one stylesheet regardless of what wraps a given mount.
+- **`createPopup` is menu-only** (`role="menu"`); v1's combined label/icon/chevron
+  dropdown modes are `createDropdown` in v2.
+- Checked/selected values are passed as plain booleans — v2's core always assigns
+  `checked`/`selected` as DOM properties, so the `1`/`0` numeric-conversion workaround v1
+  components needed is gone.
