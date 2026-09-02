@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ricdom examples</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 640px; }
+  h1 { font-size: 1.2rem; }
+  p.lede { color: #555; }
+  ul { padding-left: 1.2rem; }
+  li { margin: 0.6rem 0; }
+  code { background: #f2f2f2; padding: 0.1rem 0.3rem; border-radius: 4px; }
+</style>
+</head>
+<body>
+<!--
+  Every demo below opens directly in a browser, no build step: each one loads
+  ../dist/ricdom.iife.min.js (and, where used, ../dist/ricdom-ui.iife.min.js +
+  ../dist/ricdom-ui.css) via a plain <script>/<link> tag. Run `npm run build`
+  once first so dist/ exists, then open any .html file here directly.
+-->
+<h1>ricdom examples</h1>
+<p class="lede">Five build-free demo pages. Each opens directly in a browser — no
+  <code>npm install</code>, no bundler.</p>
+<ul>
+  <li><a href="hello.html">hello.html</a> — the smallest possible app: one
+    <code>&lt;script&gt;</code> tag and a counter (<code>ricdom</code> core only).</li>
+  <li><a href="controls.html">controls.html</a> — every stateless control, layout, and
+    text component (<code>ricdom/ui</code>, no <code>app.use()</code> needed).</li>
+  <li><a href="ui.html">ui.html</a> — dialog, popup, toast, and tooltip (stateful
+    components registered via <code>app.use()</code>).</li>
+  <li><a href="composite.html">composite.html</a> — splitter, scroll pane, collapse box,
+    accordion, tabs, dropdown, and the inline menu.</li>
+  <li><a href="tweak.html">tweak.html</a> — <code>createTweakPanel</code>, a dat.GUI-style
+    parameter panel with live-updating output.</li>
+</ul>
+</body>
+</html>
