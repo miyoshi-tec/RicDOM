@@ -171,12 +171,24 @@ const createDeferredApp = <S extends object>(
 
 // portal の描画先を自前生成する場合、target 直下の末尾に置く「島」の目印ノード
 // (設計書 §3.5)。island: true なので子孫は build/patch されず、portal 要素自身の
-// 中身は下記の portal 専用パッチサイクルが別途管理する。tag/attrs が render 毎に
-// 同一形状で再生成されるため、通常の位置ベース reconciliation で「動かない 1 要素」
-// として扱われ、同じ DOM ノードが使い回される (再生成・破棄されない)。
+// 中身は下記の portal 専用パッチサイクルが別途管理する。
+//
+// `key` を固定値で持たせるのが重要: render() のトップレベルが null/false 等の
+// invisible を返す render とそうでない render が交互に起きると、
+// normalizeChildren が invisible を除去した結果 [mainTree, PORTAL_SENTINEL] の
+// 「配列上のインデックス」が render ごとに 0 だったり 1 だったりズレる
+// (invisible な render では portal がインデックス 0 に繰り上がる)。key が無いと
+// position-based reconciliation はこのインデックスの主だけを見て「型が変わった」と
+// 誤判定し、portal の実 DOM ノードを破棄して新しい要素を作ってしまう
+// (キャッシュ済みの portal 要素参照が指す DOM ノードが浮遊し、以後の portal
+// パッチが実際には画面に繋がっていないノードに対して行われる、という実害のあるバグ
+// だった。実装中に発見・修正)。key を持たせることで key-based reconciliation
+// (dom.ts の patchChildrenByKey) が使われ、位置に関係なく同一の DOM ノードが
+// 常に再利用されることを保証する。
 const PORTAL_SENTINEL: RicElementNode = {
   tag: 'div',
   island: true,
+  key: '__ricdom_portal__',
   'data-ricdom-role': 'portal',
 } as RicElementNode;
 

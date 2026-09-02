@@ -49,6 +49,33 @@ describe('portal: 既定 (自動生成)', () => {
     expect(app.querySelector('[data-ricdom-role="portal"]')).not.toBeNull();
   });
 
+  it('メインツリーが invisible → visible に変わっても portal の DOM ノード・内容は保持される (回帰: portal に key が無いと index ズレで作り直されるバグ)', async () => {
+    // 実装中に発見: normalizeChildren は invisible な子を除去するため、
+    // [mainTree, PORTAL_SENTINEL] の「配列上のインデックス」は mainTree が
+    // invisible な render とそうでない render とで 0 だったり 1 だったりズレる。
+    // PORTAL_SENTINEL に key が無いと位置ベース reconciliation がこれを
+    // 「型が変わった」と誤判定し、portal の実 DOM ノードを破棄して新しい
+    // ノードを作ってしまう (キャッシュ済みの portal 要素参照が浮遊し、以後の
+    // portal パッチが画面に繋がっていないノードに対して行われる)。
+    const app = setupApp();
+    const handle = createApp('#app', { show: false }, (s) => (s.show ? { tag: 'div', id: 'x' } : null));
+    const part: UsePart = { renderPortal: () => ({ tag: 'span', id: 'out', children: ['portal-content'] }) };
+    handle.use(part);
+    await flush();
+
+    const portalBefore = app.querySelector('[data-ricdom-role="portal"]');
+    expect(portalBefore).not.toBeNull();
+    expect(app.querySelector('#out')!.textContent).toBe('portal-content');
+
+    handle.show = true; // メインツリーが invisible → visible に変わる
+    await flush();
+
+    const portalAfter = app.querySelector('[data-ricdom-role="portal"]');
+    expect(portalAfter).toBe(portalBefore); // 同一 DOM ノードのまま
+    expect(app.querySelector('#out')!.textContent).toBe('portal-content'); // 内容も生きている
+    expect(app.querySelector('#x')).not.toBeNull(); // メインツリーも正しく描画されている
+  });
+
   it('renderPortal() の戻り値が render サイクルごとに portal へ差分反映される', async () => {
     const app = setupApp();
     const handle = createApp('#app', { label: 'a' }, (s) => ({ tag: 'div', children: [s.label] }));
