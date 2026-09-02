@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>RicDOM 2 — createTweakPanel (no build step)</title>
+<link rel="stylesheet" href="../dist/ricdom-ui.css">
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; }
+  h1 { font-size: 1.1rem; }
+  .app-shell { max-width: 900px; margin: 2rem auto; }
+  .demo-row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .stage {
+    width: 260px; height: 260px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--ric-color-border); border-radius: var(--ric-radius);
+    background: color-mix(in srgb, var(--ric-color-bg) 92%, var(--ric-color-fg) 8%);
+    overflow: hidden;
+  }
+  .shape { display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; user-select: none; }
+</style>
+</head>
+<body>
+<!--
+  利用側はビルド不要 (設計書 G1)。IIFE 2 本 (ricdom → ricdom/ui) + CSS <link> だけで
+  createTweakPanel (Phase 3c) の Tier1/2/3 とパラメータ操作の即時反映を確認できる。
+  tweak パネルで数値/色/選択肢を弄ると、右側の図形 (.shape) がその場で変化する。
+-->
+<div id="app"></div>
+
+<script src="../dist/ricdom.iife.min.js"></script>
+<script src="../dist/ricdom-ui.iife.min.js"></script>
+<script>
+  const U = ricdomUI;
+
+  const state = {
+    theme: 'light',
+    // createTweakPanel に渡す data。プロパティの型から Tier1 で行が自動生成される
+    // (number → number 行、string → text/color 行、boolean → checkbox 行、
+    // plain object → folder)。size/rotation/rounded は Tier2 の keys で
+    // type:'range' に上書きし、mode は type:'radiobutton' に上書きしている。
+    params: {
+      size: 120,
+      color: '#4f8ef7',
+      rotation: 0,
+      rounded: 16,
+      mode: 'square',
+      showLabel: true,
+      label: 'RicDOM',
+      border: { width: 2, color: '#1e293b' },
+    },
+  };
+
+  // 状態を持つ部品は createApp の戻り値を受け取った後に use() する (設計書 §3.4)。
+  let tweak;
+
+  const shapeNode = (p) =>
+    ({
+      tag: 'div',
+      class: 'shape',
+      style: {
+        width: `${p.size}px`,
+        height: `${p.size}px`,
+        background: p.color,
+        borderRadius: p.mode === 'circle' ? '50%' : `${p.rounded}px`,
+        border: `${p.border.width}px solid ${p.border.color}`,
+        transform: `rotate(${p.rotation}deg)`,
+        transition: 'all 60ms linear',
+      },
+      children: [p.showLabel ? p.label : ''],
+    });
+
+  const app = ricdom.createApp(
+    '#app',
+    state,
+    (s) =>
+      !tweak
+        ? { tag: 'div' }
+        : U.uiPanel({
+            class: 'app-shell',
+            children: [
+              { tag: 'h1', children: ['RicDOM 2 — Phase 3c createTweakPanel'] },
+              U.uiText({ children: ['data だけ渡すと型から行が自動生成され (Tier1)、keys で一部だけ上書きできる (Tier2)。パネルを弄ると右の図形がその場で変わる。'] }),
+              {
+                tag: 'div',
+                class: 'demo-row',
+                children: [
+                  tweak({
+                    title: 'パラメータ',
+                    width: 260,
+                    data: s.params,
+                    keys: {
+                      size: { type: 'range', min: 40, max: 220, step: 2 },
+                      rotation: { type: 'range', min: 0, max: 360, step: 5 },
+                      rounded: { type: 'range', min: 0, max: 60 },
+                      mode: { type: 'radiobutton', options: ['square', 'circle'] },
+                      border: {
+                        label: '枠線',
+                        open: true,
+                        keys: { width: { type: 'range', min: 0, max: 10 } },
+                      },
+                    },
+                    // Tier3: 自動生成行の後ろに自前の行 (リセットボタン) を足す
+                    rows: [
+                      U.uiButton({
+                        children: ['既定値に戻す'],
+                        onclick: () => {
+                          s.params = { size: 120, color: '#4f8ef7', rotation: 0, rounded: 16, mode: 'square', showLabel: true, label: 'RicDOM', border: { width: 2, color: '#1e293b' } };
+                        },
+                      }),
+                    ],
+                  }),
+                  { tag: 'div', class: 'stage', children: [shapeNode(s.params)] },
+                ],
+              },
+            ],
+          }),
+  );
+
+  tweak = app.use(U.createTweakPanel());
+
+  U.applyTheme(document.getElementById('app'), { theme: state.theme });
+</script>
+</body>
+</html>

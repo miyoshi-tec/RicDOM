@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Phase 3c: tweak panel + アイコン同梱データ/CLI (docs/DESIGN.ja.md §10/§15)
+
+- **§15 追補**: `createAccordion` の閉じたパネルに `hidden` 属性を付与し a11y ツリーから
+  除外 (`role="region"` は維持)。CSS の `.ric-accordion__body { display: grid; ... }`
+  (author スタイル) が UA スタイルシートの `[hidden] { display: none }` に優先するため、
+  grid-template-rows のクローズアニメーションは従来どおり視覚的に動く。
+- **`createTweakPanel`** ← v1 `ui_tweak.js` (`create_ui_tweak_panel`/`ui_tweak_panel`/
+  `ui_tweak_row`/`ui_tweak_folder`): dat.GUI 風のパラメータ調整パネル。Tier1 (`data` を
+  渡すだけで型推論して行を自動生成: number/range/checkbox/text/select/radiobutton/
+  color、ネストした plain object は folder)、Tier2 (`keys` で type/min/max/step/
+  options/open を部分上書き)、Tier3 (`rows` に自前の `RicNode` を追加)、`width`。
+  行部品は Phase 3a の `uiInput`/`uiRange`/`uiCheckbox`/`uiSelect`/`uiRadiobutton`/
+  `uiColor` を再利用 (重複実装しない)。folder は v1 のネイティブ `<details>` を廃止し、
+  `createAccordion` と同じ `<button aria-expanded aria-controls>` + `role="region"` +
+  `hidden` パターンに変更 (開閉状態は部品が `path` — データのキー鎖を `.` 区切りに
+  したもの — をキーに JS state として保持)。number 行の「編集中ガード」は v1 の
+  onfocus マーカー方式を廃止し、コアの編集中ガード (`shouldSkipValueReapply`) に
+  一般化されたことで部品側は素直に `value` を渡すだけになった (blur 時の min/max
+  clamp + `set()` の書き戻しは部品固有の責務として残す)。radiobutton 行は a11y 上
+  `<fieldset><legend>` で構成 (`<label>` は複数 labelable descendant を持てないため、
+  v1 の `<label>` 相当は number/range/text/select/color 行にのみ適用)。radiobutton の
+  name 衝突の既知制約 (`label` 文字列由来のため、同一 label の行が 2 つあると
+  同一グループに merge される) は v1 から移植。
+- **`ricdom/icons` サブパス (新規)**: v1 `docs/icons/icons.json` の同梱 36 descriptor
+  (`{ v?, s?, p }`) を個別の named export に (`import { check, chevronDown } from
+  'ricdom/icons'`、tree-shakable — 1 アイコン 1 リテラルなので使わないアイコンは
+  バンドルされない)。名前は Lucide 由来のケバブケースを camelCase に変換
+  (`chevron-down` → `chevronDown`、`trash-2` → `trash2`)。元のケバブケース名は
+  `ICON_NAMES` (camelCase→kebab) と `ICONS_BY_NAME` (kebab→descriptor) で引ける。
+  IIFE は作らない (ビルド不要ユーザーは CLI で descriptor を取得してコピーする、
+  「使う分だけ」哲学の継続)。`svgToDescriptor(svg)` を同サブパスから export (v1
+  `docs/icons/svg_to_descriptor.js` の TS 化、circle/rect/polygon/line/ellipse →
+  path 変換込み)。
+- **`ricdom-icon` CLI** (`package.json` の `bin`、`dist/cli/ricdom-icon.cjs`):
+  v1 `scripts/icon.js` の機能パリティ。同梱名は即返し、無ければ Lucide を
+  `https.get` で取得して `svgToDescriptor` で path 化。`--json` / `--search TERM` /
+  `--names` / `-h`。stdout は純粋出力・ログは stderr、`const ICONS = {...}` ブロック
+  出力 + Lucide (ISC) 帰属コメント。ロジック本体 (`src/cli/ricdomIconLib.ts`) と
+  エントリポイント (`src/cli/ricdomIcon.ts`) を分離し、`resolveAll` にテスト用の
+  `lucideFetcher` 差し替え口を追加 (ネットワーク不要で「不明な名前 → errors[]」の
+  分岐を検証できる、v1 には無かったテスタビリティ改善)。
+- **帰属**: `THIRD_PARTY_NOTICES.md` (v1 `docs/icons/ATTRIBUTION.md` を移植) をリポジトリ
+  直下に新設し、`LICENSE` 末尾から参照。`contrast` descriptor の宣言箇所に Lucide 由来
+  である旨のコメントを付与 (他 35 個は RicDOM オリジナル)。
+- `uiIcon` の JSDoc を更新: descriptor の入手手段を「`ricdom/icons` から import」
+  「`npx ricdom-icon <name>`」の 2 択に明記 (手書き禁止は継続)。
+- `examples/tweak.html`: IIFE 2 本 + CSS `<link>` だけで `createTweakPanel` の
+  Tier1/2/3 とパラメータの即時反映 (隣の図形が変化する) を確認できるデモ。
+- テスト: unit +67 (`createAccordion` の hidden 属性、`createTweakPanel` の Tier1 型推論
+  全種・Tier2 上書き・Tier3・folder 開閉 (path ベース)・blur clamp・radiobutton name
+  制約・a11y 結合、`ricdom/icons` の 36 descriptor 検証・名前対応表、`svgToDescriptor`
+  の全図形変換、CLI の `buildBlock`/`buildJson`/`resolveAll`/`loadBundled`)、browser +6
+  (tweak の number 行で小数点を打っている最中に別 state の再描画が走っても入力が
+  潰れないことの実証 — v1 v0.3.37 のバグが v2 のコア規則で構造的に消えていることの
+  回帰テスト、tweak の folder 開閉での実 `hidden` 切り替えとフォーカス可能性、
+  `uiIcon` が `ricdom/icons` の descriptor を実 DOM に描く)。
+
 ### Added — Phase 3b: 状態を持つ部品群の移植 (docs/DESIGN.ja.md §10)
 
 - **`createSplitter`** ← v1 `create_ui_splitter`: left/right/top/bottom、ドラッグリサイズ、

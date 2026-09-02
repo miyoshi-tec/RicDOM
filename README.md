@@ -6,8 +6,8 @@
 
 Successor to [RicDOM v1](https://github.com/miyoshi-tec/RicDOM). Under construction — see [docs/DESIGN.ja.md](docs/DESIGN.ja.md).
 
-Status: Phase 3b (stateful composite components: splitter/scrollPane/collapseBox/
-accordion/tabs/dropdown/inlineMenu) — not yet published.
+Status: Phase 3c (`createTweakPanel` parameter panel + `ricdom/icons` bundled icon
+data / `svgToDescriptor` / `ricdom-icon` CLI) — not yet published.
 
 ```js
 // createApp(target, state, render) — 3 引数 (state から render の s が型付く)
@@ -56,3 +56,26 @@ Composite components (splitter / scrollPane / collapseBox / accordion / tabs /
 dropdown) also register via `app.use()` — same rule, no exceptions. `uiInlineMenu`
 is stateless (open state lives in your own state, like `uiButton`). See
 [examples/composite.html](examples/composite.html) for a full working demo.
+
+`createTweakPanel` (`app.use()`) builds a dat.GUI-style parameter panel from a
+plain data object — pass `data` and it infers a row per property (number/range/
+checkbox/text/select/radiobutton/color, nested objects become collapsible
+folders); override individual rows with `keys`, or append hand-built rows with
+`rows`. See [examples/tweak.html](examples/tweak.html).
+
+## ricdom/icons
+
+`ricdom/icons` ships 36 bundled icon descriptors (`{ v?, s?, p }`) as individual,
+tree-shakable named exports (Lucide-style kebab-case names converted to
+camelCase, e.g. `chevron-down` → `chevronDown`) plus `svgToDescriptor(svg)` for
+converting your own SVGs. Never hand-write a descriptor's path data — either
+`import` from this subpath or fetch one with the bundled CLI:
+
+```sh
+npx ricdom-icon chevronDown --json   # bundled, offline
+npx ricdom-icon settings --json      # not bundled → fetched from Lucide, path-ified
+npx ricdom-icon --names              # list bundled names
+npx ricdom-icon --search gear        # search bundled + Lucide
+```
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for icon attribution.
