@@ -160,6 +160,15 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
 - `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+## 16. Phase 3c 実装での確定事項 (2026-09-02)
+
+- `createTweakPanel` は **1 部品** (v1 の create_ui_tweak_panel / ui_tweak_row / folder を統合)。Tier1 `data` / Tier2 `keys` / Tier3 `rows`。v1 の「keys を関数で渡す動的再評価」「keys[k] を vdom 丸ごと差し替え」は Tier3 `rows` で代替できるため持たない
+- tweak の **radiobutton 行は `<fieldset><legend>`** (複数 input を `<label>` で包むのは HTML 的に不正。§3c 指示の「各行は label で結合」は単一 input 行に限る、と読み替える)
+- **number 行の編集中ガードはコアの規則が肩代わり** (部品側の focus マーカーは無い)。v1 v0.3.37 の小数点ドロップが構造的に消えていることを browser テストで実証済み。blur 時の min/max clamp + `set()` は部品の責務
+- `IconDescriptor` 型は `ricdom/icons` で独立宣言 (`ricdom/ui` の `UiIconDescriptor` と構造同一)。**`ricdom/icons` は `ricdom/ui` にも依存しない** (アイコンデータだけを使う consumer を想定)。両型の一本化は Phase 3d の API 整合レビューで検討
+- 同梱 36 アイコンのうち Lucide 由来は `contrast` のみ (v1 ATTRIBUTION 継承)。`settings` 等は同梱せず CLI の Lucide 取得で対応 (「使う分だけ」哲学)
+- CLI は lib (`ricdomIconLib.ts`、`lucideFetcher` 注入でネット無しテスト可) + entry の 2 層。v1 より testability を上げた追加であり機能パリティは維持
+
 ## 15. Phase 3b 実装での確定事項 (2026-09-02)
 
 - `createCollapseBox` の完了検知は **`transitionend` + 700ms バックストップ** (高さは per-instance の動的値で `@keyframes` では表現できないため。§13 の「animationend」は「CSS のアニメ完了イベント + バックストップ」の総称として読む)。ヘッドレス部品なので `aria-expanded` は呼び出し側のトリガーが持ち、`idFor(key)` で `aria-controls` を結ぶ
