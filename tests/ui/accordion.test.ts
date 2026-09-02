@@ -46,6 +46,29 @@ describe('createAccordion: 構造 / ARIA', () => {
     expect(header.getAttribute('aria-controls')).toBe(panel.id);
   });
 
+  it('閉じたパネルは hidden 属性を持ち、開くと外れる (§15 追補: a11y ツリーから除外)', async () => {
+    const app = setupApp();
+    let acc: ReturnType<typeof createAccordion>;
+    const handle = createApp('#app', {}, () => (acc ? acc({ items: ITEMS }) : null));
+    acc = handle.use(createAccordion());
+    await flush();
+
+    const panel = () => app.querySelectorAll('.ric-accordion__body')[0] as HTMLElement;
+    // 初期状態: 両方閉じている → hidden 属性が付く。role="region" は維持される。
+    expect(panel().hidden).toBe(true);
+    expect(panel().getAttribute('role')).toBe('region');
+
+    const header = app.querySelectorAll('.ric-accordion__header')[0] as HTMLElement;
+    header.click();
+    await flush();
+    expect(panel().hidden).toBe(false);
+    expect(panel().getAttribute('role')).toBe('region');
+
+    header.click();
+    await flush();
+    expect(panel().hidden).toBe(true);
+  });
+
   it('title に VDOM 配列 (アイコン混在) を渡せる', async () => {
     const app = setupApp();
     let acc: ReturnType<typeof createAccordion>;
