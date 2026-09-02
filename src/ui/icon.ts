@@ -1,4 +1,4 @@
-// ricdom/ui — uiIcon (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiIcon (設計書 §3.4 純粋関数部品、Phase 3a。descriptor 同梱データは Phase 3c)
 //
 // v1 (ric_ui/control/ui_icon.js) の camelCase 移植。SVG アイコンを descriptor から生成する。
 //
@@ -8,9 +8,12 @@
 //
 // ⚠️ AI エージェントへ: descriptor の path (`p`) を記憶から手書きしないこと。sub-path 欠落等で
 //   「それっぽく見えるが壊れている」アイコンが静かに出荷される (v1 での実例あり)。アイコンが
-//   欲しいときは既存の同梱データ (v1 docs/icons/、CLI の ricdom-icon 相当) から取得すること。
-//   v2 では Phase 3a 時点で同梱アイコンデータ/CLI をまだ移植していない (最終報告に記載) —
-//   手書きが避けられない状況では、まずユーザー (人間) に確認して許可を得てから行うこと。
+//   欲しいときは:
+//     1. `import { check, chevronDown, ... } from 'ricdom/icons'` (同梱 36 個、tree-shakable)
+//     2. 同梱に無ければ `npx ricdom-icon <name>` (Lucide から取得・path 化して stdout に出す。
+//        `--json` / `--search TERM` / `--names` も使える)
+//   のいずれかで取得すること。手書きが避けられない状況では、まずユーザー (人間) に
+//   確認して許可を得てから行うこと。
 //
 // descriptor:
 //   { v?, s?, p }

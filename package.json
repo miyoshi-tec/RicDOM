@@ -39,7 +39,17 @@
         "default": "./dist/ui.cjs"
       }
     },
-    "./ui.css": "./dist/ricdom-ui.css"
+    "./ui.css": "./dist/ricdom-ui.css",
+    "./icons": {
+      "import": {
+        "types": "./dist/icons.d.ts",
+        "default": "./dist/icons.js"
+      },
+      "require": {
+        "types": "./dist/icons.d.cts",
+        "default": "./dist/icons.cjs"
+      }
+    }
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

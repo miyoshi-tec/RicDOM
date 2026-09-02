@@ -74,4 +74,18 @@ export default defineConfig([
       'process.env.NODE_ENV': JSON.stringify('production'),
     },
   },
+  {
+    // ricdom/icons サブパスの ESM/CJS + 型宣言 (設計書付録 B A17、Phase 3c)。
+    // データ + 変換器のみのパッケージで、コア/ui のどちらにも実行時依存が無い
+    // (uiIcon の descriptor 引数と構造的に同じ形なだけ)。**IIFE は作らない**
+    // (ビルド不要ユーザーは `npx ricdom-icon` で descriptor をコピーする、
+    // v1 の「使う分だけ」哲学の継続 — 最終報告に記載)。
+    entry: { icons: 'src/icons/index.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    minify: false,
+    clean: false,
+    target: 'es2020',
+  },
 ]);
