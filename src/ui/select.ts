@@ -33,6 +33,10 @@ export interface UiSelectProps {
 
 const normalizeOption = (opt: string | UiSelectOption): UiSelectOption => (typeof opt === 'string' ? { value: opt, label: opt } : opt);
 
+/**
+ * ネイティブ `<select>`。状態を持たない純粋関数 (双方向バインドは `bindSelect` 参照)。
+ *   uiSelect({ value: s.role, options: ['viewer', 'editor', 'admin'] })
+ */
 export const uiSelect = ({ value = '', options = [], placeholder, disabled = false, class: extraClass, onchange, ...rest }: UiSelectProps = {}): RicNode => {
   const optionNodes: RicNode[] = [
     ...(placeholder ? [{ tag: 'option', value: '', disabled: true, children: [placeholder] } as RicElementNode] : []),

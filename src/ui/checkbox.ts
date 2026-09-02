@@ -25,6 +25,10 @@ export interface UiCheckboxProps {
   [key: string]: unknown;
 }
 
+/**
+ * チェックボックス + ラベル。状態を持たない純粋関数 (双方向バインドは `bindCheckbox` 参照)。
+ *   uiCheckbox({ checked: s.agree, children: ['同意する'], onchange: (ev) => { s.agree = ev.target.checked; } })
+ */
 export const uiCheckbox = ({ children = [], checked = false, disabled = false, class: extraClass, onchange, ...rest }: UiCheckboxProps = {}): RicNode => {
   const childArray = Array.isArray(children) ? children : [children];
   const baseClass = disabled ? 'ric-checkbox ric-checkbox--disabled' : 'ric-checkbox';

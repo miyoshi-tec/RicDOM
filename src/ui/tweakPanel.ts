@@ -417,6 +417,11 @@ const buildRows = (data: Record<string, unknown>, keys: TweakKeys, pathPrefix: s
 
 let nextFactoryId = 0;
 
+/**
+ * dat.GUI 風のパラメータ調整パネルを作る。状態を持つため `app.use(createTweakPanel())` で登録する。
+ *   const tweak = app.use(createTweakPanel());
+ *   tweak({ title: 'パラメータ', data: s.params })
+ */
 export const createTweakPanel = (): TweakPanelInstance => {
   const fid = ++nextFactoryId;
   const guard: AttachGuard = createAttachGuard('createTweakPanel');

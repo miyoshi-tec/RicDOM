@@ -53,6 +53,10 @@ const applyAutoResize = (el: HTMLTextAreaElement | null, autoResize: UiTextareaA
   el.style.overflowY = el.scrollHeight > maxH ? 'auto' : 'hidden';
 };
 
+/**
+ * `<textarea>`。`autoResize` で内容量に応じて高さを自動調整できる。状態を持たない純粋関数。
+ *   uiTextarea({ value: s.memo, autoResize: { minRows: 2, maxRows: 8 } })
+ */
 export const uiTextarea = ({
   value = '',
   placeholder,

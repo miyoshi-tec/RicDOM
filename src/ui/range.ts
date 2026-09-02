@@ -20,6 +20,10 @@ export interface UiRangeProps {
   [key: string]: unknown;
 }
 
+/**
+ * スライダー入力 + 現在値表示。状態を持たない純粋関数 (双方向バインドは `bindRange` 参照)。
+ *   uiRange({ value: s.volume, min: 0, max: 100, oninput: (ev) => { s.volume = +ev.target.value; } })
+ */
 export const uiRange = ({ value = 0, min = 0, max = 100, step = 1, disabled = false, class: extraClass, oninput, ...rest }: UiRangeProps = {}): RicNode => {
   const stepNum = Number(step) || 1;
   const minNum = Number(min);

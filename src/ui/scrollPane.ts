@@ -46,6 +46,11 @@ export interface ScrollPaneInstance extends Component<ScrollPaneProps> {
 
 let nextScrollPaneId = 0;
 
+/**
+ * 端まで自動追従するスクロール領域を作る (チャット UI 等)。状態を持つため `app.use()` で登録する。
+ *   const pane = app.use(createScrollPane({ follow: 'bottom' }));
+ *   pane({ children: [...messages] })
+ */
 export const createScrollPane = (options: CreateScrollPaneOptions = {}): ScrollPaneInstance => {
   const { follow = 'bottom', threshold = 50 } = options;
   const id = ++nextScrollPaneId;

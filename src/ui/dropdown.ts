@@ -56,6 +56,11 @@ export interface DropdownInstance extends Component<DropdownProps> {
 
 let nextDropdownId = 0;
 
+/**
+ * 汎用ポップオーバー (`aria-haspopup="dialog"`) を作る。状態を持つため `app.use()` で登録する。
+ *   const dd = app.use(createDropdown());
+ *   dd({ label: '選択肢', chevron: true, children: [...] })
+ */
 export const createDropdown = (): DropdownInstance => {
   const id = ++nextDropdownId;
   const bodyMarker = `ricdom-dropdown-${id}`;

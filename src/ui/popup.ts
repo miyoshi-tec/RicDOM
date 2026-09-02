@@ -67,6 +67,11 @@ const wrapMenuItem = (node: RicNode): RicNode => {
   } as unknown as RicNode;
 };
 
+/**
+ * `role="menu"` のドロップダウンメニューを作る。状態を持つため `app.use(createPopup())` で登録する。
+ *   const menu = app.use(createPopup());
+ *   menu({ trigger: ['⋯'], children: [uiButton({ children: ['削除'], onclick: ... })] })
+ */
 export const createPopup = (): PopupInstance => {
   const id = ++nextPopupId;
   const bodyMarker = `ricdom-popup-${id}`;

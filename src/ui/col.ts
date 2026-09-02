@@ -14,6 +14,10 @@ export interface UiColProps {
   [key: string]: unknown;
 }
 
+/**
+ * 縦方向フレックスコンテナ。状態を持たない純粋関数。
+ *   uiCol({ children: [uiText({ children: ['a'] }), uiText({ children: ['b'] })] })
+ */
 export const uiCol = ({ children = [], style, class: extraClass, ...rest }: UiColProps = {}): RicNode =>
   ({
     ...rest,

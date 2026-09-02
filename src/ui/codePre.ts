@@ -43,6 +43,10 @@ const tryHighlight = (raw: string, lang: string): string | null => {
   }
 };
 
+/**
+ * コード・JSON をダークテーマの `<pre>` で表示する (`window.hljs` があれば自動ハイライト)。
+ *   uiCodePre({ obj: s.params, maxHeight: '200px' })
+ */
 export const uiCodePre = ({ children = [], obj, lang = 'auto', maxHeight, style, class: extraClass, ...rest }: UiCodePreProps = {}): RicNode => {
   const childArray = Array.isArray(children) ? children : [children];
   const raw = obj !== undefined ? JSON.stringify(obj, null, 2) : childArray.join('');

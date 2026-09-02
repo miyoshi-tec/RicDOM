@@ -24,6 +24,10 @@ export interface UiTextProps {
   [key: string]: unknown;
 }
 
+/**
+ * variant で見た目を切り替えるテキスト表示部品。状態を持たない純粋関数。
+ *   uiText({ children: ['見出し'], variant: 'title' })
+ */
 export const uiText = ({ children = [], variant = 'default', style, class: extraClass, ...rest }: UiTextProps = {}): RicNode => {
   const tag = TAG_MAP[variant] ?? 'span';
   const baseClass = variant !== 'default' ? `ric-text ric-text--${variant}` : 'ric-text';

@@ -72,6 +72,11 @@ let nextSplitterId = 0;
 // (APG window splitter パターンの「大きめの固定ステップ」に合わせた目安値)。
 const KEY_STEP = 10;
 
+/**
+ * ドラッグ/矢印キーでリサイズできる 2 分割パネルを作る。状態を持つため `app.use()` で登録する。
+ *   const split = app.use(createSplitter({ side: 'left', size: 240 }));
+ *   split({ side: [sideContent], main: [mainContent] })
+ */
 export const createSplitter = (options: CreateSplitterOptions = {}): SplitterInstance => {
   const { side = 'left', size: initialSize = 240, min = 60, max = null, collapsible = true, onResizeEnd } = options;
   const id = ++nextSplitterId;

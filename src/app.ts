@@ -59,9 +59,13 @@ const resolveTargetElement = (target: string | Element): Element | null => {
 // 単一シグネチャ (canon は 1 つ、設計書 §12): render を第 3 引数として独立させることで
 // `S` は `state` 引数から素直に推論され、`render` コールバック内の `s` パラメータも
 // (v1 の「state に render を同梱する」形で起きていた自己参照問題無しに) 完全に型付く。
-// 第 4 引数 `options` (省略可、Phase 2 で追加) は portal の描画先を差し替える
-// `portalTo` のみを持つ (設計書 §3.5)。
+// 第 4 引数 `options` (省略可) は portal の描画先を差し替える `portalTo` のみを持つ
+// (設計書 §3.5)。
 
+/**
+ * RicDOM アプリを作成し、target 要素へ同期的に初回描画する。
+ *   createApp('#app', { count: 0 }, (s) => ({ tag: 'div', children: [String(s.count)] }))
+ */
 export const createApp = <S extends object>(
   target: string | Element,
   state: S,

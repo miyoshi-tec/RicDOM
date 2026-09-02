@@ -339,6 +339,10 @@ const parseBlocks = (src: string, transformText: MdTransformText | undefined, tr
   return blocks;
 };
 
+/**
+ * 実用的な Markdown サブセットを RicNode 木に変換して表示する。状態を持たない純粋関数。
+ *   uiMdPre({ children: ['# 見出し\n\n**本文**'] })
+ */
 export const uiMdPre = ({ children = [], transformText, transformImageSrc, class: extraClass, ...rest }: UiMdPreProps = {}): RicNode => {
   const childArray = Array.isArray(children) ? children : [children];
   const src = childArray.join('\n');

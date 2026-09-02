@@ -18,6 +18,10 @@ export interface UiInputProps {
   [key: string]: unknown;
 }
 
+/**
+ * テキスト入力。状態を持たない純粋関数 (controlled、双方向バインドは `bindInput` 参照)。
+ *   uiInput({ value: s.name, oninput: (ev) => { s.name = ev.target.value; } })
+ */
 export const uiInput = ({ placeholder, value = '', type = 'text', disabled = false, class: extraClass, ...rest }: UiInputProps = {}): RicNode =>
   ({
     ...rest,

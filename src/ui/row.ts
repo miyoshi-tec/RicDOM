@@ -13,6 +13,10 @@ export interface UiRowProps {
   [key: string]: unknown;
 }
 
+/**
+ * 横方向フレックスコンテナ。状態を持たない純粋関数。
+ *   uiRow({ children: [uiButton({ children: ['OK'] }), uiButton({ children: ['Cancel'] })] })
+ */
 export const uiRow = ({ children = [], style, class: extraClass, ...rest }: UiRowProps = {}): RicNode =>
   ({
     ...rest,

@@ -33,6 +33,11 @@ export interface ToastInstance extends Component<void> {
   show: (msg: string, options?: ToastShowOptions) => void;
 }
 
+/**
+ * トースト通知キューを作る。状態を持つため `app.use(createToast())` で登録する。
+ *   const toast = app.use(createToast());
+ *   toast.show('保存しました', { type: 'success' });
+ */
 export const createToast = (): ToastInstance => {
   const guard: AttachGuard = createAttachGuard('createToast');
   const items: ToastItem[] = [];

@@ -98,7 +98,7 @@ type GenericElementNode = { tag: string } & BaseNodeProps & TagAttrs<HTMLElement
 
 /**
  * ノード木の要素表現 (設計書 §3.1 の `Element`)。
- * `tag` は型上必須 (Phase 1 実装での確定事項、設計書 §12)。`{}` のような tag 省略は
+ * `tag` は型上必須 (設計書 §12)。`{}` のような tag 省略は
  * 型エラーになる (v1 は `raw_node.tag ?? 'div'` で暗黙に div 扱いだったが、v2 では
  * 「省略」という無記名の入力を許さず、明示を要求する)。実行時に tag が文字列でない
  * ノードが渡された場合 (JS 利用側が型チェックをすり抜けた場合) は console.error を出し
@@ -137,7 +137,7 @@ export interface Host {
 }
 
 /**
- * `app.use(part)` に渡す部品の契約 (設計書 §3.4、Phase 2 で正式化)。
+ * `app.use(part)` に渡す部品の契約 (設計書 §3.4)。
  * 状態を持つ部品 (dialog/popup/toast/tooltip 等、`ricdom/ui` の `Component<P>` はこれを実装する)
  * はこのインターフェースを実装し、`app.use()` を経由して初めて `notify`/`portal` を受け取る。
  * **`use()` を経由しない呼び出しは host が無いため、部品側が「初回だけ console.error して
@@ -161,8 +161,8 @@ export interface UsePart {
 /**
  * render 関数の型。現在の state (S、v1 の shared_proxy 相当で renderNow/refs 等の
  * instance API は含まない) を受け取り木を返す。
- * `createApp(target, state, render)` の第 3 引数として渡す (Phase 1 実装での確定事項、
- * 設計書 §12)。render を state から分離することで `S` が `state` 引数から素直に推論され、
+ * `createApp(target, state, render)` の第 3 引数として渡す (設計書 §12)。
+ * render を state から分離することで `S` が `state` 引数から素直に推論され、
  * render コールバック内の `s` も (無理な自己参照無しに) 完全に型付く。
  */
 export type RenderFn<S extends object> = (state: S) => RicNode;
@@ -182,7 +182,7 @@ export type App<S extends object> = S & {
    * (v1 の next_render 契約継承、設計書 §3.3)。
    */
   nextRender(): Promise<void>;
-  /** 部品を登録する (Phase 1 では骨のみ。Phase 2 で正式な部品契約になる) */
+  /** 部品を登録し、host (notify/portal/app) を渡す。戻り値は渡した part 自身 (設計書 §3.4)。 */
   use<T extends UsePart>(part: T): T;
   /** インスタンスを破棄し、以降の再描画・タイマーを止める */
   unmount(): void;

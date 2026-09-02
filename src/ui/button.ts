@@ -22,6 +22,10 @@ export interface UiButtonProps {
   [key: string]: unknown;
 }
 
+/**
+ * ボタン。状態を持たない純粋関数。
+ *   uiButton({ children: ['保存'], variant: 'primary', onclick: () => save() })
+ */
 export const uiButton = ({ children = [], variant = 'default', disabled = false, class: extraClass, ...rest }: UiButtonProps = {}): RicNode => {
   const baseClass = variant === 'default' ? 'ric-button' : `ric-button ric-button--${variant}`;
   return {

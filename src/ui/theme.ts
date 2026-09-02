@@ -178,7 +178,7 @@ const computeThemeVars = ({ theme, density, fontSize }: ApplyThemeOptions): Them
  * (スクロールバー・select・checkbox・日付ピッカー等) も自動でライト/ダークに追従する
  * (v1 v0.4.2 由来)。
  *
- * `data-ricdom-theme` 属性を el に付与する (Phase 3a、設計書 §13 で確定した方式)。
+ * `data-ricdom-theme` 属性を el に付与する (設計書 §13 で確定した方式)。
  * v1 はページ全体のスクロールバー既定スタイルを `.ric-page, .ric-page *` に適用していたが、
  * v2 に page 部品が無いため、この属性を CSS 側 (`[data-ricdom-theme]`/`[data-ricdom-theme] *`)
  * のスコープ用マーカーとして使う (cssTemplates.ts 参照)。

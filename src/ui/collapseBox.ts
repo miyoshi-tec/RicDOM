@@ -73,6 +73,11 @@ interface BoxState {
 
 let nextFactoryId = 0;
 
+/**
+ * 開閉をアニメーションするコンテナ primitive を作る (複数 instance は `key` で区別)。
+ *   const box = app.use(createCollapseBox({ direction: 'v' }));
+ *   box({ visible: s.expanded, children: [...] })
+ */
 export const createCollapseBox = (options: CreateCollapseBoxOptions = {}): CollapseBoxInstance => {
   const { direction = 'v', duration = 200, easing = 'ease' } = options;
   const fid = ++nextFactoryId;

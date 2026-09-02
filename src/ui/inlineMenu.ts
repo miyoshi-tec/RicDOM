@@ -92,6 +92,10 @@ const scheduleParentPositionCheck = (): void => {
   });
 };
 
+/**
+ * trigger 要素の近くに absolute 配置する軽量ポップオーバー。状態は呼び出し側が持つ (`app.use()` 不要)。
+ *   uiInlineMenu({ open: s.menuFor === row.id, children: [...] }) // 親要素に position:relative が必要
+ */
 export const uiInlineMenu = ({ open = false, anchor = 'br', children = [], style, class: extraClass, onClose }: UiInlineMenuProps): RicNode => {
   if (!open) return null;
 

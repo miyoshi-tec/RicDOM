@@ -52,6 +52,10 @@ const hexToRgb = (hex: string): { r: number; g: number; b: number } => ({
 
 const fakeEvent = (value: string): Event => ({ target: { value } }) as unknown as Event;
 
+/**
+ * カラーピッカー (hex または rgba(r,g,b,a) を自動判定)。状態を持たない純粋関数。
+ *   uiColor({ value: s.color, oninput: (ev) => { s.color = ev.target.value; } })
+ */
 export const uiColor = ({ value = '#000000', disabled = false, class: extraClass, oninput, ...rest }: UiColorProps = {}): RicNode => {
   const current = String(value);
   const rgba = parseRgba(current);

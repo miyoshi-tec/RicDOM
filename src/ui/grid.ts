@@ -34,6 +34,10 @@ const expandTracks = (v: number | string): string => {
   return v;
 };
 
+/**
+ * CSS grid コンテナ。状態を持たない純粋関数。
+ *   uiGrid({ columns: 3, gap: 8, children: [...] })
+ */
 export const uiGrid = ({ columns, rows, gap, children = [], style = {}, class: extraClass, ...rest }: UiGridProps = {}): RicNode => {
   const finalStyle: StyleValue = { ...style };
   if (columns !== undefined) finalStyle.gridTemplateColumns = expandTracks(columns);

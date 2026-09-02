@@ -11,6 +11,10 @@ export interface UiSeparatorProps {
   [key: string]: unknown;
 }
 
+/**
+ * 水平区切り線 (装飾要素)。状態を持たない純粋関数。
+ *   uiSeparator()
+ */
 export const uiSeparator = ({ class: extraClass, ...rest }: UiSeparatorProps = {}): RicNode =>
   ({
     ...rest,

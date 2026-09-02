@@ -30,6 +30,10 @@ export interface UiPanelProps {
   [key: string]: unknown;
 }
 
+/**
+ * 面・背景・枠を担当するコンテナ。状態を持たない純粋関数。
+ *   uiPanel({ children: [...], layout: 'row' })
+ */
 export const uiPanel = ({ children = [], layout = 'col', disabled = false, style, class: extraClass, ...rest }: UiPanelProps = {}): RicNode => {
   const baseClass = layout === 'row' ? 'ric-panel ric-panel--row' : 'ric-panel';
   return {

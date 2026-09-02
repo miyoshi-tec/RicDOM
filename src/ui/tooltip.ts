@@ -26,6 +26,11 @@ let nextTooltipId = 0;
 
 export type TooltipInstance = Component<TooltipProps>;
 
+/**
+ * hover/focus で表示するツールチップを作る。状態を持つため `app.use(createTooltip())` で登録する。
+ *   const tip = app.use(createTooltip());
+ *   tip({ content: 'ヒント', children: [uiButton({ children: ['?'] })] })
+ */
 export const createTooltip = (): TooltipInstance => {
   const id = ++nextTooltipId;
   const tooltipId = `ricdom-tooltip-${id}`;

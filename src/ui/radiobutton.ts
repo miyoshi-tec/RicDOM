@@ -50,6 +50,10 @@ const labelChildren = (l: RicNode | RicNode[] | undefined): RicNode[] => {
   return [String(l)];
 };
 
+/**
+ * ラジオボタングループ。状態を持たない純粋関数。
+ *   uiRadiobutton({ name: 'role', value: s.role, options: ['viewer', 'editor'], onchange: (ev) => { s.role = ev.target.value; } })
+ */
 export const uiRadiobutton = ({ name, value = '', options = [], disabled = false, class: extraClass, onchange, ...rest }: UiRadiobuttonProps): RicNode => {
   const strVal = String(value);
 
