@@ -140,6 +140,19 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - `tag` は型上**必須** (`{}` は型エラー)。実行時に tag 欠落なら console.error + 不可視扱い (v1 踏襲)
 - gzip 目標: IIFE **4.6KB** (Phase 1 実測、≤5KB 達成)
 
+## 13. Phase 2 実装での確定事項 (2026-09-02)
+
+- **部品契約**: `UsePart` = `attach(host)` / `dispose()` / `renderPortal()`。`Host = { notify(), portal, app }` は `app.use()` 経由でのみ渡される。`Host.app` の型は `App<any>` (ジェネリック化すると構造的部分型の分散で `attach` が合わなくなるため。部品側が state の型に依存しない設計なので実害なし)
+- **portal**: `createApp(target, state, render, { portalTo? })`。portal 要素は差分の位置ズレを防ぐため **安定 key 付きの sentinel** として管理 (Phase 2 で実際に踏んだバグ: render 結果の可視/不可視切替で index がずれ portal が再生成されていた)
+- **dialog の `inert`**: portal の兄弟要素に対して掛ける (単一 app の一般ケース)。ページ内の無関係な他 app までは inert にしない。document 全体を inert にするオプションは要望が出たら (再検討条件)
+- **`createPopup` は menu 専用** (ARIA の `role="menu"` 前提)。v1 の label/icon/chevron ドロップダウンモードは **Phase 3 で `createDropdown` (Popover 系) として別部品に** — canon 1 つを守るため 1 部品に 2 つの意味論を持たせない
+- **ページ全体のスクロールバー既定スタイルは Phase 3 で**: v2 に page 部品が無いため、`applyTheme(el)` が付与するマーカー属性 (`data-ricdom-theme`) 配下にスクロールバー規則を当てる方式で移植する (トークンは Phase 2 で用意済み)
+- **部品ごとのテーマ上書き props (v1 の `{theme, density, fontSize}`) は持たない**。portal は target 配下なので `applyTheme` の CSS 変数継承で足りる。再検討条件: 「同一 app 内で portal だけ別テーマ」の具体要望
+- **`ricdom/ui` はコアへの実行時依存ゼロ** (型のみ)。部品は `host` 経由でしか app に触らないため、IIFE 2 本は論理的な組でありバンドラ的な依存ではない。意図どおりとして確定
+- **アニメ完了待ちは `animationend` + 700ms setTimeout バックストップ** (CSS 未ロード / `--ric-duration` 未設定でも状態遷移が固まらない。コアの rAF+バックストップと同じ思想)。CSS 変数は `var(--x, fallback)` で既定値を持つ
+- focus trap の可視要素フィルタ (`offsetParent` 判定) は Phase 2 では省略 → **Phase 3 で実ブラウザテスト付きで追加**
+- **コア gzip 5,037B (5KiB 天井)。Phase 3 以降、コアには機能を足さない** (部品側・ui 側で解決する)
+
 ---
 
 ## 付録
