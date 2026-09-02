@@ -1,3 +1,5 @@
+> 内部記録 (日本語): 公開前 API 整合レビューの監査報告。利用者向けドキュメントは README / docs/SPEC.md / docs/TUTORIAL.md を参照。
+
 # API 整合レビュー (公開前監査)
 
 - 対象: `ricdom` / `ricdom/ui` / `ricdom/icons` の公開 API 表面、および内部実装の整合性

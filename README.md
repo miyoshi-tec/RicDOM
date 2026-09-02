@@ -20,12 +20,12 @@
 <script src="https://cdn.jsdelivr.net/npm/ricdom@2/dist/ricdom.iife.min.js"></script>
 <div id="app"></div>
 <script>
-  const app = ricdom.createApp('#app', { count: 0 }, (s) => ({
+  ricdom.createApp('#app', { count: 0 }, (s) => ({
     tag: 'div',
     children: [
-      { tag: 'button', onclick: () => { app.count -= 1; }, children: ['-'] },
+      { tag: 'button', onclick: () => { s.count -= 1; }, children: ['-'] },
       { tag: 'output', children: [String(s.count)] },
-      { tag: 'button', onclick: () => { app.count += 1; }, children: ['+'] },
+      { tag: 'button', onclick: () => { s.count += 1; }, children: ['+'] },
     ],
   }));
 </script>
@@ -72,7 +72,7 @@ re-rendering, and zero required build step for the consumer, at the same time.
 
 `2.0.0-alpha` — API-complete and under active testing, not yet published to npm.
 
-This is the successor to [RicDOM v1](https://github.com/miyoshi-tec/RicDOM) (now in
+This is the successor to [RicDOM v1](https://github.com/miyoshi-tec/RicDOM-v1) (now in
 maintenance mode), rebuilt in TypeScript with camelCase APIs, real accessibility, and a
 browser-tested CI pipeline. It is not source-compatible with v1 — see
 [CHANGELOG.md](CHANGELOG.md) for the breaking changes if you're migrating an existing v1

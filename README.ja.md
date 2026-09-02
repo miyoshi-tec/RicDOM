@@ -21,12 +21,12 @@ English version: [README.md](README.md)
 <script src="https://cdn.jsdelivr.net/npm/ricdom@2/dist/ricdom.iife.min.js"></script>
 <div id="app"></div>
 <script>
-  const app = ricdom.createApp('#app', { count: 0 }, (s) => ({
+  ricdom.createApp('#app', { count: 0 }, (s) => ({
     tag: 'div',
     children: [
-      { tag: 'button', onclick: () => { app.count -= 1; }, children: ['-'] },
+      { tag: 'button', onclick: () => { s.count -= 1; }, children: ['-'] },
       { tag: 'output', children: [String(s.count)] },
-      { tag: 'button', onclick: () => { app.count += 1; }, children: ['+'] },
+      { tag: 'button', onclick: () => { s.count += 1; }, children: ['+'] },
     ],
   }));
 </script>
@@ -73,7 +73,7 @@ import { createApp } from 'https://esm.sh/ricdom@2';
 
 `2.0.0-alpha` — API は確定し活発にテスト中、npm には未公開。
 
-本パッケージは [RicDOM v1](https://github.com/miyoshi-tec/RicDOM) (現在は保守モード)
+本パッケージは [RicDOM v1](https://github.com/miyoshi-tec/RicDOM-v1) (現在は保守モード)
 の後継として、TypeScript・camelCase API・本物のアクセシビリティ・ブラウザテスト付き
 CI パイプラインで一から作り直したもの。v1 とのソース互換性は無い — 既存 v1 アプリを
 移行する場合の破壊的変更は [CHANGELOG.md](CHANGELOG.md) を参照。
