@@ -800,6 +800,234 @@ const CODE_PRE_CSS = `
   overflow: visible;
 }`;
 
+// ── Phase 3b: 状態を持つ部品 (composite) ─────────────────────────
+
+// scroll-pane はスクロールバー配色のみ提供する。挙動は inline style (overflow-y:auto)
+// + JS の scrollTop 制御で担う (createScrollPane 参照)。
+const SCROLL_PANE_CSS = `
+.ric-scroll-pane {
+  min-height: 0;
+  scrollbar-color: ${sbt} transparent;
+  scrollbar-width: thin;
+}
+.ric-scroll-pane::-webkit-scrollbar { width: 8px; height: 8px; }
+.ric-scroll-pane::-webkit-scrollbar-thumb {
+  background: ${sbt};
+  border-radius: 4px;
+}
+.ric-scroll-pane::-webkit-scrollbar-track { background: transparent; }`;
+
+// collapse-box は inline style の overflow/transition/width/height で動作するため
+// (createCollapseBox 参照)、CSS 側はセマンティクスとしての class 名だけ用意する。
+// consumer 側で .ric-collapse-box--entering/--closing を見て追加演出を載せたい場合に使う。
+const COLLAPSE_BOX_CSS = `
+.ric-collapse-box {
+  display: block;
+}`;
+
+const SPLITTER_CSS = `
+.ric-splitter { overflow: hidden; }
+.ric-splitter__side {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.ric-splitter__main { flex: 1; overflow: auto; min-width: 0; min-height: 0; }
+.ric-splitter__divider {
+  flex: 0 0 5px;
+  background: ${bd};
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  transition: background 0.15s;
+  user-select: none;
+  z-index: 1;
+}
+.ric-splitter__divider:focus-visible { outline: 2px solid ${ac}; outline-offset: -2px; }
+/* variant クラスは直接の divider にのみ効かせる (子孫セレクタだと、外側 vertical
+   splitter の中の内側 horizontal splitter の divider にも漏れるため > で 1 階層に限定) */
+.ric-splitter--horizontal > .ric-splitter__divider { cursor: col-resize; }
+.ric-splitter--vertical   > .ric-splitter__divider { cursor: row-resize; }
+.ric-splitter--collapsed  > .ric-splitter__divider { cursor: pointer; }
+.ric-splitter__divider:hover,
+.ric-splitter__divider--dragging { background: ${ac}; }
+.ric-splitter__collapse-btn {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px; height: 40px; padding: 0;
+  background: ${bg};
+  border: ${b1};
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: ${fm};
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.1s, color 0.1s, border-color 0.1s;
+}
+.ric-splitter--vertical > .ric-splitter__divider > .ric-splitter__collapse-btn {
+  width: 40px; height: 20px; border-radius: 10px;
+}
+.ric-splitter:hover > .ric-splitter__divider > .ric-splitter__collapse-btn,
+.ric-splitter__divider--dragging > .ric-splitter__collapse-btn { opacity: 1; }
+.ric-splitter__collapse-btn:hover {
+  background: ${ac};
+  color: ${af};
+  border-color: ${ac};
+}
+.ric-splitter__divider:hover > .ric-splitter__collapse-btn,
+.ric-splitter__divider--dragging > .ric-splitter__collapse-btn {
+  border-color: ${af};
+}`;
+
+const ACCORDION_CSS = `
+.ric-accordion {
+  display: flex; flex-direction: column;
+  border: ${b1};
+  border-radius: ${r};
+  overflow: hidden;
+}
+.ric-accordion__item + .ric-accordion__item {
+  border-top: ${b1};
+}
+.ric-accordion__header {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: ${py} ${px};
+  background: ${bg};
+  border: none; cursor: pointer;
+  font-size: 1em; color: ${fg}; font-weight: 500;
+  text-align: left; user-select: none;
+  transition: background ${da};
+}
+.ric-accordion__header:hover, .ric-accordion__header--open { background: ${bd}; }
+.ric-accordion__title { flex: 1; text-align: left; }
+.ric-accordion__arrow { color: ${fm}; margin-left: ${g}; transition: transform ${da}; }
+.ric-accordion__header--open .ric-accordion__arrow { transform: rotate(180deg); }
+/* grid-template-rows のトリックで auto 高さに対してアニメーションする。
+   閉じ: 0fr → 開き: 1fr (子要素は min-height:0 + overflow:hidden が必須) */
+.ric-accordion__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows ${da};
+}
+.ric-accordion__body--open {
+  grid-template-rows: 1fr;
+}
+.ric-accordion__body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.ric-accordion__body--open > .ric-accordion__body-inner {
+  padding: ${gm} ${px};
+  background: ${bg};
+  border-top: ${b1};
+}`;
+
+const TABS_CSS = `
+.ric-tabs { display: flex; flex-direction: column; gap: ${g}; width: 100%; }
+.ric-tabs__bar {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: ${b1};
+}
+.ric-tabs__tab {
+  padding: ${g} ${px};
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  font-size: 1em;
+  color: ${fm};
+  white-space: nowrap;
+  transition: color 0.15s, border-bottom-color 0.15s, background 0.15s;
+}
+.ric-tabs__tab:hover { color: ${fg}; background: color-mix(in srgb, ${fg} 8%, transparent); }
+.ric-tabs__tab:focus-visible { outline: 2px solid ${ac}; outline-offset: -2px; }
+.ric-tabs__tab--active {
+  color: ${ac};
+  border-bottom-color: ${ac};
+  background: color-mix(in srgb, ${fg} 10%, transparent);
+  font-weight: 600;
+}
+.ric-tabs__panel { flex: 1; overflow: auto; min-height: 0; }
+.ric-tabs__panel:focus-visible { outline: 2px solid ${ac}; outline-offset: -2px; }
+.ric-tabs--pill .ric-tabs__bar {
+  border-bottom: none;
+  background: ${bg};
+  border-radius: ${r};
+  padding: 3px;
+  gap: 2px;
+  align-self: flex-start;
+}
+.ric-tabs--pill .ric-tabs__tab {
+  border-bottom: none;
+  border-radius: calc(${r} - 2px);
+  margin-bottom: 0;
+}
+.ric-tabs--pill .ric-tabs__tab--active {
+  background: ${ac};
+  color: ${af};
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}`;
+
+// createDropdown (v1 create_ui_popup の label/icon/chevron モード後継)。トリガーの
+// 見た目は v1 の .ric-popup__trigger* を移植して `.ric-dropdown__trigger*` に改名した
+// (createPopup の menu 専用トリガーは .ric-button を流用しており名前が衝突しないため)。
+// 本体の開閉アニメ (@keyframes ric-popup-in/out) とオーバーレイ (.ric-popup__overlay) は
+// POPUP_CSS で既に定義済みのものをそのまま再利用する (buildStylesheet が両方を結合する
+// ため、同じスタイルシート内で参照できる。重複定義しない)。
+const DROPDOWN_CSS = `
+.ric-dropdown__trigger {
+  width: ${ch}; height: ${ch};
+  border-radius: ${r};
+  background: ${ct}; border: ${b1};
+  cursor: pointer; font-size: 18px; color: ${fg};
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.ric-dropdown__trigger:hover { border-color: ${ac}; }
+.ric-dropdown__trigger--label {
+  width: auto; justify-content: space-between;
+  padding: 0 ${px};
+  font-size: 1em;
+}
+.ric-dropdown__trigger--ghost { border-color: transparent; background: transparent; }
+.ric-dropdown__trigger--ghost:hover { border-color: ${bd}; background: ${ct}; }
+.ric-dropdown__trigger--open {
+  background: ${ac}; color: ${af};
+  border-color: ${ac};
+}
+.ric-dropdown__chevron { transition: transform 0.2s ${eas}; opacity: 0.7; }
+.ric-dropdown__chevron--open { transform: rotate(180deg); }
+.ric-dropdown__body {
+  min-width: 160px;
+  background: ${ct};
+  border: ${b1};
+  border-radius: ${r};
+  box-shadow: ${sh};
+  overflow: auto;
+  padding: ${gm};
+}`;
+
+// portal を持たない軽量ポップオーバー (createPopup/createDropdown と違い overlay も
+// アニメーションも持たない、v1 継承)。
+const INLINE_MENU_CSS = `
+.ric-inline-menu {
+  background: ${ct};
+  border: ${b1};
+  border-radius: ${r};
+  padding: 4px;
+  box-shadow: ${sh};
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ric-inline-menu .ric-button {
+  justify-content: flex-start;
+  text-align: left;
+}`;
+
 /**
  * ricdom/ui の CSS 1 枚分の文字列を組み立てる (設計書 §4)。
  * `injectStyles()` (実行時注入) と `dist/ricdom-ui.css` 生成スクリプト
@@ -829,4 +1057,11 @@ export const buildStylesheet = (): string =>
     PANEL_CSS,
     MD_PRE_CSS,
     CODE_PRE_CSS,
+    SCROLL_PANE_CSS,
+    COLLAPSE_BOX_CSS,
+    SPLITTER_CSS,
+    ACCORDION_CSS,
+    TABS_CSS,
+    DROPDOWN_CSS,
+    INLINE_MENU_CSS,
   ].join('\n');

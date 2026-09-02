@@ -80,4 +80,26 @@ export type { ToastInstance, ToastShowOptions, ToastType } from './toast.js';
 export { createTooltip } from './tooltip.js';
 export type { TooltipProps, TooltipInstance, TooltipDir } from './tooltip.js';
 
+// ── Phase 3b: 状態を持つ部品 ──
+export { createSplitter } from './splitter.js';
+export type { SplitterProps, SplitterInstance, CreateSplitterOptions, SplitterSide } from './splitter.js';
+
+export { createScrollPane } from './scrollPane.js';
+export type { ScrollPaneProps, ScrollPaneInstance, CreateScrollPaneOptions, ScrollPaneFollow } from './scrollPane.js';
+
+export { createCollapseBox } from './collapseBox.js';
+export type { CollapseBoxProps, CollapseBoxInstance, CreateCollapseBoxOptions, CollapseBoxDirection } from './collapseBox.js';
+
+export { createAccordion } from './accordion.js';
+export type { AccordionProps, AccordionInstance, CreateAccordionOptions, AccordionItem } from './accordion.js';
+
+export { createTabs } from './tabs.js';
+export type { TabsProps, TabsInstance, TabItem, TabsVariant } from './tabs.js';
+
+export { createDropdown } from './dropdown.js';
+export type { DropdownProps, DropdownInstance } from './dropdown.js';
+
+export { uiInlineMenu } from './inlineMenu.js';
+export type { UiInlineMenuProps, UiInlineMenuAnchor } from './inlineMenu.js';
+
 export type { Component, Host } from './internal/component.js';
