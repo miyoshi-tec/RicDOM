@@ -1,4 +1,4 @@
-// internal/popupPosition.ts (Phase 3b、createPopup/createDropdown/createTooltip 共有の位置計算)
+// internal/popupPosition.ts (createPopup/createDropdown/createTooltip 共有の位置計算)
 
 import { describe, expect, it } from 'vitest';
 import { clampLeft, computeFlipDir, computeFlipDirAt, posToStyle } from '../../src/ui/internal/popupPosition.js';

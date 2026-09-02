@@ -1,4 +1,4 @@
-// ricdom-icon CLI — ロジック本体 (Phase 3c)
+// ricdom-icon CLI — ロジック本体
 //
 // v1 (scripts/icon.js) の TS 移植。アイコン descriptor を「名前 → stdout」で引くコマンドの
 // ヘッドレス実装。GUI を開けない CLI / CI / AI エージェント向けの導線 (設計書付録 B A17:

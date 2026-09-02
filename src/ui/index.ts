@@ -1,6 +1,5 @@
 // ricdom/ui — 公開エントリポイント
-// Phase 2: 部品契約 + portal + テーマ + CSS 配布
-// Phase 3a: 状態を持たない部品 (control/layout/text) + bind*
+// 部品契約 + portal + テーマ + CSS 配布、状態を持たない部品 (control/layout/text) + bind* を提供する。
 //
 // IIFE ビルド (dist/ricdom-ui.iife.min.js) はここから globalName `ricdomUI` として
 // まとめてグローバルに公開される (tsup.config.ts 参照)。`ricdom` (コア) の後に
@@ -18,7 +17,7 @@ export type { UiButtonProps, UiButtonVariant } from './button.js';
 export { uiInput } from './input.js';
 export type { UiInputProps } from './input.js';
 
-// ── Phase 3a: 状態を持たない部品 (control) ──
+// ── 状態を持たない部品 (control) ──
 export { uiTextarea } from './textarea.js';
 export type { UiTextareaProps, UiTextareaAutoResize } from './textarea.js';
 
@@ -48,7 +47,7 @@ export type { IconDescriptor, UiIconOptions } from './icon.js';
 
 export { bindInput, bindTextarea, bindCheckbox, bindSelect, bindRange } from './bind.js';
 
-// ── Phase 3a: レイアウト ──
+// ── レイアウト ──
 export { uiCol } from './col.js';
 export type { UiColProps } from './col.js';
 
@@ -61,7 +60,7 @@ export type { UiGridProps } from './grid.js';
 export { uiPanel } from './panel.js';
 export type { UiPanelProps, UiPanelLayout } from './panel.js';
 
-// ── Phase 3a: テキスト ──
+// ── テキスト ──
 export { uiMdPre } from './mdPre.js';
 export type { UiMdPreProps, MdTransformText, MdTransformImageSrc } from './mdPre.js';
 
@@ -80,7 +79,7 @@ export type { ToastInstance, ToastShowOptions, ToastType } from './toast.js';
 export { createTooltip } from './tooltip.js';
 export type { TooltipProps, TooltipInstance, TooltipDir } from './tooltip.js';
 
-// ── Phase 3b: 状態を持つ部品 ──
+// ── 状態を持つ部品 ──
 export { createSplitter } from './splitter.js';
 export type { SplitterProps, SplitterInstance, CreateSplitterOptions, SplitterSide } from './splitter.js';
 
@@ -102,7 +101,7 @@ export type { DropdownProps, DropdownInstance } from './dropdown.js';
 export { uiInlineMenu } from './inlineMenu.js';
 export type { UiInlineMenuProps, UiInlineMenuAnchor } from './inlineMenu.js';
 
-// ── Phase 3c ──
+// ── パラメータ調整パネル ──
 export { createTweakPanel, inferTweakType } from './tweakPanel.js';
 export type { TweakPanelProps, TweakPanelInstance, TweakKeyOverride, TweakKeys, TweakRowType, TweakInferredType } from './tweakPanel.js';
 

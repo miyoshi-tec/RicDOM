@@ -64,7 +64,7 @@ const isVisible = (el: HTMLElement): boolean => el.offsetParent !== null || el.g
 // 既存の jsdom 単体テスト (tests/ui/dialog.test.ts) が「フォーカス可能要素が
 // 1 つも無い」判定になり壊れる。`document.body` 自身の getClientRects() が
 // 空かどうかでレイアウトエンジンの有無を検出し、無ければ (jsdom) フィルタを
-// スキップして v1/Phase 2 と同じ挙動を保つ。可視要素フィルタの実効果は
+// スキップして v1 と同じ挙動を保つ。可視要素フィルタの実効果は
 // tests/browser/ (実ブラウザ、レイアウトあり) でのみ検証できる。
 const hasLayoutEngine = (doc: Document | null): boolean => !!doc?.body && doc.body.getClientRects().length > 0;
 

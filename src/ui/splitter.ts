@@ -1,4 +1,4 @@
-// ricdom/ui — createSplitter (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3b)
+// ricdom/ui — createSplitter (設計書 §3.4 部品契約 + 付録 E a11y)
 //
 // v1 (ric_ui/composite/create_ui_splitter.js) の移植。v1 との相違点:
 //   - 状態を持つので `app.use(createSplitter(options))` で明示登録する (設計書 §3.4)。
@@ -215,7 +215,7 @@ export const createSplitter = (options: CreateSplitterOptions = {}): SplitterIns
       'aria-orientation': isHorizontal ? 'vertical' : 'horizontal',
       'aria-valuenow': valueNow,
       'aria-valuemin': min,
-      // max が無制限 (null) のときは aria-valuemax を省略する (論理的な上限が無い、Phase 3b で判断)
+      // max が無制限 (null) のときは aria-valuemax を省略する (論理的な上限が無いため)
       ...(max !== null ? { 'aria-valuemax': max } : {}),
       tabIndex: 0,
       onmousedown: handleMouseDown,

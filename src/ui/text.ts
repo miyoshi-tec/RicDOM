@@ -1,4 +1,4 @@
-// ricdom/ui — uiText (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiText (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/text/ui_text.js) の camelCase 移植。variant で見た目を切り替える
 // テキスト表示部品 (旧 ui_title/ui_label を統合)。

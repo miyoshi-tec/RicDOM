@@ -1,6 +1,6 @@
 // RicDOM 2 — createApp (v1 の create_RicDOM 後継)
 //
-// v1 との主な相違点、および Phase 1 → Phase 1b で確定した仕様 (設計書 §12 参照):
+// v1 との主な相違点、および確定した仕様 (設計書 §12 参照):
 //   - `createApp(target, state, render)` の 3 引数。v1 の「state の中に render を同梱する」
 //     形は TS で `S` の推論が自己参照になり render 内の `s` が `any` に落ちるため、
 //     render を独立した第 3 引数にした。canon は 1 つ (state 同梱オーバーロードは持たない)。
@@ -153,7 +153,7 @@ const createDeferredApp = <S extends object>(
       if (prop === 'nextRender') return () => new Promise<void>(() => {}); // 解決するまで resolve しない
       // target 未解決の間は portal が存在しないため attach() を呼べない。
       // part はそのまま返す (NOOP 流儀) — 解決後に呼び直してもらう必要がある
-      // (DOMContentLoaded 待ちのごく短い窓のみの制約、設計書に言及なし・Phase 2 で残る既知の穴)。
+      // (DOMContentLoaded 待ちのごく短い窓のみの制約、設計書に言及なし・既知の穴)。
       if (prop === 'use') return (part: UsePart) => part;
       if (prop === 'refs') return new Map<string, Element>();
       return Reflect.get(target_, prop, receiver);

@@ -1,4 +1,4 @@
-// ricdom-icon CLI (src/cli/ricdomIconLib.ts) のテスト (Phase 3c、v1 tests/icon_cli.test.js の移植)
+// ricdom-icon CLI (src/cli/ricdomIconLib.ts) のテスト (v1 tests/icon_cli.test.js の移植)
 //
 // ネット必須の Lucide fetch は CI 非依存にするためテストしない (v1 継承)。
 // 同梱解決・出力整形・resolveAll のオフライン経路のみを検証する。

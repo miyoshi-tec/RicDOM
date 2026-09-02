@@ -1,4 +1,4 @@
-// internal/exclusiveRegistry.ts (Phase 3b、popup 系の排他制御、host.app 単位)
+// internal/exclusiveRegistry.ts (popup 系の排他制御、host.app 単位)
 
 import { describe, expect, it } from 'vitest';
 import { closeOthers, registerExclusive, unregisterExclusive } from '../../src/ui/internal/exclusiveRegistry.js';

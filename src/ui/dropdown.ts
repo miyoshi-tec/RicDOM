@@ -1,8 +1,8 @@
-// ricdom/ui — createDropdown (設計書 §3.4 部品契約 + §5/付録 E a11y、Phase 3b)
+// ricdom/ui — createDropdown (設計書 §3.4 部品契約 + §5/付録 E a11y)
 //
 // v1 (ric_ui/popup/create_ui_popup.js) の label/icon/chevron モード (旧 create_ui_dropdown
-// 相当) を、Phase 2 で createPopup を menu 専用に絞った際の宿題として分離した部品
-// (設計書 §13: 「v1 の label/icon/chevron ドロップダウンモードは Phase 3 で createDropdown
+// 相当) を、createPopup を menu 専用に絞った際の宿題として分離した部品
+// (設計書 §13: 「v1 の label/icon/chevron ドロップダウンモードは createDropdown
 // (Popover 系) として別部品に」)。
 //
 // createPopup との違い: 本体は `role="menu"`/`menuitem` を持つメニューではなく、
@@ -15,7 +15,7 @@
 // v1 との相違点 (位置計算の簡略化):
 //   v1 の `_get_portal_cb` (containing block 探索、`.ric-page` の backdrop-filter を
 //   避ける祖先探索) と `_get_expand_ref` (アイコンモードの左右展開方向判定) は移植しない —
-//   v2 に `.ric-page` 概念が無く、Phase 2 の createPopup も既に viewport 基準に簡略化して
+//   v2 に `.ric-page` 概念が無く、createPopup も既に viewport 基準に簡略化して
 //   実装していたため、createDropdown も同じ簡略化を踏襲する (「実測してからはみ出しを
 //   横 clamp で解消する」考え方に統一。最終報告に記載)。
 //

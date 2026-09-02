@@ -1,4 +1,4 @@
-// ricdom/ui — uiColor (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiColor (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/ui_color.js) の camelCase 移植。hex (#rrggbb) と rgba(r,g,b,a) の
 // 両方をサポートするカラーピッカー。

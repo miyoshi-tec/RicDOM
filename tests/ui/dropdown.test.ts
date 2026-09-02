@@ -1,4 +1,4 @@
-// createDropdown (設計書 §3.4 部品契約 + §5/付録 E a11y、Phase 3b)
+// createDropdown (設計書 §3.4 部品契約 + §5/付録 E a11y)
 // 実測位置 (below/above flip・横 clamp) は jsdom のレイアウト非対応のため
 // tests/browser/uiDropdown.test.ts (実ブラウザ) で検証する。ここでは ARIA 属性・
 // label/icon/chevron/ghost モード・use() 忘れ検知・排他制御 (host.app 単位) を確認する。

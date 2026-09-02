@@ -1,4 +1,4 @@
-// uiIcon (設計書 §3.4、Phase 3a、descriptor → svg 変換)
+// uiIcon (設計書 §3.4、descriptor → svg 変換)
 //
 // descriptor の path はテスト用に「手書き」しない (JSDoc の方針通り) — v1
 // docs/icons/ 由来の検証済み descriptor (Lucide 'check') をそのまま使う。

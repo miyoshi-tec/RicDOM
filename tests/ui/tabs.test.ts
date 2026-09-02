@@ -1,4 +1,4 @@
-// createTabs (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3b)
+// createTabs (設計書 §3.4 部品契約 + 付録 E a11y)
 // 矢印キー移動で実フォーカスが動くことの確認は jsdom のフォーカス/レイアウト非対応のため
 // tests/browser/uiTabs.test.ts (実ブラウザ) で検証する。ここでは構造・ARIA・
 // controlled/uncontrolled・roving tabindex の状態・use() 忘れ検知を確認する。

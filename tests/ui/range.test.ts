@@ -1,4 +1,4 @@
-// uiRange (設計書 §3.4、Phase 3a、隔離契約 + wheel でのステップ増減)
+// uiRange (設計書 §3.4、隔離契約 + wheel でのステップ増減)
 
 import { describe, expect, it, vi } from 'vitest';
 import { uiRange } from '../../src/ui/range.js';

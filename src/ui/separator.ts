@@ -1,4 +1,4 @@
-// ricdom/ui — uiSeparator (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiSeparator (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/ui_separator.js) の camelCase 移植。水平区切り線 (装飾要素)。
 // rest スプレッド契約 (v1 A15 継承): id/data-*/aria-*/style 等の任意属性を透過する。

@@ -3,7 +3,7 @@
 // v1 (ric_ui/popup/create_ui_tooltip.js) の移植 + a11y 新規実装 (aria-describedby / Esc)。
 // v1 との相違点は portal の描画先が host.portal になったこと (§3.5) のみ、
 // 位置計算 (top→bottom→right→left の優先順位) は v1 のロジックをそのまま使う。
-// Pos/posToStyle は Phase 3b で `internal/popupPosition.ts` に切り出し、createPopup /
+// Pos/posToStyle は `internal/popupPosition.ts` に切り出し、createPopup /
 // createDropdown と共有する (4 方向判定そのものは tooltip 固有なので移植しない)。
 //
 // 使い方:

@@ -1,4 +1,4 @@
-// ricdom/icons — 同梱データの検証 (Phase 3c、設計書付録 B A17)
+// ricdom/icons — 同梱データの検証 (設計書付録 B A17)
 
 import { describe, expect, it } from 'vitest';
 import * as icons from '../../src/icons/index.js';

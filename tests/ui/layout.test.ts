@@ -1,4 +1,4 @@
-// uiCol / uiRow / uiGrid / uiPanel (設計書 §3.4/§13、Phase 3a)
+// uiCol / uiRow / uiGrid / uiPanel (設計書 §3.4/§13)
 // v2 には createPage が無い (設計書 §13) — テーマ変数は applyTheme(el) が当てた祖先要素から
 // 継承する前提で、レイアウト部品自体は色・背景を持たない (uiPanel を除く)。
 

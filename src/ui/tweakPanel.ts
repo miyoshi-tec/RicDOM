@@ -1,4 +1,4 @@
-// ricdom/ui — createTweakPanel (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3c)
+// ricdom/ui — createTweakPanel (設計書 §3.4 部品契約 + 付録 E a11y)
 //
 // v1 (ric_ui/composite/ui_tweak.js: create_ui_tweak_panel / ui_tweak_panel / ui_tweak_row /
 // ui_tweak_folder) の移植。dat.GUI / Tweakpane ライクなパラメータ調整パネル。

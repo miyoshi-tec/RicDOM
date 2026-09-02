@@ -1,5 +1,5 @@
 // 実ブラウザ回帰テスト: uiIcon が ricdom/icons の descriptor をそのまま描画できること
-// (Phase 3c、設計書付録 B A17)。`ricdom/icons` は `ricdom/ui` に実行時依存を持たない
+// (設計書付録 B A17)。`ricdom/icons` は `ricdom/ui` に実行時依存を持たない
 // data-only パッケージなので (§13 と同じ「型のみ依存」の考え方)、descriptor を
 // import してそのまま uiIcon の第 1 引数に渡せることを実 DOM で確認する。
 

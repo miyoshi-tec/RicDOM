@@ -1,4 +1,4 @@
-// target 未解決時の挙動 (Phase 1b、設計書 §12)。
+// target 未解決時の挙動 (設計書 §12)。
 // v1 の 20 秒ポーリングは持たず、`DOMContentLoaded` を 1 回だけ待って再解決する。
 // それでも見つからなければ console.error + 型付き NOOP になる。
 // `<head>` 内 script のように、createApp() 呼び出し時点ではまだ target がパースされて

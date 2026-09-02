@@ -1,4 +1,4 @@
-// ricdom/icons — 同梱アイコンデータ (Phase 3c)
+// ricdom/icons — 同梱アイコンデータ
 //
 // v1 (docs/icons/icons.json、36 個) の TS 化。設計書付録 B A17「アイコン手書き禁止 + CLI」
 // の「データ層」部分 — 各アイコンは個別の named export (tree-shakable。バンドラは

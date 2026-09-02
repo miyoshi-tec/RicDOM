@@ -1,4 +1,4 @@
-// ricdom/ui — hljs (highlight.js) 検出・警告の共有ヘルパー (Phase 3a)
+// ricdom/ui — hljs (highlight.js) 検出・警告の共有ヘルパー
 //
 // uiMdPre (フェンスコードブロック) と uiCodePre は両方とも window.hljs があれば
 // シンタックスハイライトを試み、無ければプレーンテキストにフォールバックする。

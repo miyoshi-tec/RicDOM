@@ -1,4 +1,4 @@
-// ricdom/icons — SVG → アイコン descriptor 変換器 (Phase 3c)
+// ricdom/icons — SVG → アイコン descriptor 変換器
 //
 // v1 (docs/icons/svg_to_descriptor.js) の TS 化。任意のアイコン SVG 文字列を uiIcon の
 // descriptor `{ v?, s?, p }` に変換する。CLI (`ricdom-icon`、Lucide fetch 経路) と

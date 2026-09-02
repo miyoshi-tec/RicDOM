@@ -7,9 +7,9 @@
 //     v2 には page コンポーネントが無いため、el への適用まで 1 関数で完結させる
 //     (`:root` は使わない。同一ページ内で複数要素が別テーマを持てる、v1 踏襲)。
 //   - density / fontSize は camelCase 化 (v1 は density / font_size)。
-//   - v1 の `create_density` / `create_font_size` / `export_settings` は Phase 2 の
+//   - v1 の `create_density` / `create_font_size` / `export_settings` は
 //     最小移植スコープに含めない (設計書 §4 が明示するのは applyTheme / createTheme /
-//     exportTheme の 3 つ)。必要になった時点で Phase 3 以降に追加を検討する。
+//     exportTheme の 3 つ)。必要になった時点で追加を検討する。
 
 export type ThemeName = 'light' | 'dark' | 'teal' | 'cyber' | 'aqua';
 export type DensityName = 'comfortable' | 'compact' | 'tight';

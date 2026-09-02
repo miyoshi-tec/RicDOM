@@ -1,4 +1,4 @@
-// ricdom/ui — uiCol (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiCol (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/layout/ui_col.js) の camelCase 移植。縦方向フレックスコンテナ。
 // gap は CSS 変数 (--ric-gap-md) から自動で取得される。色・背景は持たない

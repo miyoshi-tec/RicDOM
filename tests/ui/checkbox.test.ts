@@ -1,4 +1,4 @@
-// uiCheckbox (設計書 §3.4、Phase 3a、隔離契約: checked/onchange は内部 input 限定)
+// uiCheckbox (設計書 §3.4、隔離契約: checked/onchange は内部 input 限定)
 
 import { describe, expect, it, vi } from 'vitest';
 import { uiCheckbox } from '../../src/ui/checkbox.js';

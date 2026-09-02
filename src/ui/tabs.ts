@@ -1,11 +1,11 @@
-// ricdom/ui — createTabs (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3b)
+// ricdom/ui — createTabs (設計書 §3.4 部品契約 + 付録 E a11y)
 //
 // v1 (ric_ui/composite/ui_tabs.js + bind_tabs.js) の移植。
 //
 // v1 との相違点:
 //   - v1 の ui_tabs は状態を持たない純粋関数 (どのタブがアクティブかは常に呼び出し側の
 //     state、`bind_tabs` はその双方向バインド糖衣) だった。v2 の createTabs は
-//     **controlled/uncontrolled 両対応**にする (Phase 3b タスクの明示要求) —
+//     **controlled/uncontrolled 両対応**にする —
 //     `active` props を渡せば controlled (v1 の ui_tabs 相当)、省略すれば
 //     uncontrolled (内部状態で管理、`bind_tabs` 相当の糖衣が要らなくなる)。
 //     状態を持ちうるため `app.use(createTabs())` で明示登録する (設計書 §3.4)。

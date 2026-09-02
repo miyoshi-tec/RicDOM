@@ -1,4 +1,4 @@
-// uiSelect (設計書 §3.4、Phase 3a、value/option 構築順はコアが解決済み)
+// uiSelect (設計書 §3.4、value/option 構築順はコアが解決済み)
 
 import { describe, expect, it, vi } from 'vitest';
 import { uiSelect } from '../../src/ui/select.js';

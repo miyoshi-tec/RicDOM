@@ -1,4 +1,4 @@
-// ricdom/ui — uiIcon (設計書 §3.4 純粋関数部品、Phase 3a。descriptor 同梱データは Phase 3c)
+// ricdom/ui — uiIcon (設計書 §3.4 純粋関数部品。descriptor 同梱データを含む)
 //
 // v1 (ric_ui/control/ui_icon.js) の camelCase 移植。SVG アイコンを descriptor から生成する。
 //

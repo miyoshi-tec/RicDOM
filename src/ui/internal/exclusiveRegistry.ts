@@ -1,4 +1,4 @@
-// ricdom/ui — popup 系の排他制御レジストリ (Phase 3b)
+// ricdom/ui — popup 系の排他制御レジストリ
 //
 // v1 の `_popup_registry` (popup/_popup_utils.js) はモジュールレベルの配列で、
 // `create_ui_popup()` を呼ぶたびに無条件で push されるだけで削除 API が無かった

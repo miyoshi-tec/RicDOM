@@ -1,15 +1,15 @@
 // ricdom/ui — CSS テンプレート (設計書 §4)
 //
-// v1 (ric_ui/css_templates.js) から各部品の規則を移植する。Phase 2 でボタン/入力/dialog/
-// popup/toast/tooltip、Phase 3a で状態を持たない部品 (control/layout/text) 一式 + ページ全体
-// スクロールバー既定スタイルを追加した。v1 との相違点:
+// v1 (ric_ui/css_templates.js) から各部品の規則を移植する。ボタン/入力/dialog/
+// popup/toast/tooltip、状態を持たない部品 (control/layout/text) 一式 + ページ全体
+// スクロールバー既定スタイルを含む。v1 との相違点:
 //   - `.ric-page ` プレフィックスを廃止。v2 には `create_ui_page` に相当する「テーマ適用
 //     スコープ用コンポーネント」が無く、`applyTheme(el, ...)` は任意の要素に直接 CSS 変数を
 //     当てるだけなので (§4)、CSS 側は単純なクラスセレクタで書ける (変数は通常の CSS
 //     継承で子孫に届く)。
 //   - v1 の「ページ全体スクロールバー既定スタイル」(`.ric-page, .ric-page *` への一括適用) は、
 //     v2 に page 部品が無いため `[data-ricdom-theme]` (applyTheme が付与するマーカー属性) を
-//     スコープに使う方式に置き換えた (Phase 3a、設計書 §13 で確定。SCROLLBAR_CSS 参照)。
+//     スコープに使う方式に置き換えた (設計書 §13 で確定。SCROLLBAR_CSS 参照)。
 //   - v1 の create_ui_popup は label/icon/chevron の 3 モードを持つ汎用ドロップダウンだったが、
 //     v2 の createPopup は「トリガー + role=menu の本体」に絞ったメニュー部品として設計
 //     し直した (設計書 E の記述 — aria-haspopup="menu" / role="menu" / menuitem 自動付与)。
@@ -285,7 +285,7 @@ const TOOLTIP_CSS = `
 .ric-tooltip__popup--right  { transform: translateY(-50%); transform-origin: left center; animation: ric-tip-v ${da}; }
 .ric-tooltip__popup--left   { transform: translateY(-50%); transform-origin: right center; animation: ric-tip-v ${da}; }`;
 
-// ── Phase 3a: 状態を持たない部品とレイアウト (設計書 §4/§13) ─────────────
+// ── 状態を持たない部品とレイアウト (設計書 §4/§13) ─────────────
 
 // ページ全体のスクロールバー既定スタイル (v1 の `.ric-page, .ric-page *` 相当)。
 // v2 に page 部品が無いため、applyTheme(el) が付与する `data-ricdom-theme` 属性を
@@ -800,7 +800,7 @@ const CODE_PRE_CSS = `
   overflow: visible;
 }`;
 
-// ── Phase 3b: 状態を持つ部品 (composite) ─────────────────────────
+// ── 状態を持つ部品 (composite) ─────────────────────────
 
 // scroll-pane はスクロールバー配色のみ提供する。挙動は inline style (overflow-y:auto)
 // + JS の scrollTop 制御で担う (createScrollPane 参照)。
@@ -1028,7 +1028,7 @@ const INLINE_MENU_CSS = `
   text-align: left;
 }`;
 
-// ── ric-tweak (パラメータ調整パネル、Phase 3c) ──
+// ── ric-tweak (パラメータ調整パネル) ──
 // v1 (ric_ui/css_templates.js の ric-tweak/ric-tweak-row/ric-tweak-folder) の移植。
 // folder は v1 のネイティブ <details> (::before の三角形 + rotate) を廃止し、
 // createAccordion と同じ <button> + grid-template-rows トリックに置き換えた

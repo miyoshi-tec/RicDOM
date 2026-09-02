@@ -1,4 +1,4 @@
-// uiInlineMenu (設計書 §3.4: 状態を持たない純粋関数部品、Phase 3b)
+// uiInlineMenu (設計書 §3.4: 状態を持たない純粋関数部品)
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
@@ -52,7 +52,7 @@ describe('uiInlineMenu: クリックの伝播抑止', () => {
   });
 });
 
-describe('uiInlineMenu: onClose (Phase 3b の新規追加)', () => {
+describe('uiInlineMenu: onClose', () => {
   it('onClose 省略時は Escape で何も起きない (v1 と同じ後方互換の挙動)', () => {
     const node = uiInlineMenu({ open: true, children: [] }) as unknown as { onkeydown?: (ev: unknown) => void };
     expect(node.onkeydown).toBeUndefined();

@@ -1,4 +1,4 @@
-// createSplitter (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3b)
+// createSplitter (設計書 §3.4 部品契約 + 付録 E a11y)
 // 実ドラッグ (pointer events) と矢印キーでの実リサイズは jsdom のレイアウト非対応のため
 // tests/browser/uiSplitter.test.ts (実ブラウザ) で検証する。ここでは ARIA 属性・
 // controlled/uncontrolled・use() 忘れ検知・getSize/setSize を確認する。

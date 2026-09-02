@@ -1,4 +1,4 @@
-// ricdom/ui — createAccordion (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3b)
+// ricdom/ui — createAccordion (設計書 §3.4 部品契約 + 付録 E a11y)
 //
 // v1 (ric_ui/composite/create_ui_accordion.js) の移植。開閉パネルリスト、内部状態付き。
 //

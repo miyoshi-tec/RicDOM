@@ -1,11 +1,11 @@
-// ricdom/ui — popup 系の位置計算ヘルパー (Phase 3b、設計書「共通」節)
+// ricdom/ui — popup 系の位置計算ヘルパー (設計書「共通」節)
 //
-// Phase 2 の createPopup が自前に持っていた位置計算 (v1 の `_popup_utils.js` 相当:
+// createPopup が自前に持っていた位置計算 (v1 の `_popup_utils.js` 相当:
 // `_make_popup_dir` / `_pos_style` の後継) を、popup.ts / dropdown.ts / tooltip.ts の
 // 3 部品で共有できるようここに切り出す (「重複を作らない」指示への対応)。
 //
 // v1 の `_get_portal_cb` (containing block 探索、`.ric-page` の backdrop-filter を
-// 避けるための祖先探索) は移植しない — v2 には `.ric-page` 概念が無く、Phase 2 の
+// 避けるための祖先探索) は移植しない — v2 には `.ric-page` 概念が無く、
 // createPopup も既に「viewport 基準 (window.innerWidth/innerHeight)」に簡略化して
 // portal を実装していた (v1 との既知の差異、CB 相当の概念が無いため)。dropdown も
 // 同じ簡略化を踏襲する (最終報告に記載)。

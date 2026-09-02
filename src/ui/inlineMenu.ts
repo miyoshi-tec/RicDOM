@@ -1,4 +1,4 @@
-// ricdom/ui — uiInlineMenu (設計書 §3.4: 状態を持たない純粋関数部品、Phase 3b)
+// ricdom/ui — uiInlineMenu (設計書 §3.4: 状態を持たない純粋関数部品)
 //
 // v1 (ric_ui/composite/ui_inline_menu.js) の camelCase 移植。trigger 要素の近くに
 // absolute 配置する軽量ポップオーバー。
@@ -18,7 +18,7 @@
 //   - 矢印キーでの項目間移動・focus trap は持たない。本格的な menu が要るなら
 //     createPopup (role="menu" + 矢印キー/Home/End) を使うこと。
 //
-// v1 との相違点 (Phase 3b の a11y 最小追加、設計書「意図的に最小」の指示):
+// v1 との相違点 (a11y 最小追加、設計書「意図的に最小」の指示):
 //   - `role="menu"` を追加。
 //   - Esc キーで閉じたいケース向けに、新規の任意 prop `onClose` を追加した。
 //     uiInlineMenu 自身は state を持たないため自分では閉じられない (v1 と同じ制約) —

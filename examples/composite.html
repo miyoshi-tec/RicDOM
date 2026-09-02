@@ -15,7 +15,7 @@
 <body>
 <!--
   利用側はビルド不要 (設計書 G1)。IIFE 2 本 (ricdom → ricdom/ui) + CSS <link> だけで
-  Phase 3b の状態を持つ部品群 (splitter/scrollPane/collapseBox/accordion/tabs/dropdown) と
+  状態を持つ部品群 (splitter/scrollPane/collapseBox/accordion/tabs/dropdown) と
   純粋関数部品 (inlineMenu) が一覧できることの証明 (設計書 §7)。
   npm install も webpack/vite の設定も不要 — このファイルをブラウザで開くだけで動く。
 -->
@@ -221,7 +221,7 @@
         class: 'app-shell',
         style: { margin: '2rem auto' },
         children: [
-          { tag: 'h1', children: ['RicDOM 2 — Phase 3b composite'] },
+          { tag: 'h1', children: ['RicDOM 2 — composite'] },
           themeRow(s),
           U.uiSeparator(),
           splitterDemo(s),

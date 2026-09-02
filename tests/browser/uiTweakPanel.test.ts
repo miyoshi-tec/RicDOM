@@ -1,4 +1,4 @@
-// 実ブラウザ回帰テスト: createTweakPanel (Phase 3c、設計書 §7)
+// 実ブラウザ回帰テスト: createTweakPanel (設計書 §7)
 //
 // v1 の v0.3.37 バグ (number 行で小数点を打っている最中に別 state の再 render が走ると
 // 入力が潰れる) が、v2 のコア規則 (編集中ガード、src/dom.ts の shouldSkipValueReapply) に

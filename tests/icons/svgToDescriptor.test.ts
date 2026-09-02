@@ -1,4 +1,4 @@
-// ricdom/icons — svgToDescriptor 変換器テスト (Phase 3c、v1 tests/svg_to_descriptor.test.js の移植)
+// ricdom/icons — svgToDescriptor 変換器テスト (v1 tests/svg_to_descriptor.test.js の移植)
 //
 // アイコン SVG 文字列 → uiIcon descriptor { v?, s?, p } の変換を検証する。
 // path 以外の要素 (line/polyline/polygon/rect/circle/ellipse) が path に

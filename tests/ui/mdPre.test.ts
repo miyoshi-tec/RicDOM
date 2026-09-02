@@ -1,4 +1,4 @@
-// uiMdPre (設計書 §3.4、Phase 3a、v1 ui_md_pre の記法網羅移植)
+// uiMdPre (設計書 §3.4、v1 ui_md_pre の記法網羅移植)
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { _resetHljsWarningForTest } from '../../src/ui/internal/hljs.js';

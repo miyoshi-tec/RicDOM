@@ -1,4 +1,4 @@
-// uiColor (設計書 §3.4、Phase 3a、hex/rgba 自動判定 + 隔離契約)
+// uiColor (設計書 §3.4、hex/rgba 自動判定 + 隔離契約)
 
 import { describe, expect, it, vi } from 'vitest';
 import { uiColor } from '../../src/ui/color.js';

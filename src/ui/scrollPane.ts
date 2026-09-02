@@ -1,9 +1,9 @@
-// ricdom/ui — createScrollPane (設計書 §3.4 部品契約、Phase 3b)
+// ricdom/ui — createScrollPane (設計書 §3.4 部品契約)
 //
 // v1 (ric_ui/composite/create_ui_scroll_pane.js) の移植。「最下部 (または最上部) 追従型の
 // スクロール領域」— チャット UI・ログビューアで「内容が追加されたら自動で端までスクロール、
 // ただしユーザーが途中を見ている間は動かさない」を宣言的に実現する (設計OS consumer が
-// 高評価だった機能、Phase 3b タスクの言及)。
+// 高評価だった機能)。
 //
 // v1 との相違点:
 //   - 状態を持つので `app.use(createScrollPane(options))` で明示登録する (設計書 §3.4)。

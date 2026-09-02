@@ -1,4 +1,4 @@
-// ricdom/ui — uiMdPre (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiMdPre (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/text/ui_md_pre.js) の camelCase 移植。Markdown テキストを RicNode 木に変換する
 // 部品。ヘルプ画面・チュートリアル表示用の簡易パーサー。外部ライブラリ不要。完全な

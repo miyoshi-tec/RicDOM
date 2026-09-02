@@ -24,7 +24,7 @@ describe('型テスト: createApp(target, state, render) の 3 引数 (設計書
   it('render 内の `s` は state から推論され、既知プロパティは正しい型で補完される', () => {
     // render を第 3 引数として独立させたことで、state に「render を同梱する」形の
     // 自己参照が無くなり、render コールバック内の `s` が `any` に落ちずに完全に型付く
-    // ことを確認する (Phase 1 実装での確定事項)。
+    // ことを確認する。
     createApp('#app', { count: 0 }, (s) => {
       expectTypeOf(s.count).toEqualTypeOf<number>();
       return { tag: 'div', children: [String(s.count)] };
@@ -71,7 +71,7 @@ describe('型テスト: RicElementNode (タグ → 属性型)', () => {
     expect(ok.tag).toBe('input');
   });
 
-  it('tag は型上必須。省略 ({}) は型エラーになる (Phase 1 実装での確定事項、設計書 §12)', () => {
+  it('tag は型上必須。省略 ({}) は型エラーになる (設計書 §12)', () => {
     // @ts-expect-error -- tag が無いノードは RicElementNode を満たさない (v1 の暗黙 div 扱いは廃止)
     const bad: RicElementNode = {};
     expect(true).toBe(true);

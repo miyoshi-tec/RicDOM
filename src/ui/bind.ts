@@ -1,5 +1,5 @@
 // ricdom/ui — bindInput / bindTextarea / bindCheckbox / bindSelect / bindRange
-// (設計書 §3.4 純粋関数部品、Phase 3a)
+// (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/bind_*.js) の camelCase 移植。ui_xxx を state と双方向バインドする
 // 便利関数 — 「state の一段目 Proxy にバインドする流儀」(コアの浅い Proxy、設計書 §3.3)。
@@ -11,7 +11,7 @@
 // v2 では 5 関数とも「options を先に展開 → 計算済みの value/onchange/oninput を後に置いて
 // 上書き不可にする」で統一する (rest スプレッド契約 A15 と同じ考え方を bind* にも適用)。
 //
-// v1 の bind_color / bind_radiobutton は本 Phase の対象外 (設計書指定の 5 関数のみ移植)。
+// v1 の bind_color / bind_radiobutton は対象外 (設計書指定の 5 関数のみ移植)。
 // name 衝突の既知制約は uiRadiobutton 側の JSDoc に記載済み。
 
 import type { RicNode } from '../types.js';

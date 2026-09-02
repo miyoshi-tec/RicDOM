@@ -1,4 +1,4 @@
-// createCollapseBox (設計書 §3.4 部品契約、Phase 3b)
+// createCollapseBox (設計書 §3.4 部品契約)
 // 実際に height/width が変化することの確認は jsdom がレイアウトを持たない
 // (scrollHeight が常に 0) ため tests/browser/uiCollapseBox.test.ts (実ブラウザ) で
 // 検証する。ここでは状態遷移・複数インスタンス独立性・use() 忘れ検知・idFor/isAnimating を確認する。

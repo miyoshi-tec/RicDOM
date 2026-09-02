@@ -1,4 +1,4 @@
-// createScrollPane (設計書 §3.4 部品契約、Phase 3b)
+// createScrollPane (設計書 §3.4 部品契約)
 // follow:'bottom' で実際に scrollTop が末尾になることの確認は jsdom がレイアウトを
 // 持たない (scrollHeight/clientHeight が常に 0) ため tests/browser/uiScrollPane.test.ts
 // (実ブラウザ) で検証する。ここでは DOM 構造・rest スプレッド・use() 忘れ検知・

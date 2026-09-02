@@ -1,4 +1,4 @@
-// ricdom/ui — uiRadiobutton (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiRadiobutton (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/ui_radiobutton.js) の camelCase 移植。ui_select と同じ options
 // インターフェースを持つラジオボタングループ。

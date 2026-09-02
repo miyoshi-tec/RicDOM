@@ -1,4 +1,4 @@
-// refs (data-ricdom-ref) / use() の骨 (Phase 1) / unmount() の確認。
+// refs (data-ricdom-ref) / use() の骨 / unmount() の確認。
 
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
@@ -31,7 +31,7 @@ describe('refs', () => {
   });
 });
 
-describe('use() (Phase 2: 正式な部品契約、設計書 §3.4)', () => {
+describe('use() (正式な部品契約、設計書 §3.4)', () => {
   it('登録した part の attach が host (notify/portal/app) 付きで呼ばれる', () => {
     setupApp();
     const handle = createApp('#app', {}, () => ({ tag: 'div' }));

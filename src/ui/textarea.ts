@@ -1,4 +1,4 @@
-// ricdom/ui — uiTextarea (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiTextarea (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/ui_textarea.js) の camelCase 移植。ui_input の <textarea> 版で、
 // `autoResize` オプションで内容量に応じて高さを自動調整できる。

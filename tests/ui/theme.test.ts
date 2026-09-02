@@ -56,7 +56,7 @@ describe('applyTheme: 5 テーマの color-scheme が bg 明暗と整合する',
     expect(el.style.getPropertyValue('--ric-color-fg')).toBe('#e5e7eb');
   });
 
-  it('data-ricdom-theme 属性を付与する (Phase 3a、スクロールバー既定スタイルのスコープ用マーカー、設計書 §13)', () => {
+  it('data-ricdom-theme 属性を付与する (スクロールバー既定スタイルのスコープ用マーカー、設計書 §13)', () => {
     const el = document.createElement('div');
     expect(el.hasAttribute('data-ricdom-theme')).toBe(false);
     applyTheme(el, { theme: 'dark' });

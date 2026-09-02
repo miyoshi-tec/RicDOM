@@ -1,4 +1,4 @@
-// uiRadiobutton (設計書 §3.4、Phase 3a、per-option 属性転送 + 隔離契約)
+// uiRadiobutton (設計書 §3.4、per-option 属性転送 + 隔離契約)
 
 import { describe, expect, it, vi } from 'vitest';
 import { uiRadiobutton } from '../../src/ui/radiobutton.js';

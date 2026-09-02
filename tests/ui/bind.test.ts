@@ -1,4 +1,4 @@
-// bindInput / bindTextarea / bindCheckbox / bindSelect / bindRange (設計書 §3.4、Phase 3a)
+// bindInput / bindTextarea / bindCheckbox / bindSelect / bindRange (設計書 §3.4)
 // state の一段目 Proxy へ双方向バインドする「流儀」の検証: 生成された RicNode の
 // value/checked が s[key] を反映し、ハンドラを呼ぶと s[key] が更新されることを確認する。
 

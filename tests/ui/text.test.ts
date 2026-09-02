@@ -1,4 +1,4 @@
-// uiText (設計書 §3.4、Phase 3a、variant → タグ/class マッピング)
+// uiText (設計書 §3.4、variant → タグ/class マッピング)
 
 import { describe, expect, it } from 'vitest';
 import { uiText } from '../../src/ui/text.js';

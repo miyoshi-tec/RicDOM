@@ -1,4 +1,4 @@
-// ricdom/ui — uiPanel (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiPanel (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/surface/ui_panel.js) の camelCase 移植。面・背景・枠を担当するコンテナ。
 // 文字色・フォントは親から CSS 継承。面だけを担当する。
@@ -10,7 +10,7 @@
 //     portal は app の target 配下なので applyTheme の CSS 変数継承で足りる (再検討条件:
 //     「同一 app 内で portal だけ別テーマ」の具体要望が出た場合)。
 //   - v1 の `create_ui_panel` (内部状態を持つファクトリ、s のトップレベルに置いて使う版) は
-//     移植しない — Phase 3a の対象部品は「すべて純粋関数」なので状態を持つ変種は対象外。
+//     移植しない — 対象部品は「すべて純粋関数」なので状態を持つ変種は対象外。
 //   - disabled の見た目 (opacity 0.45) は v1 が make_css_vars 文字列 + style_to_css_string で
 //     inline style として計算していたが、v2 の style は object 限定かつ CSS 1 枚配布の方針
 //     (設計書 §4) と揃えるため、CSS 側の `.ric-panel[inert]` セレクタで表現する

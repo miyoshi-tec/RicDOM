@@ -1,4 +1,4 @@
-// uiSeparator (設計書 §3.4、Phase 3a)
+// uiSeparator (設計書 §3.4)
 
 import { describe, expect, it } from 'vitest';
 import { uiSeparator } from '../../src/ui/separator.js';

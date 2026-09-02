@@ -1,4 +1,4 @@
-// ricdom/ui — uiCodePre (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiCodePre (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/text/ui_code_pre.js) の camelCase 移植。コード・JSON をダークテーマの <pre> で
 // 表示する部品。テーマに関わらず常にダーク表示とする (コードブロックの慣習、--ric-code-bg/fg

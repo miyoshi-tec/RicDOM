@@ -1,4 +1,4 @@
-// createAccordion (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3b)
+// createAccordion (設計書 §3.4 部品契約 + 付録 E a11y)
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';

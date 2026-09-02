@@ -1,4 +1,4 @@
-// uiCodePre (設計書 §3.4、Phase 3a)
+// uiCodePre (設計書 §3.4)
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uiCodePre } from '../../src/ui/codePre.js';

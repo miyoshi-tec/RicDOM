@@ -5,15 +5,15 @@
 //   - v1 は label/icon/chevron の 3 モードを持つ汎用ドロップダウン (旧 dropdown/menu 統合) だったが、
 //     設計書 E の記述 (aria-haspopup="menu" / role="menu" / menuitem 自動付与) に合わせて
 //     「トリガー + role=menu の本体」に絞ったメニュー部品として実装し直した
-//     (v1 の label/icon モード相当は Phase 3b で `createDropdown` として別部品に分離、
+//     (v1 の label/icon モード相当は `createDropdown` として別部品に分離、
 //     設計書 §13 で確定済みの方針)。
 //   - 矢印キー (↑↓) での項目間移動・Home/End・Esc でトリガーへ復帰を新規実装 (a11y、v1 未対応)。
-//   - 排他制御 (他の popup を閉じる) は Phase 2 では未実装だったが、Phase 3b で
+//   - 排他制御 (他の popup を閉じる) は
 //     `internal/exclusiveRegistry.ts` (host.app 単位、v1 の無制限成長するモジュール
 //     レベル `_popup_registry` の後継、B13 解消) を使って実装した。createDropdown と
 //     同じレジストリを共有する (「popup 系」全体で 1 つ開いたら他を閉じる、v1 踏襲)。
 //   - 位置計算 (below/above flip・横 clamp) は `internal/popupPosition.ts` に切り出し、
-//     createDropdown / createTooltip と共有する (Phase 3b、重複を作らない)。
+//     createDropdown / createTooltip と共有する (重複を作らない)。
 //
 // 使い方:
 //   const menu = app.use(createPopup());

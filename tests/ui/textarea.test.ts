@@ -1,4 +1,4 @@
-// uiTextarea (設計書 §3.4、Phase 3a、v1 A15 の rest スプレッド契約継承)
+// uiTextarea (設計書 §3.4、v1 A15 の rest スプレッド契約継承)
 
 import { describe, expect, it, vi } from 'vitest';
 import { uiTextarea } from '../../src/ui/textarea.js';

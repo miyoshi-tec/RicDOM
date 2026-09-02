@@ -1,8 +1,8 @@
-// ricdom/ui — 状態を持たない部品 (control/layout/text) 共通ヘルパー (Phase 3a)
+// ricdom/ui — 状態を持たない部品 (control/layout/text) 共通ヘルパー
 //
 // v1 (ric_ui/control/*.js, ric_ui/layout/*.js) では各ファイルが同じ 4 行の
-// class 連結ロジックをコピペしていた。v2 でも uiButton/uiInput (Phase 2) は
-// 同じコピペを踏襲していたが、Phase 3b で button.ts/input.ts もここに合流させた
+// class 連結ロジックをコピペしていた。v2 でも当初は uiButton/uiInput が
+// 同じコピペを踏襲していたが、button.ts/input.ts もここに合流させた
 // (§14 の追補: 「uiButton/uiInput に data-ricdom-role を付与し、UI_ROLE 列挙に統合」)。
 
 import type { ClassValue } from '../../types.js';
@@ -21,10 +21,9 @@ export const mergeClass = (base: string, extra: ClassValue | undefined): string 
  * `src/app.ts`/`src/ui/injectStyles.ts` が内部マーカーとして使っている
  * 'portal'/'styles' と値がぶつからないよう、部品名前空間として列挙する。
  *
- * Phase 3a では「状態を持たない部品」専用だったが、Phase 3b の §14 追補で
- * uiButton/uiInput (Phase 2 実装) と、状態を持つ部品 (splitter/scrollPane/
+ * 状態を持たない部品に加え、uiButton/uiInput と、状態を持つ部品 (splitter/scrollPane/
  * collapseBox/accordion/tabs/dropdown/popup) の内部マーカーもここに統合し、
- * 「全部品で一貫」させた (popup.ts の 'popup-item' 直書きもここに移動)。
+ * 「全部品で一貫」させている (§14 追補。popup.ts の 'popup-item' 直書きもここに移動)。
  */
 export const UI_ROLE = {
   button: 'button',
@@ -44,7 +43,7 @@ export const UI_ROLE = {
   panel: 'panel',
   mdPre: 'md-pre',
   codePre: 'code-pre',
-  // ── Phase 3b: 状態を持つ部品 ──
+  // ── 状態を持つ部品 ──
   popupItem: 'popup-item',
   scrollPane: 'scroll-pane',
   splitter: 'splitter',
@@ -65,7 +64,7 @@ export const UI_ROLE = {
   dropdown: 'dropdown',
   dropdownTrigger: 'dropdown-trigger',
   inlineMenu: 'inline-menu',
-  // ── Phase 3c ──
+  // ── パラメータ調整パネル ──
   tweakPanel: 'tweak-panel',
   tweakFolder: 'tweak-folder',
   tweakFolderHeader: 'tweak-folder-header',

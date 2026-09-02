@@ -1,4 +1,4 @@
-// ricdom-icon CLI — エントリポイント (Phase 3c)
+// ricdom-icon CLI — エントリポイント
 //
 // v1 (scripts/icon.js) の main() 部分の TS 移植。ロジック本体は ricdomIconLib.ts に
 // 分離してある (テストから副作用なしで import するため、ricdomIconLib.ts のヘッダ

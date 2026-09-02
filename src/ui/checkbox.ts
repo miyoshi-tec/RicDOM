@@ -1,4 +1,4 @@
-// ricdom/ui — uiCheckbox (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiCheckbox (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/ui_checkbox.js) の camelCase 移植。チェックボックス + ラベルをまとめた
 // control 部品。

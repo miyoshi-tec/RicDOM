@@ -1,4 +1,4 @@
-// ricdom/ui — uiSelect (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiSelect (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/ui_select.js) の camelCase 移植。CSS `appearance: base-select` により
 // ドロップダウンの見た目をテーマ色で統一する (Chrome 135+)。ネイティブ <select> なので

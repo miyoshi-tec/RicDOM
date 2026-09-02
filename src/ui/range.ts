@@ -1,4 +1,4 @@
-// ricdom/ui — uiRange (設計書 §3.4 純粋関数部品、Phase 3a)
+// ricdom/ui — uiRange (設計書 §3.4 純粋関数部品)
 //
 // v1 (ric_ui/control/ui_range.js) の camelCase 移植。スライダー入力 + 現在値表示。
 // ホイールでステップ単位の増減が可能。

@@ -22,7 +22,7 @@
 <body>
 <!--
   利用側はビルド不要 (設計書 G1)。IIFE 2 本 (ricdom → ricdom/ui) + CSS <link> だけで
-  createTweakPanel (Phase 3c) の Tier1/2/3 とパラメータ操作の即時反映を確認できる。
+  createTweakPanel の Tier1/2/3 とパラメータ操作の即時反映を確認できる。
   tweak パネルで数値/色/選択肢を弄ると、右側の図形 (.shape) がその場で変化する。
 -->
 <div id="app"></div>
@@ -78,7 +78,7 @@
         : U.uiPanel({
             class: 'app-shell',
             children: [
-              { tag: 'h1', children: ['RicDOM 2 — Phase 3c createTweakPanel'] },
+              { tag: 'h1', children: ['RicDOM 2 — tweak panel'] },
               U.uiText({ children: ['data だけ渡すと型から行が自動生成され (Tier1)、keys で一部だけ上書きできる (Tier2)。パネルを弄ると右の図形がその場で変わる。'] }),
               {
                 tag: 'div',

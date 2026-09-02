@@ -1,4 +1,4 @@
-// ricdom/ui — createCollapseBox (設計書 §3.4 部品契約 + 付録 E a11y、Phase 3b)
+// ricdom/ui — createCollapseBox (設計書 §3.4 部品契約 + 付録 E a11y)
 //
 // v1 (ric_ui/composite/create_ui_collapse_box.js) の移植。子要素を「アニメーションしながら
 // 現れる/消える」コンテナの汎用 primitive。**複数 instance 対応** (v1 v0.3.11〜継承):

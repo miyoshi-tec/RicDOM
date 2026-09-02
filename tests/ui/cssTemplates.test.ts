@@ -1,9 +1,9 @@
-// buildStylesheet (設計書 §4/§13、Phase 3a: 状態を持たない部品 + スクロールバー既定スタイル)
+// buildStylesheet (設計書 §4/§13、状態を持たない部品 + スクロールバー既定スタイル)
 
 import { describe, expect, it } from 'vitest';
 import { buildStylesheet } from '../../src/ui/cssTemplates.js';
 
-describe('buildStylesheet: Phase 3a で追加した規則を含む', () => {
+describe('buildStylesheet: 状態を持たない部品の規則を含む', () => {
   const css = buildStylesheet();
 
   it.each(['.ric-textarea', '.ric-checkbox', '.ric-select', '.ric-radiogroup', '.ric-range', '.ric-color', '.ric-separator', '.ric-text', '.ric-icon', '.ric-col', '.ric-row', '.ric-grid', '.ric-panel', '.ric-md-pre', '.ric-code-pre'])(
@@ -23,7 +23,7 @@ describe('buildStylesheet: Phase 3a で追加した規則を含む', () => {
     expect(css).toContain('.ric-panel[inert]');
   });
 
-  it('既存 (Phase 2) の規則も引き続き含まれる', () => {
+  it('既存の規則も引き続き含まれる', () => {
     expect(css).toContain('.ric-button');
     expect(css).toContain('.ric-dialog');
     expect(css).toContain('.ric-popup__body');

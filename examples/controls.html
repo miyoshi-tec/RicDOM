@@ -14,7 +14,7 @@
 <body>
 <!--
   利用側はビルド不要 (設計書 G1)。IIFE 2 本 (ricdom → ricdom/ui) + CSS <link> だけで
-  Phase 3a の control/layout/text 部品 (すべて純粋関数、app.use() 不要) が一覧できることの
+  control/layout/text 部品 (すべて純粋関数、app.use() 不要) が一覧できることの
   証明 (設計書 §7)。npm install も webpack/vite の設定も不要 — このファイルをブラウザで
   開くだけで動く。
 -->
@@ -69,7 +69,7 @@
       U.uiPanel({
         style: { maxWidth: '720px', margin: '2rem auto' },
         children: [
-          { tag: 'h1', children: ['RicDOM 2 — Phase 3a controls'] },
+          { tag: 'h1', children: ['RicDOM 2 — controls'] },
           themeRow(s),
           U.uiSeparator(),
 

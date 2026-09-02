@@ -1,4 +1,4 @@
-// ricdom/icons — 型定義 (Phase 3c)
+// ricdom/icons — 型定義
 //
 // uiIcon (ricdom/ui) が受け取る descriptor と構造的に同じ形 `{ v?, s?, p }` (設計書
 // 付録 B A17)。`ricdom/icons` は `ricdom/ui` へ実行時はもちろん型としても依存しない
