@@ -7,10 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Phase 1b (docs/DESIGN.ja.md §12)
+
+- `createApp(target, state, render)` を 3 引数に変更。v1 の「state に render を同梱する」
+  形のオーバーロードは削除 (canon は 1 つ)。render を独立させたことで `S` が `state` から
+  素直に推論され、render コールバック内の `s` も完全に型付く。`app.render = fn` による
+  後付け設定は維持 (v1 踏襲)。
+- target が未解決のとき: v1 の 20 秒ポーリングは廃止し、`DOMContentLoaded` を 1 回だけ待って
+  再解決する。それでも見つからなければ `console.error` + 型付き NOOP。
+- `tag` を型上必須に変更 (`{}` は型エラー)。v1 は tag 省略時に暗黙で `div` 扱いだったが、
+  実行時に tag が欠落したノードが渡された場合は `console.error` + 不可視ノード扱いにする。
+- 実ブラウザテスト (`@vitest/browser` + Playwright/chromium) を追加。rAF 停止環境でのバック
+  ストップ描画・`<select>` の value/option 構築順・編集中ガード (実 DOM の badInput 込み)・
+  IIFE ビルド smoke の 4 件を最初の回帰テストとして `tests/browser/` に実装。
+- GitHub Actions CI (`CI`): typecheck → jsdom テスト → Playwright インストール →
+  ブラウザテスト → build を push/PR ごとに実行。
+
 ### Added — Phase 1: コア (docs/DESIGN.ja.md §10)
 
-- `createApp(target, state)`: v1 `create_RicDOM` の後継。target 解決済みなら同期初回描画、
-  無効な target/state は `console.error` + 型付き NOOP App を返す (throw しない)。
+- `createApp(target, state, render)`: v1 `create_RicDOM` の後継。target 解決済みなら
+  同期初回描画、無効な target/state/render は `console.error` + 型付き NOOP App を
+  返す (throw しない)。
 - ノード表現: `{ tag, class, style, children, ref, key, island, ...attrs }`。`ctx` → `children`
   に改称。タグ名から属性型を導く TypeScript 型 (`RicElementNode`)。
 - 差分パッチ: position-based + key-based reconciliation、`FORCE_REAPPLY`

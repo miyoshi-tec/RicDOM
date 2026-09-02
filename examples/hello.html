@@ -19,9 +19,11 @@
 <script src="../dist/ricdom.iife.min.js"></script>
 <script>
   // IIFE ビルドはグローバル `ricdom` として公開される (tsup.config.ts の globalName)。
-  ricdom.createApp('#app', {
-    count: 0,
-    render: (s) => ({
+  // createApp(target, state, render) の 3 引数 (Phase 1 実装での確定事項、設計書 §12)。
+  ricdom.createApp(
+    '#app',
+    { count: 0 },
+    (s) => ({
       tag: 'div',
       children: [
         { tag: 'button', onclick: () => { s.count -= 1; }, children: ['-'] },
@@ -29,7 +31,7 @@
         { tag: 'button', onclick: () => { s.count += 1; }, children: ['+'] },
       ],
     }),
-  });
+  );
 </script>
 </body>
 </html>
