@@ -40,16 +40,19 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run",
-    "test:browser": "vitest run --browser",
+    "test": "vitest run --project unit",
+    "pretest:browser": "npm run build",
+    "test:browser": "vitest run --project browser",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
+    "@vitest/browser": "^3.2.7",
     "expect-type": "^1.1.0",
     "jsdom": "^25.0.1",
+    "playwright": "^1.55.1",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.7"
   }
 }
