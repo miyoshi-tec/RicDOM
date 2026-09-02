@@ -160,6 +160,15 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
 - `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+## 15. Phase 3b 実装での確定事項 (2026-09-02)
+
+- `createCollapseBox` の完了検知は **`transitionend` + 700ms バックストップ** (高さは per-instance の動的値で `@keyframes` では表現できないため。§13 の「animationend」は「CSS のアニメ完了イベント + バックストップ」の総称として読む)。ヘッドレス部品なので `aria-expanded` は呼び出し側のトリガーが持ち、`idFor(key)` で `aria-controls` を結ぶ
+- `createSplitter`: render props は `side` / `main` にノードを直接渡す (v1 の `{ctx}` ラッパーは廃止)。**矢印キーでのリサイズ (10px、`onResizeEnd` は押下ごと)** は v2 新規。`max` が null なら `aria-valuemax` を省略
+- `createTabs`: **automatic activation** (矢印キー移動で即切替、APG の両方式のうち一般的な方)。v1 の `bind_tabs` は uncontrolled モードが代替するため復活させない
+- `createDropdown`: トリガーは `aria-haspopup="dialog"` (汎用 Popover の APG 上の最近傍値)。v1 の `_get_expand_ref` (論理コンテナ基準の展開方向ヒューリスティック) は移植せず、viewport 基準の flip + clamp で統一 (Phase 2 と同じ簡素化)。再検討条件: 「広い行の右端トリガーで左に展開してほしい」類の実害報告
+- 排他制御は **app 単位の 1 レジストリを popup と dropdown で共有** (v1 の単一 registry を app スコープにしたもの、dispose で解除)
+- **accordion の閉じたパネルは `hidden` 属性を付けて a11y ツリーから除外する** (`role="region"` を全パネルに付ける実装のままだと閉じたパネルがランドマークノイズになる → Phase 3c で追補)
+- CSS 微差 (dropdown trigger の `width:auto`、splitter ボタン hover の共通トークン化) は v2 の判断を正とする
 - **FACT (docs へ)**: `createApp(target, state, render)` に渡した **元の `state` オブジェクトを直接変更しても再描画されない**。反応するのは戻り値の `app` と render の引数 `s` (= Proxy) だけ。Phase 3a のデモで実際に踏んだ罠 (v1 でも同じ)。TUTORIAL の最初の章と型ドキュメントに明記し、dev モードで検知できる方法があれば Phase 4 で検討 (元オブジェクトの参照を差し替えられないため現時点では docs で対処)
 
 ---
