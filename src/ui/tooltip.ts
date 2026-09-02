@@ -12,6 +12,7 @@
 
 import type { RicNode } from '../types.js';
 import { type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { UI_ROLE } from './internal/pureHelpers.js';
 import { type Pos, posToStyle } from './internal/popupPosition.js';
 
 export type TooltipDir = 'auto' | 'top' | 'bottom' | 'right' | 'left';
@@ -106,6 +107,7 @@ export const createTooltip = (): TooltipInstance => {
       class: `ric-tooltip__popup ric-tooltip__popup--${dir}`,
       id: tooltipId,
       role: 'tooltip',
+      'data-ricdom-role': UI_ROLE.tooltip,
       style: posToStyle(pos),
       children: [typeof contentLast === 'string' ? { tag: 'span', children: [contentLast] } : contentLast],
     } as unknown as RicNode;

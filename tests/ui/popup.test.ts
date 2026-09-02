@@ -59,6 +59,7 @@ describe('createPopup: トリガーの ARIA 属性', () => {
 
     const body = app.querySelector('[role="menu"]');
     expect(body).not.toBeNull();
+    expect(body!.getAttribute('data-ricdom-role')).toBe('popup'); // portal ルートの安定セレクタ
     const items = app.querySelectorAll('[role="menuitem"]');
     expect(items.length).toBe(2);
     expect(items[0]!.className).toContain('ric-popup__item');

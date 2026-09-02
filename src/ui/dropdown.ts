@@ -194,6 +194,7 @@ export const createDropdown = (): DropdownInstance => {
       {
         tag: 'div',
         class: `ric-dropdown__body ric-popup__body--${dir}${isClosing ? ' ric-popup__body--out' : ''}`,
+        'data-ricdom-role': UI_ROLE.dropdown,
         'data-ricdom-dropdown-id': bodyMarker,
         style: { ...posToStyle(pos), ...(isMeasuring ? { visibility: 'hidden' } : {}) },
         onanimationend: handleAnimEnd,

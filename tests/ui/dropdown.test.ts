@@ -103,6 +103,7 @@ describe('createDropdown: 開閉', () => {
     const body = app.querySelector('.ric-dropdown__body');
     expect(body).not.toBeNull();
     expect(body!.textContent).toBe('中身');
+    expect(body!.getAttribute('data-ricdom-role')).toBe('dropdown'); // portal ルートの安定セレクタ
     expect(dd!.isOpen()).toBe(true);
   });
 

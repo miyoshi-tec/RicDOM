@@ -44,7 +44,11 @@ export const UI_ROLE = {
   mdPre: 'md-pre',
   codePre: 'code-pre',
   // ── 状態を持つ部品 ──
+  dialog: 'dialog',
+  popup: 'popup',
   popupItem: 'popup-item',
+  toast: 'toast',
+  tooltip: 'tooltip',
   scrollPane: 'scroll-pane',
   splitter: 'splitter',
   splitterSide: 'splitter-side',

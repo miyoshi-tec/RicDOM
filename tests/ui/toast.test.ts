@@ -37,6 +37,7 @@ describe('createToast: role/aria-live', () => {
     expect(item.getAttribute('role')).toBe('status');
     expect(item.getAttribute('aria-live')).toBe('polite');
     expect(item.textContent).toContain('保存しました');
+    expect(app.querySelector('.ric-toast__container')!.getAttribute('data-ricdom-role')).toBe('toast'); // portal ルートの安定セレクタ
   });
 
   it('type: error の toast は role="alert" + aria-live="assertive"', async () => {

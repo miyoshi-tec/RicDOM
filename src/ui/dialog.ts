@@ -19,6 +19,7 @@
 
 import type { RicNode } from '../types.js';
 import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { UI_ROLE } from './internal/pureHelpers.js';
 
 export type DialogCloseReason = 'overlay' | 'close-button' | 'escape' | 'api';
 
@@ -284,6 +285,7 @@ export const createDialog = (): DialogInstance => {
         'aria-labelledby': titleId,
         'aria-describedby': bodyId,
         tabIndex: -1,
+        'data-ricdom-role': UI_ROLE.dialog,
         'data-ricdom-dialog-id': dialogRoleAttr,
         style: widthLast != null ? { width: `min(${typeof widthLast === 'number' ? `${widthLast}px` : widthLast}, 90vw)` } : {},
         onanimationend: (ev: AnimationEvent) => {

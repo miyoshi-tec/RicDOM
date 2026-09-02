@@ -51,7 +51,9 @@ describe('createTooltip: aria-describedby / 表示', () => {
     const trigger = app.querySelector('.ric-tooltip')!;
     trigger.dispatchEvent(new Event('mouseenter'));
     await flush();
-    expect(app.querySelector('[role="tooltip"]')).not.toBeNull();
+    const popup = app.querySelector('[role="tooltip"]');
+    expect(popup).not.toBeNull();
+    expect(popup!.getAttribute('data-ricdom-role')).toBe('tooltip'); // portal ルートの安定セレクタ
 
     trigger.dispatchEvent(new Event('mouseleave'));
     await flush();

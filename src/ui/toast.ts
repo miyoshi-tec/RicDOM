@@ -12,6 +12,7 @@
 
 import type { RicNode } from '../types.js';
 import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import { UI_ROLE } from './internal/pureHelpers.js';
 
 export type ToastType = 'default' | 'success' | 'error' | 'warning' | 'info';
 
@@ -70,6 +71,7 @@ export const createToast = (): ToastInstance => {
     return {
       tag: 'div',
       class: 'ric-toast__container',
+      'data-ricdom-role': UI_ROLE.toast,
       children: items.map((item) => ({
         tag: 'div',
         class: `ric-toast__item${item.entering ? ' ric-toast__item--in' : ''}${item.type !== 'default' ? ` ric-toast__item--${item.type}` : ''}${item.closing ? ' ric-toast__item--out' : ''}`,

@@ -237,6 +237,7 @@ export const createPopup = (): PopupInstance => {
         tag: 'div',
         class: `ric-popup__body ric-popup__body--${dir}${isClosing ? ' ric-popup__body--out' : ''}`,
         role: 'menu',
+        'data-ricdom-role': UI_ROLE.popup,
         'data-ricdom-popup-id': bodyMarker,
         style: { ...posToStyle(pos), ...(isMeasuring ? { visibility: 'hidden' } : {}) },
         onanimationend: handleAnimEnd,

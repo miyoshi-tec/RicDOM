@@ -56,6 +56,7 @@ describe('createDialog: uncontrolled', () => {
     const describedBy = dialogEl.getAttribute('aria-describedby')!;
     expect(document.getElementById(describedBy)!.textContent).toBe('本文');
     expect(dlg!.isOpen()).toBe(true);
+    expect(dialogEl.getAttribute('data-ricdom-role')).toBe('dialog'); // portal ルートの安定セレクタ
   });
 
   it('triggerChildren を省略すると trigger ボタンを描画しない (自前トリガー用)', async () => {
