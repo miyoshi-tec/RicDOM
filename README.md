@@ -1,81 +1,90 @@
 # ricdom
 
 [![CI](https://github.com/miyoshi-tec/ricdom/actions/workflows/ci.yml/badge.svg)](https://github.com/miyoshi-tec/ricdom/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> Write UI as plain objects. Assign to state. The real DOM updates. No build step, typed, accessible.
+**Write UI as plain objects. Assign to state. The real DOM updates.**
 
-Successor to [RicDOM v1](https://github.com/miyoshi-tec/RicDOM). Under construction — see [docs/DESIGN.ja.md](docs/DESIGN.ja.md).
+- **Plain-object UI tree.** No JSX, no template compiler, no DSL to learn — a component is
+  just an object literal (`{ tag: 'div', children: [...] }`), typed end to end.
+- **Proxy state, no ceremony.** `app.count += 1` re-renders. No store, no reducer, no
+  subscription to wire up by hand.
+- **No build step, ever, for consumers.** One `<script>` tag or one `import` and it runs —
+  TypeScript is how *ricdom itself* is built, not something you're required to adopt.
 
-Status: Phase 3c (`createTweakPanel` parameter panel + `ricdom/icons` bundled icon
-data / `svgToDescriptor` / `ricdom-icon` CLI) — not yet published.
+日本語版: [README.ja.md](README.ja.md)
 
-```js
-// createApp(target, state, render) — 3 引数 (state から render の s が型付く)
-ricdom.createApp(
-  '#app',
-  { count: 0 },
-  (s) => ({
-    tag: 'div',
-    children: [
-      { tag: 'button', onclick: () => { s.count -= 1; }, children: ['-'] },
-      { tag: 'output', children: [String(s.count)] },
-      { tag: 'button', onclick: () => { s.count += 1; }, children: ['+'] },
-    ],
-  }),
-);
-```
-
-## ricdom/ui
-
-Stateful components (dialog / popup / toast / tooltip) register via `app.use()`
-so they always receive a portal to render into — no implicit wiring, no silent
-failures if you forget to register one. Stateless components — buttons, inputs,
-textareas, checkboxes, radio groups, selects, ranges, color pickers, layout
-(col/row/grid/panel), markdown/code display — are plain functions
-(`props => RicNode`, no `app.use()`); see `examples/controls.html`.
+## Quick start
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ricdom@2/dist/ricdom-ui.css">
 <script src="https://cdn.jsdelivr.net/npm/ricdom@2/dist/ricdom.iife.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/ricdom@2/dist/ricdom-ui.iife.min.js"></script>
+<div id="app"></div>
 <script>
-  let dlg;
-  const app = ricdom.createApp('#app', {}, (s) =>
-    dlg ? dlg({ triggerChildren: ['Open'], title: 'Confirm', children: ['Really?'] }) : null,
-  );
-  dlg = app.use(ricdomUI.createDialog());
-
-  ricdomUI.applyTheme(document.getElementById('app'), { theme: 'dark' });
+  const app = ricdom.createApp('#app', { count: 0 }, (s) => ({
+    tag: 'div',
+    children: [
+      { tag: 'button', onclick: () => { app.count -= 1; }, children: ['-'] },
+      { tag: 'output', children: [String(s.count)] },
+      { tag: 'button', onclick: () => { app.count += 1; }, children: ['+'] },
+    ],
+  }));
 </script>
 ```
 
-See [examples/ui.html](examples/ui.html) for a full working demo (dialog + popup +
-toast + tooltip, zero build step).
+Or with native ESM / a bundler:
 
-Composite components (splitter / scrollPane / collapseBox / accordion / tabs /
-dropdown) also register via `app.use()` — same rule, no exceptions. `uiInlineMenu`
-is stateless (open state lives in your own state, like `uiButton`). See
-[examples/composite.html](examples/composite.html) for a full working demo.
-
-`createTweakPanel` (`app.use()`) builds a dat.GUI-style parameter panel from a
-plain data object — pass `data` and it infers a row per property (number/range/
-checkbox/text/select/radiobutton/color, nested objects become collapsible
-folders); override individual rows with `keys`, or append hand-built rows with
-`rows`. See [examples/tweak.html](examples/tweak.html).
-
-## ricdom/icons
-
-`ricdom/icons` ships 36 bundled icon descriptors (`{ v?, s?, p }`) as individual,
-tree-shakable named exports (Lucide-style kebab-case names converted to
-camelCase, e.g. `chevron-down` → `chevronDown`) plus `svgToDescriptor(svg)` for
-converting your own SVGs. Never hand-write a descriptor's path data — either
-`import` from this subpath or fetch one with the bundled CLI:
-
-```sh
-npx ricdom-icon chevronDown --json   # bundled, offline
-npx ricdom-icon settings --json      # not bundled → fetched from Lucide, path-ified
-npx ricdom-icon --names              # list bundled names
-npx ricdom-icon --search gear        # search bundled + Lucide
+```js
+import { createApp } from 'https://esm.sh/ricdom@2';
 ```
 
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for icon attribution.
+## Where ricdom sits
+
+| | UI tree | Reactivity | gzip | No build step | TS types | Distribution |
+|---|---|---|---|---|---|---|
+| VanJS | function calls (`tags.div(...)`) | own state (`.val`) | ~1KB | yes | yes | npm/CDN |
+| Alpine.js | HTML attributes (`x-data`) | Proxy | 7–15KB | yes | partial | CDN-first |
+| petite-vue | HTML attributes (`v-`/`@`/`:`) | Vue 3-style Proxy | ~6KB | yes | yes | CDN |
+| htmx | HTML attributes (`hx-*`) | none (server-driven) | ~14KB | yes | partial | CDN/npm |
+| Lit | tagged templates + Web Components | `@property` decls | 5–6KB | mostly | first-class | npm/CDN |
+| Preact + htm | tagged templates | VDOM diff (+ Signals) | ~4KB | yes | yes | npm/CDN |
+| Solid.js | JSX | signals (no VDOM) | ~7.6KB | **no** | first-class | npm |
+| Mithril | `m(sel, attrs, children)` → vnode | VDOM diff, manual redraw | ~8.8KB | yes | bundled | npm/CDN |
+| **ricdom** | **hand-written plain objects** | **Proxy (shallow + dev warnings)** | **≤ 5KB (core)** | yes | first-class | npm/jsDelivr |
+
+Nothing else in this space combines a hand-written plain-object tree, Proxy-driven
+re-rendering, and zero required build step for the consumer, at the same time.
+
+## What's in the box
+
+- **`ricdom`** — the core: plain-object tree → real DOM, shallow-Proxy reactivity, a
+  render scheduler with an rAF+timeout backstop, islands for externally-managed subtrees.
+  Core bundle is ≤ 5,120B gzipped.
+- **`ricdom/ui`** — 29 components (buttons, inputs, layout, markdown/code display, dialog,
+  popup, toast, tooltip, dropdown, splitter, tabs, accordion, a dat.GUI-style tweak panel,
+  and more), each with a real WAI-ARIA APG accessibility contract (focus trap, roving
+  tabindex, keyboard navigation — not bolted on after the fact), distributed as one CSS
+  file (`ricdom-ui.css`).
+- **`ricdom/icons`** + `ricdom-icon` CLI — a small bundled icon set as tree-shakable
+  named exports, plus a CLI that fetches and converts any [Lucide](https://lucide.dev/)
+  icon on demand. Icon path data is never meant to be hand-written.
+
+## Status
+
+`2.0.0-alpha` — API-complete and under active testing, not yet published to npm.
+
+This is the successor to [RicDOM v1](https://github.com/miyoshi-tec/RicDOM) (now in
+maintenance mode), rebuilt in TypeScript with camelCase APIs, real accessibility, and a
+browser-tested CI pipeline. It is not source-compatible with v1 — see
+[CHANGELOG.md](CHANGELOG.md) for the breaking changes if you're migrating an existing v1
+app.
+
+License: [MIT](LICENSE).
+
+## Learn more
+
+- [TUTORIAL.md](docs/TUTORIAL.md) — a 10-chapter, code-first walkthrough
+- [SPEC.md](docs/SPEC.md) — the full contract: diffing rules, reactivity, every
+  component's props and ARIA behavior
+- [examples/](examples/index.html) — five build-free demo pages
+- [CHANGELOG.md](CHANGELOG.md) — release history
+- [CONTRIBUTING.md](CONTRIBUTING.md) — developing ricdom itself
