@@ -1028,6 +1028,122 @@ const INLINE_MENU_CSS = `
   text-align: left;
 }`;
 
+// ── ric-tweak (パラメータ調整パネル、Phase 3c) ──
+// v1 (ric_ui/css_templates.js の ric-tweak/ric-tweak-row/ric-tweak-folder) の移植。
+// folder は v1 のネイティブ <details> (::before の三角形 + rotate) を廃止し、
+// createAccordion と同じ <button> + grid-template-rows トリックに置き換えた
+// (tweakPanel.ts のヘッダコメント参照)。
+const TWEAK_CSS = `
+.ric-tweak {
+  display: flex;
+  flex-direction: column;
+  color: ${fg};
+  background: ${bg};
+  border: ${b1};
+  border-radius: ${r};
+  padding: ${g} 0;
+  user-select: none;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.ric-tweak__title {
+  font-size: 1em;
+  font-weight: bold;
+  color: ${fg};
+  padding: ${g} ${gm};
+  margin-bottom: ${g};
+  border-bottom: ${b1};
+}
+.ric-tweak-row {
+  display: flex;
+  align-items: center;
+  gap: ${g};
+  padding: ${g} ${gm};
+  min-width: 0;
+  border: none;
+  margin: 0;
+}
+.ric-tweak-row:hover {
+  background: color-mix(in srgb, ${fg} 6%, transparent);
+}
+.ric-tweak-row__label {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 0.85em;
+  color: ${fm};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+}
+/* checkbox 行は ui_checkbox 内蔵ラベルを使うため __label を持たない。
+   通常行とトーンを揃えるため、内部の .ric-checkbox にも同じ色・サイズを適用する。 */
+.ric-tweak-row--checkbox .ric-checkbox {
+  font-size: 0.85em;
+  color: ${fm};
+}
+/* radiobutton 行は <fieldset> (a11y 上、複数選択肢のグループ化は <label> ではなく
+   fieldset/legend が正しい、tweakPanel.ts 参照) */
+.ric-tweak-row--radiobutton {
+  align-items: flex-start;
+}
+.ric-tweak-row > .ric-input,
+.ric-tweak-row > .ric-range,
+.ric-tweak-row > .ric-select,
+.ric-tweak-row > .ric-color {
+  flex: 1;
+  min-width: 0;
+}
+.ric-tweak-row__json {
+  flex: 1;
+  margin: 0;
+  padding: ${g} 5px;
+  background: ${bg};
+  border: ${b1};
+  border-radius: ${r};
+  font-size: 0.75em;
+  font-family: monospace;
+  color: ${fm};
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 80px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.ric-tweak-folder {
+  border-top: ${b1};
+}
+.ric-tweak-folder__header {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: ${g} ${gm};
+  background: ${bg};
+  border: none; cursor: pointer;
+  font-size: 0.9em; font-weight: 600; color: ${fg};
+  text-align: left; user-select: none;
+  transition: background ${da};
+}
+.ric-tweak-folder__header:hover, .ric-tweak-folder__header--open { background: color-mix(in srgb, ${fg} 6%, transparent); }
+.ric-tweak-folder__label { flex: 1; text-align: left; }
+.ric-tweak-folder__arrow { color: ${fm}; margin-left: ${g}; transition: transform ${da}; }
+.ric-tweak-folder__header--open .ric-tweak-folder__arrow { transform: rotate(180deg); }
+/* grid-template-rows のトリックで auto 高さに対してアニメーションする (createAccordion と同じ) */
+.ric-tweak-folder__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows ${da};
+}
+.ric-tweak-folder__body--open {
+  grid-template-rows: 1fr;
+}
+.ric-tweak-folder__body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.ric-tweak-folder__body--open > .ric-tweak-folder__body-inner {
+  display: flex;
+  flex-direction: column;
+}`;
+
 /**
  * ricdom/ui の CSS 1 枚分の文字列を組み立てる (設計書 §4)。
  * `injectStyles()` (実行時注入) と `dist/ricdom-ui.css` 生成スクリプト
@@ -1064,4 +1180,5 @@ export const buildStylesheet = (): string =>
     TABS_CSS,
     DROPDOWN_CSS,
     INLINE_MENU_CSS,
+    TWEAK_CSS,
   ].join('\n');

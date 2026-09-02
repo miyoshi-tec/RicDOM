@@ -102,4 +102,8 @@ export type { DropdownProps, DropdownInstance } from './dropdown.js';
 export { uiInlineMenu } from './inlineMenu.js';
 export type { UiInlineMenuProps, UiInlineMenuAnchor } from './inlineMenu.js';
 
+// ── Phase 3c ──
+export { createTweakPanel, inferTweakType } from './tweakPanel.js';
+export type { TweakPanelProps, TweakPanelInstance, TweakKeyOverride, TweakKeys, TweakRowType, TweakInferredType } from './tweakPanel.js';
+
 export type { Component, Host } from './internal/component.js';

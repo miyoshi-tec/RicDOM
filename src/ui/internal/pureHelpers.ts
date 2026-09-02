@@ -63,6 +63,11 @@ export const UI_ROLE = {
   dropdown: 'dropdown',
   dropdownTrigger: 'dropdown-trigger',
   inlineMenu: 'inline-menu',
+  // ── Phase 3c ──
+  tweakPanel: 'tweak-panel',
+  tweakFolder: 'tweak-folder',
+  tweakFolderHeader: 'tweak-folder-header',
+  tweakFolderBody: 'tweak-folder-body',
 } as const;
 
 export type UiRole = (typeof UI_ROLE)[keyof typeof UI_ROLE];
