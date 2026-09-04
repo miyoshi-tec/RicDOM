@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.1] — not yet published
+
+Five fixes/additions from feedback on the first pilot migration (歯車DXFジェネレーター).
+
+### Added
+
+- **`createApp(target, state, render, { setup })`**: `setup(app)` runs once, immediately
+  before the first render (after the app and its portal exist). Anything registered with
+  `app.use()` inside `setup` is already attached by the time the first `render` call
+  references it, removing the "return a placeholder until `use()` has run, then force a
+  render" two-step that was otherwise required on first render. `setup` is skipped for a
+  NOOP app, and an exception thrown by `setup` is caught, logged via `console.error`, and
+  does not prevent the first render.
+- **`createTweakPanel`: `keys[k].get`/`keys[k].set`**: a `keys` entry can now read/write a
+  row through `get()`/`set()` instead of `data[k]` — `data[k]` is never touched for that
+  row, and the key doesn't even need to exist in `data` (useful for a value derived from
+  other fields, e.g. a center distance computed from a module/teeth pair). Rows declared
+  this way render after `data`'s own rows, in `keys` order. A throwing `get`/`set` is
+  caught and logged, degrading only that row.
+- **`createTweakPanel`: `keys[k].rows`**: a folder-shaped `keys` entry can carry its own
+  `rows: RicNode[]`, appended at the end of *that* folder's body — the existing top-level
+  `rows` prop only ever appends to the end of the whole panel.
+- **`createTweakPanel`: stable row hooks**: every leaf row (number/range/checkbox/text/
+  select/radiobutton/color, and the new `get`/`set` rows) carries
+  `data-ricdom-role="tweak-row"` and `data-ricdom-tweak-key="<dot.path>"` for E2E/CSS
+  targeting independent of row order.
+- **`uiButton({ size })`**: `'sm' | 'md' | 'lg'`, default `'md'` (adds `.ric-button--sm`/
+  `.ric-button--lg`; `'md'` is the core button's own size, so it adds no class).
+- **`createDialog`: `returnFocus`**: `dlg.open({ returnFocus })` (uncontrolled) or
+  `DialogProps.returnFocus` (controlled) controls where focus goes when the dialog closes.
+  Default is unchanged (APG behavior — restore to the pre-open `activeElement`); `false`
+  skips focus restoration entirely (the dialog's DOM is simply removed, and the browser's
+  own default takes over — no explicit `document.body` focus call); an `Element` restores
+  focus there specifically. Fixes a case where opening a dialog from a non-focusable
+  trigger returned focus to an unrelated element that merely happened to be focused right
+  before the click.
+
+### Changed
+
+- Core gzip size: **5,091B** (was 5,030B), still under the 5,120B budget — the increase is
+  entirely the new `setup` option.
+- SPEC.md: added a FACT that a hidden/unfocused tab throttles `setTimeout` (not just
+  `requestAnimationFrame`), so the scheduler's 200ms backstop can take up to ~1s there;
+  code needing an immediate render regardless of tab state should call `app.renderNow()`.
+
 ## [2.0.0-alpha.0] — not yet published
 
 Initial alpha of ricdom 2, a from-scratch TypeScript successor to

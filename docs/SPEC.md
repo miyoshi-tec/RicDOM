@@ -248,6 +248,17 @@ single render.
   that needs to await "the DOM has caught up with a state change I just made," not as a
   general-purpose "wait a tick."
 
+### FACT: hidden tabs throttle both halves of the backstop
+
+A hidden/backgrounded tab (or any document where `document.hasFocus() === false`) does not
+just stop `requestAnimationFrame` — most browsers also throttle `setTimeout` in that state,
+typically to no faster than about once per second. The 200ms backstop described above is
+still armed and will still eventually fire, but "eventually" can mean up to ~1s in a hidden
+tab, not 200ms. A test (or any code) that needs the DOM to reflect a state change
+immediately, regardless of tab visibility/focus, should call `app.renderNow()` rather than
+waiting on a timer — `nextRender()`/a bare `setTimeout` wait is not reliable under
+throttling.
+
 ### FACT: the "2 rAF rule"
 
 A `requestAnimationFrame` callback firing does **not** mean the browser has laid out or
@@ -267,7 +278,7 @@ function createApp<S extends object>(
   target: string | Element,
   state: S,
   render: (state: S) => RicNode,
-  options?: { portalTo?: Element },
+  options?: { portalTo?: Element; setup?: (app: App<S>) => void },
 ): App<S>;
 ```
 
@@ -276,6 +287,31 @@ form v1 also supported). This is the only signature; there is no overload. Keepi
 out of `state` lets `S` be inferred cleanly from the `state` argument, so the `s` parameter
 your `render` callback receives is fully typed with no manual type annotation and no
 self-referential generic.
+
+### `options.setup`
+
+`setup(app)` runs **once, immediately before the first render** — after the app and its
+portal (§7) exist, but before `render` is called for the first time. Anything registered
+with `app.use()` inside `setup` is therefore already attached (has a `Host`) by the time
+the first `render` call references it — no placeholder-then-`renderNow()` two-step needed:
+
+```js
+let dlg;
+const app = createApp(
+  '#app',
+  {},
+  () => dlg({ triggerChildren: ['Open'], title: 'Confirm', children: ['Really?'] }),
+  { setup: (a) => { dlg = a.use(createDialog()); } },
+);
+```
+
+Without `setup`, `render` would have to guard the first call (`dlg ? dlg(...) : null`)
+because `createApp` itself performs the first render synchronously, before the line that
+calls `app.use()` has had a chance to run — `setup` exists specifically so that placeholder
+branch is never necessary. If `setup` throws, the exception is caught, logged via
+`console.error`, and the first render proceeds normally (never throws, per project
+convention). `setup` is **not** called when `createApp` returns a NOOP app (invalid
+`target`/`state`/`render`) — there is no app/portal for it to receive.
 
 ### Target resolution
 
@@ -523,7 +559,7 @@ the accessibility contract, which is FACT that is easy to miss by reading types 
 
 | Component | Notes |
 |---|---|
-| `uiButton(props)` | `variant`: `'default' \| 'primary' \| 'ghost'`. Rest-spread contract (§10.5) |
+| `uiButton(props)` | `variant`: `'default' \| 'primary' \| 'ghost'`. `size`: `'sm' \| 'md' \| 'lg'`, default `'md'` (`'md'` adds no size class — it *is* the core `.ric-button` size). Rest-spread contract (§10.5) |
 | `uiInput(props)` | Text input, controlled. `value` is always emitted (even `''`) so it participates in `FORCE_REAPPLY`/the editing guard |
 | `uiTextarea(props)` | `autoResize?: { minRows?, maxRows? }` grows/shrinks height to content, clamped, with overflow scrolling past `maxRows`. **IME note**: a controlled textarea can have its value overwritten mid-composition before IME confirmation — consider driving updates from `onchange` instead of `oninput` for CJK-heavy input |
 | `uiCheckbox(props)` | Renders `<label><input type=checkbox>…</label>`; `checked`/`onchange` are isolated to the inner `<input>` (rest props go on the outer `<label>`) |
@@ -561,11 +597,33 @@ completes even without `ricdom-ui.css` present, it just skips the animation.
 
 | Component | ARIA / a11y contract |
 |---|---|
-| `createDialog()` | Modal. `role="dialog"` + `aria-modal="true"` + `aria-labelledby`/`aria-describedby`. Opening moves focus to the first focusable descendant (visible-element–filtered); `Tab`/`Shift+Tab` are trapped inside; `Escape` closes and returns focus to the triggering element; every sibling of the portal is set `inert` while open. Three usage modes: uncontrolled + auto trigger (`triggerChildren` given → call returns a trigger `RicNode`), uncontrolled + your own trigger (`triggerChildren` omitted → call `dlg.open()`/`dlg.close()`), or controlled (`open`/`onClose(reason)` where `reason` is `'overlay' \| 'close-button' \| 'escape' \| 'api'`) |
+| `createDialog()` | Modal. `role="dialog"` + `aria-modal="true"` + `aria-labelledby`/`aria-describedby`. Opening moves focus to the first focusable descendant (visible-element–filtered); `Tab`/`Shift+Tab` are trapped inside; `Escape` closes and returns focus to the triggering element; every sibling of the portal is set `inert` while open. Three usage modes: uncontrolled + auto trigger (`triggerChildren` given → call returns a trigger `RicNode`), uncontrolled + your own trigger (`triggerChildren` omitted → call `dlg.open()`/`dlg.close()`), or controlled (`open`/`onClose(reason)` where `reason` is `'overlay' \| 'close-button' \| 'escape' \| 'api'`). `returnFocus` (§10.3.1) controls where focus goes on close |
 | `createPopup()` | `role="menu"` dropdown. Trigger gets `aria-haspopup="menu"` + `aria-expanded`; every menu child is auto-wrapped with `role="menuitem"`. `ArrowUp`/`ArrowDown`/`Home`/`End` move focus among items; `Escape` closes and restores focus to the trigger. `openAt({x,y} \| MouseEvent)` opens at an arbitrary point instead of a trigger button. Menu-open state is exclusive with `createDropdown` within the same app (opening one closes any other open popup/dropdown) |
 | `createToast()` | `toast.show(msg, { type, duration })` queues a notification; `type: 'error'` renders `role="alert"`/`aria-live="assertive"`, everything else `role="status"`/`aria-live="polite"`. `duration: 0` disables auto-dismiss (manual close only). Never steals focus |
 | `createTooltip()` | `aria-describedby` links trigger ↔ popup; shown on hover or focus, dismissed on blur/mouseleave/`Escape`. `dir: 'auto' \| 'top' \| 'bottom' \| 'right' \| 'left'`, `'auto'` picks a direction that fits the viewport |
 | `createDropdown()` | Generic popover (not a menu): trigger gets `aria-haspopup="dialog"` + `aria-expanded`; body content's semantics are entirely up to you. `label`+`chevron` mode or `icon` mode for the trigger. Shares position-flip logic and the exclusive-open registry with `createPopup` |
+
+#### 10.3.1 FACT: dialog focus-return control (`returnFocus`)
+
+By default, closing a dialog returns focus to whatever `document.activeElement` was
+**at the moment it opened** (the APG-recommended behavior). This is not always what you
+want: if the dialog was opened via `dlg.open()` from a non-focusable trigger (a `<span>`
+click handler, say), "whatever happened to be focused right before that click" can be an
+unrelated element (e.g. a number input the user was last typing into) — restoring focus
+there can surface as spurious `focusin` events to app-level focus listeners.
+
+- Uncontrolled mode: `dlg.open({ returnFocus })` (the auto-trigger button built from
+  `triggerChildren` does not take this option — it is itself always a real, focusable
+  `<button>`, so the default is always correct there).
+- Controlled mode: pass `returnFocus` as a `DialogProps` field, alongside `open`/`onClose`.
+
+`returnFocus` accepts:
+- omitted (default): APG behavior, restore focus to the pre-open `activeElement`.
+- `false`: do not restore focus at all. No element is focused programmatically — once the
+  dialog's DOM is removed, the browser's own default (moving focus to `document.body`)
+  takes over. This is "do nothing," not "explicitly focus `document.body`."
+- an `Element`: restore focus to that element specifically, regardless of what was focused
+  when the dialog opened.
 
 ### 10.4 Stateless — text
 
@@ -585,6 +643,45 @@ caller cannot accidentally shadow them). Passing `class` through `rest` extends 
 than replaces the component's base class (`mergeClass`), while any other computed field
 you might collide with (`tag`, `data-ricdom-role`) always wins over what you pass.
 
+### 10.6 Stateful — `createTweakPanel`
+
+Also `app.use()`-registered (§6). Builds a parameter panel from a `data` object in three
+tiers: `data` alone infers a row per property from its runtime type (Tier 1); `keys`
+overrides individual rows or folders by property name (Tier 2); `rows`/a folder's
+`keys[k].rows` append hand-built `RicNode`s (Tier 3).
+
+#### FACT: `keys[k].get`/`set` — rows that don't read/write `data`
+
+A `keys` entry may carry `get?: () => unknown` and/or `set?: (v: unknown) => void`. When
+either is present, that row's value comes from `get()` (not `data[k]`) and writes go to
+`set()` (not `data[k] = v`) — `data[k]` is never touched for that row. This is how you
+expose a value that doesn't live in `data` at all (e.g. a center distance derived from a
+module/teeth pair): give `keys` an entry for a property name that doesn't exist in `data`,
+with a `get`. Rows declared this way (key present in `keys`, absent from `data`) render
+*after* all of `data`'s own rows, in the order they appear in `keys`. If `get` (or `set`)
+throws, `createTweakPanel` logs `console.error` and continues rendering (`get` falls back
+to `undefined` for that render) — a broken hook degrades one row, it does not break the
+panel.
+
+#### FACT: `keys[k].rows` — per-folder Tier 3
+
+A folder-shaped `keys` entry (the property's value is a plain object) may also carry its
+own `rows: RicNode[]`, appended at the end of that specific folder's body — distinct from
+the panel-level `rows` prop, which only ever appends to the very end of the whole panel.
+Use this to put a hand-built row (e.g. a "reset this section" button) inside a particular
+folder rather than at the panel's outer edge.
+
+#### FACT: every leaf row carries `data-ricdom-role="tweak-row"` + `data-ricdom-tweak-key`
+
+Every leaf row (number/range/checkbox/text/select/radiobutton/color, and the `get`/`set`
+computed rows above) has its outer container marked `data-ricdom-role="tweak-row"` and
+`data-ricdom-tweak-key="<path>"`, where `<path>` is the dot-joined key chain from the
+panel's root (`"outer.inner"` for a property nested one folder deep) — a stable hook for
+E2E tests or custom CSS that doesn't depend on row order or DOM structure. The checkbox row
+is the one exception to the usual row shape: because `uiCheckbox` renders its own
+`<label>` internally, the checkbox row has no separate `.ric-tweak-row__label` `<span>`
+(every other row type does) — the role/key attributes are still present on its container.
+
 ---
 
 ## 11. `data-ricdom-role` registry
@@ -600,7 +697,7 @@ this too, distinct from their trigger element's role (if any):
 `splitter-side` `splitter-main` `splitter-divider` `splitter-toggle` `collapse-box`
 `accordion` `accordion-item` `accordion-header` `accordion-body` `accordion-title` `tabs`
 `tabs-bar` `tabs-tab` `tabs-panel` `inline-menu` — `tweak-panel` `tweak-folder`
-`tweak-folder-header` `tweak-folder-body`.
+`tweak-folder-header` `tweak-folder-body` `tweak-row` (§10.6).
 
 The core library itself uses `data-ricdom-role="portal"` for the auto-generated portal
 sentinel (§7) and `data-ricdom-ref` (a different attribute) for `ref`-registered elements

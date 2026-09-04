@@ -178,22 +178,31 @@ whenever you need custom logic in the handler instead of a straight assignment.
 Stateless components (everything in the previous chapter) are just functions you call.
 Stateful components — ones that hold their own open/closed state and need somewhere to
 render into, like a dialog — are different: you register them once with `app.use()`, and
-call the returned handle inside `render` every time:
+call the returned handle inside `render` every time. `createApp` renders synchronously
+before it returns, so register the part in the `setup` option — it runs right before that
+first render, so the part is already usable on the very first call:
 
 ```js
 import { createApp } from 'ricdom';
 import { createToast, uiButton } from 'ricdom/ui';
 
 let toast;
-const app = createApp('#app', {}, () => {
-  toast(); // registers this render cycle's portal content — call it every render
-  return uiButton({
-    children: ['Save'],
-    onclick: () => toast.show('Saved!', { type: 'success' }),
-  });
-});
-toast = app.use(createToast());
+const app = createApp(
+  '#app',
+  {},
+  () => {
+    toast(); // registers this render cycle's portal content — call it every render
+    return uiButton({
+      children: ['Save'],
+      onclick: () => toast.show('Saved!', { type: 'success' }),
+    });
+  },
+  { setup: (a) => { toast = a.use(createToast()); } },
+);
 ```
+
+(Without `setup`, you'd have to make `render` return a placeholder until `use()` has run,
+then trigger another render — `setup` exists so you don't have to.)
 
 If you forget the `app.use(...)` step and call `createToast()()` directly, nothing
 crashes — `ricdom/ui` logs one `console.error` explaining the fix and renders nothing.
@@ -228,36 +237,26 @@ runtime and is safe to call more than once.
 ## 7. Dialog and popup
 
 Accessibility (focus trap, `Escape` handling, ARIA roles) is the library's job, not yours
-— you just supply content:
+— you just supply content. For the common "click a button to open" case, `createDialog`
+can render its own trigger button for you:
 
 ```js
 import { createApp } from 'ricdom';
 import { createDialog, uiButton } from 'ricdom/ui';
 
 let dlg;
-const app = createApp('#app', { confirmed: false }, (s) => {
-  dlg(); // register this render's portal content
-  return uiButton({
-    children: ['Delete item'],
-    onclick: () => { s.showDialog = true; },
-  });
-});
-```
-
-Simpler still, for the common "click a button to open" case, `createDialog` can render its
-own trigger button for you:
-
-```js
-let dlg;
-const app = createApp('#app', {}, () =>
-  dlg({
-    triggerChildren: ['Delete item'],
-    title: 'Are you sure?',
-    children: ['This cannot be undone.'],
-    actions: [uiButton({ children: ['Delete'], variant: 'primary', onclick: () => { /* ... */ dlg.close(); } })],
-  }),
+const app = createApp(
+  '#app',
+  {},
+  () =>
+    dlg({
+      triggerChildren: ['Delete item'],
+      title: 'Are you sure?',
+      children: ['This cannot be undone.'],
+      actions: [uiButton({ children: ['Delete'], variant: 'primary', onclick: () => { /* ... */ dlg.close(); } })],
+    }),
+  { setup: (a) => { dlg = a.use(createDialog()); } },
 );
-dlg = app.use(createDialog());
 ```
 
 This is *uncontrolled* mode: the dialog manages its own open/closed state. For a dialog
@@ -278,16 +277,19 @@ with arrow-key navigation built in:
 
 ```js
 let menu;
-const app = createApp('#app', {}, () =>
-  menu({
-    trigger: ['⋯'],
-    children: [
-      uiButton({ children: ['Rename'], onclick: () => { /* ... */ } }),
-      uiButton({ children: ['Delete'], onclick: () => { /* ... */ } }),
-    ],
-  }),
+const app = createApp(
+  '#app',
+  {},
+  () =>
+    menu({
+      trigger: ['⋯'],
+      children: [
+        uiButton({ children: ['Rename'], onclick: () => { /* ... */ } }),
+        uiButton({ children: ['Delete'], onclick: () => { /* ... */ } }),
+      ],
+    }),
+  { setup: (a) => { menu = a.use(createPopup()); } },
 );
-menu = app.use(createPopup());
 ```
 
 `Escape`, focus trapping/restoration, and outside-click dismissal all work without any
@@ -306,10 +308,12 @@ import { createApp } from 'ricdom';
 import { createTweakPanel } from 'ricdom/ui';
 
 let tweak;
-const app = createApp('#app', { params: { size: 10, color: '#ff0000', spin: true } }, (s) =>
-  tweak({ title: 'Params', data: s.params }),
+const app = createApp(
+  '#app',
+  { params: { size: 10, color: '#ff0000', spin: true } },
+  (s) => tweak({ title: 'Params', data: s.params }),
+  { setup: (a) => { tweak = a.use(createTweakPanel()); } },
 );
-tweak = app.use(createTweakPanel());
 ```
 
 This alone produces a number field for `size`, a color picker for `color`, and a checkbox
@@ -318,6 +322,12 @@ for `spin` — the row type is inferred from the value's type (booleans → chec
 object to get a collapsible folder. Override individual rows (min/max/step/options/type)
 with the `keys` prop, or append your own hand-built rows with `rows` — see
 [SPEC.md §10](SPEC.md#10-components) or `examples/tweak.html` for the full three-tier API.
+
+A row doesn't have to come from `data`: give a `keys` entry a `get` (and optionally `set`)
+function and it renders as its own row without ever reading or writing `data[key]` —
+useful for a derived/read-only value (e.g. an area computed from `size`). A folder's
+`keys` entry can also carry its own `rows` array, appended at the end of that folder
+specifically (the top-level `rows` prop only ever appends to the end of the whole panel).
 
 ---
 
