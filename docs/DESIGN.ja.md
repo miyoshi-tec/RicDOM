@@ -166,17 +166,18 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
 ## 19. パイロット移行第 1 号 (歯車DXFジェネレーター) からの確定事項 (2026-09-03、2.0.0-alpha.1)
 
-- **移行実績**: v1 v0.4.2 → v2 、機能フル動作。機械変換 ~450 行 (ctx→children 73 箇所、関数名 11 種 40 箇所、handle→app 35 箇所)、手動 150〜180 行。歯形エンジン (変更禁止ゾーン) は無変更 = 「UI 層だけ差し替えられる」設計が実証された
-- **API の穴 3 件を採用**: ① に / (data に無い計算値の行を keys だけで宣言可、v1  相当) + フォルダ単位  ②全 leaf row に  +  (checkbox 行にラベル span が無いことは FACT) ③ (v1 parity)
-- **dialog のフォーカス復帰**: 既定は APG (開く前の activeElement へ) を維持。 で無効化/明示指定。「フォーカス不可能な起動元 → 直前の入力欄に着地 → アプリの document 直付け focusin 監視が誤発火」は consumer 側の相互作用として SPEC に FACT
-- ****: 初回同期描画の直前に 1 回呼ばれ、中で  した部品を初回 render から使える (「プレースホルダ + renderNow の 2 段構え」を不要に)。TUTORIAL/examples はこのパターンに統一。**コア gzip 5,097B (天井まで 23B)** — setup 実装は 61B に圧縮した (naive 実装は天井超え)。**以後コアは完全凍結**: 追加が要る場合は同量以上の削減とセット
-- **相互作用 FACT**: hidden タブでは rAF に加え setTimeout も ~1s に throttle されるためバックストップも遅れる (v1 と同じ)。即時反映が要るテストは - **良かった点として確認された v1 継承の性質**:  の代入操作感、NOOP の壊れ方 (console.error だけで白画面にならない → 原因特定が速い)、tweak の  毎 render 契約、クラス名 ( 等) の据え置き、、MIT
+- **移行実績**: v1 v0.4.2 → v2 `a2f444e`、機能フル動作。機械変換 ~450 行 (ctx→children 73 箇所、関数名 11 種 40 箇所、handle→app 35 箇所)、手動 150〜180 行。歯形エンジン (変更禁止ゾーン) は無変更 = 「UI 層だけ差し替えられる」設計が実証された
+- **API の穴 3 件を採用**: ① `TweakKeyOverride` に `get` / `set` (data に無い計算値の行を keys だけで宣言可、v1 `ui_tweak_row` 相当) + フォルダ単位 `rows` ②全 leaf row に `data-ricdom-role="tweak-row"` + `data-ricdom-tweak-key` (checkbox 行にラベル span が無いことは FACT) ③ `uiButton({ size })` (v1 parity)
+- **dialog のフォーカス復帰**: 既定は APG (開く前の activeElement へ) を維持。`returnFocus: false | Element` で無効化/明示指定。「フォーカス不可能な起動元 → 直前の入力欄に着地 → アプリの document 直付け focusin 監視が誤発火」は consumer 側の相互作用として SPEC に FACT
+- **`createApp(..., { setup(app) })`**: 初回同期描画の直前に 1 回呼ばれ、中で `app.use()` した部品を初回 render から使える (「プレースホルダ + renderNow の 2 段構え」を不要に)。TUTORIAL/examples はこのパターンに統一。**コア gzip 5,097B (天井まで 23B)** — setup 実装は 61B に圧縮した (naive 実装は天井超え)。**以後コアは完全凍結**: 追加が要る場合は同量以上の削減とセット
+- **相互作用 FACT**: hidden タブでは rAF に加え setTimeout も ~1s に throttle されるためバックストップも遅れる (v1 と同じ)。即時反映が要るテストは `renderNow()`
+- **良かった点として確認された v1 継承の性質**: `App<S>` の代入操作感、NOOP の壊れ方 (console.error だけで白画面にならない → 原因特定が速い)、tweak の `tw({...})` 毎 render 契約、クラス名 (`.ric-tweak-row__label` 等) の据え置き、`DialogProps.width`、MIT
 
 ## 18. Phase 4a (docs) での確定事項 (2026-09-02)
 
 - 内部記録 (本設計書・API_AUDIT) は「内部記録」注記を付けて**公開リポジトリに残す** (OSS の ADR と同じ扱い。AI 統括の関与は Co-Authored-By で透明)。利用者向け docs (README / SPEC / TUTORIAL / CHANGELOG / CONTRIBUTING) には制作過程語を入れない
 - README の部品数は実数を書く (FACT 方針)。CHANGELOG の未公開版は「not yet published」と明記し日付を捏造しない
-- README の Quick start は render 内で引数  を使う例に統一 (「元 state を直接変えても反応しない」FACT と一貫)
+- README の Quick start は render 内で引数 `s` を使う例に統一 (「元 state を直接変えても反応しない」FACT と一貫)
 
 ## 17. Phase 3d (API 整合レビュー) での確定事項 (2026-09-02)
 
