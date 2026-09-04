@@ -1013,6 +1013,12 @@ const DROPDOWN_CSS = `
 .ric-dropdown__chevron { transition: transform 0.2s ${eas}; opacity: 0.7; }
 .ric-dropdown__chevron--open { transform: rotate(180deg); }
 .ric-dropdown__body {
+  /* createDropdown 新設時 (Phase 3b) からの欠落。.ric-popup__body は position:fixed を
+     持つが、こちらは持たないまま inline の top/left/bottom (dropdown.ts の computePos)
+     を当てていたため static のまま無視され、本体が portal 内の通常フローに並んでいた —
+     target が display:flex; flex-direction:column だとページ本体がその分押し込まれる
+     実機バグ (#9)。alpha.3 で .ric-popup__body と揃えて修正。 */
+  position: fixed;
   min-width: 160px;
   background: ${ct};
   border: ${b1};
