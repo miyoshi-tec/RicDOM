@@ -24,7 +24,10 @@
 // `process` 自体が存在しない環境 (bundler を通さない生の ESM import 等) では
 // dev 相当 (警告を出す側) にフォールバックする — 「silent failure を増やさない」
 // という本ライブラリの一貫した方針を、判定不能なケースでも優先するため。
-const isDevMode = (): boolean => {
+//
+// dom.ts の key 重複警告 (#13) も同じ判定規則を使うため export する。1 箇所に
+// 定義を寄せて重複定義を避ける (dom.ts はここから import する)。
+export const isDevMode = (): boolean => {
   try {
     return typeof process === 'undefined' || typeof process.env === 'undefined' || process.env.NODE_ENV !== 'production';
   } catch {

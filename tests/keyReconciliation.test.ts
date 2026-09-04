@@ -1,7 +1,7 @@
 // key ベースの子要素 reconciliation (v1 tests/key_reconciliation.test.js 相当)。
 // 並べ替え・中央挿入・削除で DOM ノードが再利用される (= 同一参照が保たれる) ことを確認する。
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app.js';
 import { flush, setupApp } from './_helpers/dom.js';
 
@@ -236,5 +236,78 @@ describe('兄弟内での key 重複 (#13)', () => {
     expect(after[1]).toBe(liX); // X の DOM は再利用される (同一参照)
     expect(after[1]!.dataset.marker).toBe('kept-me');
     expect(after[0]!.textContent).toBe('B'); // B は新規ノード (X の DOM を奪っていない)
+  });
+});
+
+describe('兄弟内での key 重複の dev 警告 (#13)', () => {
+  let originalNodeEnv: string | undefined;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    originalNodeEnv = process.env.NODE_ENV;
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    warnSpy.mockRestore();
+  });
+
+  it('dev では重複 key を含む render のたびに console.warn が 1 回だけ出る (初回 mount は対象外)', async () => {
+    process.env.NODE_ENV = 'development';
+    const app = setupApp();
+    const handle = createApp('#app', { n: 0 }, (s) => ({
+      tag: 'ul',
+      children: [
+        { tag: 'li', key: 'x', children: [`x1-${s.n}`] },
+        { tag: 'li', key: 'x', children: [`x2-${s.n}`] },
+      ],
+    }));
+    await flush();
+    // 初回 mount は buildDomNode による新規構築のみで patchChildrenByKey を経由しない
+    // (比較対象の prev が無いため)。よってこの時点では警告は出ない。
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    handle.n = 1;
+    await flush();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    handle.n = 2;
+    await flush();
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('production (NODE_ENV=production) では警告が出ない', async () => {
+    process.env.NODE_ENV = 'production';
+    const app = setupApp();
+    const handle = createApp('#app', { n: 0 }, (s) => ({
+      tag: 'ul',
+      children: [
+        { tag: 'li', key: 'x', children: [`x1-${s.n}`] },
+        { tag: 'li', key: 'x', children: [`x2-${s.n}`] },
+      ],
+    }));
+    await flush();
+
+    handle.n = 1;
+    await flush();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('重複の無い通常の key-based reconciliation では警告が出ない', async () => {
+    process.env.NODE_ENV = 'development';
+    const app = setupApp();
+    const handle = createApp('#app', { n: 0 }, (s) => ({
+      tag: 'ul',
+      children: [
+        { tag: 'li', key: 'a', children: [`a-${s.n}`] },
+        { tag: 'li', key: 'b', children: [`b-${s.n}`] },
+      ],
+    }));
+    await flush();
+
+    handle.n = 1;
+    await flush();
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });

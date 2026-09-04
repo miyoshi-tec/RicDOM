@@ -21,6 +21,7 @@ import {
   normalizeChildren,
   normalizeNode,
 } from './normalize.js';
+import { isDevMode } from './reactivity.js';
 
 // =====================================================================
 // 定数
@@ -381,6 +382,10 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
 
   let cursor: ChildNode | null = parentEl.firstChild;
 
+  // dev: 兄弟内の key 重複を検知したら 1 render (= この関数呼び出し) につき 1 回だけ
+  // 警告する (#13)。found === null (下記) の判定と表裏一体なので専用の Set は持たない。
+  let hasDuplicateKey = false;
+
   for (let i = 0; i < nextChildren.length; i++) {
     const nextRaw = nextChildren[i] as RicNode;
     const nextNormalized = normalizeNode(nextRaw);
@@ -398,7 +403,8 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
       const key = (nextNormalized as NormalizedElement).key as string | number;
       const found = prevKeyedMap.get(key);
       if (found) entry = found;
-      else blockUnkeyedFallback = found !== null; // undefined = 初出の新規 key、null = 重複の 2 個目以降
+      else if (found === null) hasDuplicateKey = true; // 同じ pass で既に見た key = 重複
+      else blockUnkeyedFallback = true; // found === undefined: 初出の新規 key
       prevKeyedMap.set(key, null); // 「見た」ことを記録 (元々無かった新規 key でも同様)
     }
 
@@ -450,6 +456,10 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
   }
   for (const entry of prevUnkeyed) {
     if (entry.d && entry.d.parentNode === parentEl) parentEl.removeChild(entry.d);
+  }
+
+  if (hasDuplicateKey && isDevMode()) {
+    console.warn('RicDOM: 兄弟の key が重複しています (重複分は unkeyed 扱い)。key は一意にしてください。');
   }
 };
 
