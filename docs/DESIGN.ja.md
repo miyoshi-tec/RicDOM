@@ -174,7 +174,16 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **SPEC FACT**: key は兄弟内で一意であること。重複は 2 個目以降が unkeyed 扱い (位置ベース、tag 一致なら再利用)、新規 key は新規生成、dev で console.warn
 - 移行プロンプトの罠 11 に追加 (v1 全版と alpha.3 以前は増殖する)。**v1 consumer 全員に潜在する穴**なので、v0.4.5 のリリース時に告知する
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
-- **観察 (対応なし)**: DPI 150% の実機で、右端に密着したトリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えたと E2E が報告 (consumer 側で 1px 許容にして解消、修正要望なし)。`computeAnchoredLeft` は右端揃えの後に `clampLeft` (右端も `innerWidth - width - margin` に収める) を通すため、**最終位置では起き得ない**。実測フェーズ (`measuredWidth` 未定の仮位置、`visibility: hidden`) か入場アニメーション中の rect を拾った可能性が高い。再検討の条件: 再計測 render 後にも超える実測が出たとき (その場合は別バグ)
+- ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
+
+## 23. パイロット第 2 号の追報 5 (#14 実測フェーズの幅歪み) からの確定事項 (2026-09-05、2.0.0-alpha.5)
+
+- **バグ**: popup / dropdown の「開く → `visibility: hidden` で実測 render → 幅・高さを測って再配置」フローで、実測 render の本体を `left = rect.left` (トリガー左端、`openAt` は `x`) に置いていた。本体は `position: fixed` で幅未指定 (shrink-to-fit) なので利用可能幅が `innerWidth − rect.left` に制限され、右端付近のトリガーでは中身が折り返されて `offsetWidth` が過小に測られる。その幅で右端揃えすると本体が本来より狭く、右端に余白なしで張り付く (実測: rect.left 1213.33 / 実測 224 / 本来 417 / 最終 right 1361.33)
+- **修正**: 実測 render の間だけ本体を `left: margin` (8px) に置く (`measuringLeft()` を `popupPosition.ts` に新設、dropdown・popup トリガー経路・`openAt` の 3 箇所で共有)。測った幅が「viewport に収まる最大幅」と一致するので、既存の `computeAnchoredLeft` → `clampLeft` は無変更で正しく効く。`width: max-content` 方式は不採用 (viewport より広いコンテンツで clamp 後の折り返し幅と食い違う)
+- **テスト (観測結果を assert)**: 右端密着トリガーから開いた本体の `offsetWidth` が、左端トリガーで開いた同内容の幅と一致 (±2px)、かつ right ≤ innerWidth − 8。dropdown / popup トリガー / `openAt` の 3 経路 + portalContract の横断版。**修正前に赤 (dropdown 132px 過小、popup 30px 過小) → 修正後に緑**を統括も独立に再現
+- 判明した周辺事実: vitest browser の実 viewport は 414×896 (想定より狭い)。再現テキストは自然幅がそれに収まる長さにする。幅が viewport 幅とほぼ等しいコンテンツでは `clampLeft` の左右 margin を両立できない (別件、実害報告なし、記録のみ)
+- consumer 側 E2E の「1px 許容」は端数ではなく本症状 (右端密着) を通していた → alpha.5 取り込み後に許容を外して `right ≤ innerWidth − 8` に戻してもらう
+- コア未変更 (gzip 5,169B)。unit 526 / browser 96。第 2 号は初報 10 + 追報 6 = **16 件**
 
 ## 21. パイロット第 2 号の追報 (alpha.2 取り込み後の実機 4 件 + テスト戦略) からの確定事項 (2026-09-04、2.0.0-alpha.3)
 
