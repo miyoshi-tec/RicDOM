@@ -5,6 +5,98 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.3] — not yet published
+
+Four bug reports plus a test-strategy proposal from the second pilot migration (Trend
+Guard, an Electron app), used in production.
+
+### Fixed
+
+- **`createDropdown`: missing `position: fixed` (#9)**: `.ric-dropdown__body` never had
+  `position: fixed` (unlike `.ric-popup__body`, which always did), so the inline
+  `top`/`left`/`bottom` values `dropdown.ts` computes had nothing to apply to — the body
+  stayed in normal document flow inside the portal element. If the mount target was a
+  vertical flex/grid container, the dropdown body's own layout height pushed the target's
+  other children around while it was open. Added `position: fixed` to match
+  `.ric-popup__body`.
+- **`createPopup`: menu didn't close on item selection (#10)**: activating a menuitem
+  (click; a `<button>` item also gets this via native `Enter`/`Space` → `click`) now closes
+  the menu and returns focus to the trigger by default (the APG menu button pattern) —
+  previously the menu stayed open until an explicit `Escape`/outside click/`menu.close()`.
+  Implemented by wrapping each item's own `onclick` (in `wrapMenuItem`) rather than
+  listening for a `click` on the menu body, so it still closes even if the item's `onclick`
+  calls `ev.stopPropagation()`. Applies the same way whether the menu was opened from the
+  trigger button or via `openAt()`. See `closeOnSelect` under Added for the opt-out.
+- **`applyTheme`: didn't paint `background`/`color` on the element (#11)**: `applyTheme`
+  only ever set CSS custom properties as inline style — the element it was called on stayed
+  visually transparent/colorless (only its descendants looked themed, via normal variable
+  inheritance). v1's `create_ui_page` painted `.ric-page` this way; with no `page` component
+  in v2, that half of the parity was missing. `ricdom-ui.css` now has a
+  `[data-ricdom-theme] { background: var(--ric-color-bg); color: var(--ric-color-fg); }`
+  rule (single attribute selector, low specificity — override it yourself to opt a subtree
+  out). A nested `applyTheme`d descendant still paints its own background over its
+  ancestor's, matching v1.
+- **`createDialog`: initial focus stole focus set by the consumer (#12)**: opening a dialog
+  always moved focus to the first focusable descendant, even if the consumer had already
+  focused something specific inside it during the same open (e.g. via `createFocusWhen`,
+  or their own render-time code) — whichever of `animationend`/the 700ms fallback fired
+  would override it a moment later. `focusFirstElement` now checks
+  `document.activeElement` first and does nothing if it's already inside the dialog's root
+  (excluding the root itself, which is a fallback target from a *previous* run of this same
+  step, not "already focused" in the sense that matters here). When nothing is focused yet,
+  an `[autofocus]` element (`{ autofocus: true }` on a `RicNode`, same idea as native
+  `<dialog>`'s focusing steps) is now preferred over DOM order, ahead of the previous
+  "first focusable" fallback.
+
+### Added
+
+- **`PopupProps.closeOnSelect`**: opt out of the #10 close-on-activate behavior
+  (`closeOnSelect: false`) for checkbox-style menus where selecting an item should toggle
+  state without dismissing the menu. A `disabled: true`/`aria-disabled="true"` item, or one
+  whose `role` was explicitly overridden away from `'menuitem'` (e.g. a separator), is never
+  treated as "activated" regardless of `closeOnSelect`.
+
+### Tests
+
+- **`tests/browser/portalContract.test.ts`**: a parameterized contract shared by
+  `createPopup`/`createDropdown`/`createTooltip`/`createToast`/`createDialog` — asserting
+  outcomes a consumer would actually observe rather than internal class names or inline
+  values: the open body's rect is inside the viewport, its computed `position` is `fixed`,
+  a trigger-anchored body sits within 32px of its trigger, and — the #9 reproduction case
+  itself — a sibling inside a `display: flex; flex-direction: column; height: 100vh` mount
+  target keeps the same rect before and after opening.
+- **`tests/browser/uiPopup.test.ts`**: #10's close-on-activate via click/`Enter`/`Space`,
+  focus restoration to the trigger, `closeOnSelect: false`, `disabled`/`aria-disabled`
+  items not closing the menu, `stopPropagation()` in an item's `onclick` not preventing the
+  close, and the same behavior through `openAt()`.
+- **`tests/browser/uiTheme.test.ts`**: #11's computed `background-color`/`color` for both a
+  bundled theme name and a custom `ThemeVars` object (whose `data-ricdom-theme` attribute
+  value is always the empty string — `[data-ricdom-theme]` matches on presence, not value),
+  a CSS override winning with no added specificity, and a nested themed descendant painting
+  its own background.
+- **`tests/browser/uiFocusWhen.test.ts`** / **`tests/browser/uiDialog.test.ts`**: #12's
+  "focus already inside the dialog is left alone" (via `createFocusWhen` targeting a `ref`
+  inside the dialog, asserted 800ms after open — past the 700ms fallback) and
+  "`[autofocus]` wins over an earlier-in-DOM-order close button" (also asserted at 800ms).
+- **`scripts/examplesSmoke.mjs`** (`npm run test:examples`, added to CI after the browser
+  test step): serves the repo root over a plain Node `http` server and drives every
+  `examples/*.html` page with Playwright — zero console errors/`pageerror`s, every
+  `button[aria-haspopup]` opens a `[data-ricdom-role="popup"|"dropdown"|"dialog"]` body
+  whose rect is inside the viewport, and `Escape` closes it. Requires a build first
+  (`pretest:examples` runs `npm run build`).
+
+### Docs
+
+- SPEC.md: `createPopup`'s row documents close-on-activate + `closeOnSelect`, plus new FACT
+  sections for it (§10.3.1d), dialog's initial-focus order (§10.3.1c), and `applyTheme`'s
+  background/color paint (§8). Added the missing §10.3.3 component table for
+  `createTabs`/`createSplitter`/`createScrollPane`/`createCollapseBox`/`createAccordion`
+  (implemented in Phase 3b/3c, never added to this table).
+- V1_VS_V2.ja.md / TUTORIAL.md: one-line notes on `create_ui_page`'s removal now having
+  full parity (`applyTheme` paints background/color, alpha.3~) and the trigger-look prop
+  shape difference between `createPopup` (inside the `trigger` object) and `createDropdown`
+  (top-level props).
+
 ## [2.0.0-alpha.2] — not yet published
 
 Ten fixes/additions from feedback on the second pilot migration (Trend Guard, an Electron

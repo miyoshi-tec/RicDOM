@@ -523,6 +523,27 @@ styling of those controls.
   `el` (density/font-size variables are excluded) — round-trips with `applyTheme`, e.g.
   for persisting a user's theme choice to `localStorage`.
 
+### FACT: `applyTheme` paints `background`/`color` on the element (2.0.0-alpha.3)
+
+`ricdom-ui.css` has a rule scoped to the `[data-ricdom-theme]` attribute itself (not its
+descendants): `background: var(--ric-color-bg); color: var(--ric-color-fg);`. Without it,
+`applyTheme` would only ever set CSS custom properties — the element it's called on stays
+visually transparent/colorless, and only its descendants (which inherit the variables
+normally) end up looking themed, which is not what "apply a theme to this element" implies.
+This mirrors v1's `create_ui_page`, which painted `.ric-page` the same way.
+
+- If a themed element has descendants that are themselves `applyTheme`d (a nested "island"
+  with its own theme), the nested element paints its own `background`/`color` over its
+  ancestor's — this is intentional, matching v1.
+- The selector is a single attribute selector (`[data-ricdom-theme]`, no descendant
+  combinator, no class), so its specificity is low — override `background`/`color` from
+  your own stylesheet (or inline) to opt out for a particular element without needing any
+  extra specificity tricks.
+- The attribute value itself is always the empty string (`applyTheme` always calls
+  `el.setAttribute('data-ricdom-theme', '')`, regardless of whether `theme` was a bundled
+  name or your own `ThemeVars` object) — `[data-ricdom-theme]` matches on the attribute's
+  *presence*, not a particular value, so this holds for both cases.
+
 ### `[data-ricdom-theme]` and page-wide scrollbar styling
 
 `ricdom-ui.css` styles `::-webkit-scrollbar`/`scrollbar-color` scoped to
@@ -622,7 +643,7 @@ completes even without `ricdom-ui.css` present, it just skips the animation.
 | Component | ARIA / a11y contract |
 |---|---|
 | `createDialog()` | Modal. `role="dialog"` + `aria-modal="true"` + `aria-labelledby`/`aria-describedby`. Opening moves focus to the first focusable descendant (visible-element–filtered); `Tab`/`Shift+Tab` are trapped inside; `Escape` closes and returns focus to the triggering element; every sibling of the portal is set `inert` while open. Three usage modes: uncontrolled + auto trigger (`triggerChildren` given → call returns a trigger `RicNode`), uncontrolled + your own trigger (`triggerChildren` omitted → call `dlg.open()`/`dlg.close()`), or controlled (`open`/`onClose(reason)` where `reason` is `'overlay' \| 'close-button' \| 'escape' \| 'api'`). `returnFocus` (§10.3.1) controls where focus goes on close |
-| `createPopup()` | `role="menu"` dropdown. Trigger gets `aria-haspopup="menu"` + `aria-expanded`; every menu child is auto-wrapped with `role="menuitem"`, its `class` merged (not replaced) with `.ric-popup__item`. `ArrowUp`/`ArrowDown`/`Home`/`End` move focus among items; `Escape` closes and restores focus to the trigger. `openAt({x,y} \| MouseEvent)` opens at an arbitrary point instead of a trigger button. `trigger` accepts a `RicNode`/`RicNode[]` (used as-is) or a `{ icon?, label?, ghost?, size?, class?, style? }` object (§10.3.1a). Menu-open state is exclusive with `createDropdown` within the same app (opening one closes any other open popup/dropdown) |
+| `createPopup()` | `role="menu"` dropdown. Trigger gets `aria-haspopup="menu"` + `aria-expanded`; every menu child is auto-wrapped with `role="menuitem"`, its `class` merged (not replaced) with `.ric-popup__item`. `ArrowUp`/`ArrowDown`/`Home`/`End` move focus among items; `Escape` closes and restores focus to the trigger. Activating a menuitem (click; for a `<button>` item, `Enter`/`Space` fire a native click) closes the menu and returns focus to the trigger too (APG menu button pattern) — set `closeOnSelect: false` to opt out (checkbox-style menus); a `disabled: true`/`aria-disabled="true"` item, or one whose `role` was overridden away from `'menuitem'` (e.g. a separator), never triggers this regardless of `closeOnSelect` (§10.3.1d). `openAt({x,y} \| MouseEvent)` opens at an arbitrary point instead of a trigger button — the same close-on-select behavior applies to menus opened this way. `trigger` accepts a `RicNode`/`RicNode[]` (used as-is) or a `{ icon?, label?, ghost?, size?, class?, style? }` object (§10.3.1a). Menu-open state is exclusive with `createDropdown` within the same app (opening one closes any other open popup/dropdown) |
 | `createToast()` | `toast.show(msg, { type, duration })` queues a notification; `type: 'error'` renders `role="alert"`/`aria-live="assertive"`, everything else `role="status"`/`aria-live="polite"`. `duration: 0` disables auto-dismiss (manual close only). Never steals focus |
 | `createTooltip()` | `aria-describedby` links trigger ↔ popup; shown on hover or focus, dismissed on blur/mouseleave/`Escape`. `dir: 'auto' \| 'top' \| 'bottom' \| 'right' \| 'left'`, `'auto'` picks a direction that fits the viewport |
 | `createDropdown()` | Generic popover (not a menu): trigger gets `aria-haspopup="dialog"` + `aria-expanded`; body content's semantics are entirely up to you. `label`+`chevron` mode or `icon` mode for the trigger. Shares position-flip logic and the exclusive-open registry with `createPopup` |
@@ -665,6 +686,29 @@ there can surface as spurious `focusin` events to app-level focus listeners.
 - an `Element`: restore focus to that element specifically, regardless of what was focused
   when the dialog opened.
 
+### 10.3.1c FACT: dialog initial focus (`[autofocus]` / already-focused)
+
+When a dialog opens, it decides where to send focus in this order:
+
+1. **Already focused, do nothing.** If `document.activeElement` is already inside the
+   dialog's root when the initial-focus step runs, it is left alone — this lets a
+   `createFocusWhen` call (or any other consumer code that focuses something during the
+   same open) win, instead of being overridden a moment later when the dialog's own
+   entrance-animation/700ms-backstop timer fires. (If focus is on the dialog root element
+   itself — the fallback target from a *previous* run of this same step, see 3 below — this
+   case is skipped and the search continues to steps 2/3, rather than being treated as
+   "already focused.")
+2. **`[autofocus]`.** The first visible focusable descendant carrying the standard HTML
+   `autofocus` attribute (`{ autofocus: true }` on a `RicNode` — same idea as native
+   `<dialog>`'s focusing steps) wins over DOM order — so an autofocus target later in the
+   dialog's body still beats, say, the header's close button.
+3. **First focusable, or the dialog root.** Falls back to the first focusable descendant
+   (visible-element–filtered, §14), and if there are none, focuses the dialog root itself.
+
+This runs on both the CSS `animationend` path and the 700ms fallback timer (§10.3, whichever
+fires first; the other is a no-op) — step 1 makes both of those safe to skip when something
+else already moved focus in the meantime.
+
 ### 10.3.1a FACT: `createPopup`'s two `trigger` forms
 
 `PopupProps.trigger` accepts either:
@@ -687,6 +731,24 @@ If no `TabItem` in `items` has a `children` field, `createTabs` renders only the
 usage where selecting a tab doesn't reveal an associated content panel. If even one item in
 `items` has `children`, the panel is rendered as before (for every item — items without
 `children` simply show an empty panel when active).
+
+### 10.3.1d FACT: `createPopup`'s `closeOnSelect` (menu close-on-activate)
+
+By default (`closeOnSelect` omitted or `true`), activating a menuitem closes the menu and
+restores focus to the trigger — this is implemented by wrapping the item's own `onclick`
+(not by listening for a `click` event on the menu body), so it still closes even if the
+item's `onclick` calls `ev.stopPropagation()`. The wrapped handler always calls the item's
+original `onclick` first, then closes.
+
+- `closeOnSelect: false` disables this entirely — useful for checkbox-style menus where
+  selecting an item should toggle its state without dismissing the menu.
+- An item is never treated as "activated" for this purpose if it is `disabled: true`
+  (native `disabled`, which also means the browser itself won't dispatch `click` for it) or
+  `aria-disabled="true"` (a soft/visual disable — `click` still fires, but the menu won't
+  close on it), or if its `role` was explicitly overridden to something other than
+  `'menuitem'` (e.g. a `role: 'separator'` divider you pass as one of `children`).
+- Applies identically regardless of how the menu was opened — from the trigger button or
+  via `openAt()`.
 
 ### 10.3.2 Stateful — `createFocusWhen`
 
@@ -713,6 +775,20 @@ fw(refName: string, condition: boolean): null
   logs one `console.warn` (dev builds only) and otherwise does nothing — it never throws.
 - Always returns `null` — it exists for its side effect, not to contribute to the render
   tree.
+
+### 10.3.3 Stateful — layout/composite (2.0.0-alpha.3 docs addition)
+
+All `app.use()`d like the rest of §10.3. These were implemented in Phase 3b/3c but missed
+the initial docs pass (§20 of the design doc) — added here with the same FACT-only
+treatment as the rest of this table.
+
+| Component | ARIA / a11y contract |
+|---|---|
+| `createTabs()` | `role="tablist"`/`"tab"`/`"tabpanel"`, `aria-selected`, roving `tabindex` (active tab `0`, others `-1`). **Automatic activation**: `ArrowLeft`/`ArrowRight`/`ArrowUp`/`ArrowDown` move focus *and* switch the active tab in the same step (not focus-only); `Home`/`End` jump to the first/last tab. Controlled (`active` prop given) or uncontrolled (`defaultActive`, internal state); `onChange(key)` fires either way. `variant: 'line' \| 'pill'`. See §10.3.1b for the panel-less (no `TabItem.children`) mode |
+| `createSplitter(options)` | Two-pane resizable layout. The divider is `role="separator"` + `aria-orientation` + `aria-valuenow`/`aria-valuemin`/`aria-valuemax` (the last omitted entirely when `options.max` is `null`, i.e. no logical upper bound) + `tabIndex: 0`; resizes via mouse drag or arrow keys (10px per keypress, in the direction that grows the side panel). `onResizeEnd(size)` fires once per drag (on `mouseup`) or once per keypress (since keyboard has no separate "end" event). The optional collapse toggle button gets `aria-label: 'Expand' \| 'Collapse'`. `side`/`main` (render props) hold the panel content directly (no `{ ctx }` wrapper, unlike v1); `collapsed`/`onCollapseChange` (props) make it controlled |
+| `createScrollPane(options)` | A scrollable container that auto-follows new content at the `options.follow: 'bottom' \| 'top' \| 'none'` edge (within `options.threshold` px) unless the user has scrolled away from it — no ARIA role of its own (it's a plain `overflow: auto` region, not a live-region announcer). `pane.scrollToBottom()`/`scrollToTop()` force a scroll regardless of the current follow state |
+| `createCollapseBox(options)` | Headless animated show/hide container (`options.direction: 'v' \| 'h' \| 'both'`) with **no trigger of its own** — unlike `createAccordion`, it has no button to hang `aria-expanded` on, so *you* put `aria-expanded={visible}` + `aria-controls={box.idFor(key)}` on your own trigger to satisfy the APG disclosure pattern (`idFor(key)`, key optional, gives the stable `id` the box renders with). Supports multiple concurrent instances distinguished by a `key` prop (sparse list animation). Completion is detected via `transitionend` (not `animationend` — height/width targets are per-instance dynamic values, not expressible as fixed `@keyframes`) with the same 700ms fallback as the rest of §10.3 |
+| `createAccordion(options)` | Each item's header is a real `<button aria-expanded aria-controls>` (so `Enter`/`Space` activation is native, no extra keydown handling needed); its panel is `role="region"` + `aria-labelledby`, and gets the `hidden` attribute while closed (removing it from the accessibility tree — the CSS `grid-template-rows` close animation still runs visually, since an author `display` rule outranks the `[hidden] { display: none }` user-agent default). `options.defaultOpen: Record<id, boolean>` seeds initial state; `multi: false` on props makes it single-open (exclusive, closes any other open panel) instead of the default multi-open |
 
 ### 10.4 Stateless — text
 

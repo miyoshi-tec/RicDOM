@@ -228,6 +228,11 @@ Built-in themes: `light`, `dark`, `teal`, `cyber`, `aqua`. Densities: `comfortab
 object as `theme` for a fully custom palette, or `createTheme('teal', { ... })` to start
 from a bundled theme and override just a few variables.
 
+`applyTheme` also paints `background`/`color` on the element itself (2.0.0-alpha.3~) — with
+v1's `create_ui_page` gone, this is what makes the element you called it on actually look
+themed, not just its descendants (which pick up the `--ric-*` variables through normal CSS
+inheritance either way).
+
 If you skipped the `<link rel="stylesheet">` in chapter 4 (e.g. a pure `<script>`-only
 page), call `ricdomUI.injectStyles()` once instead — it inserts the same stylesheet at
 runtime and is safe to call more than once.
@@ -293,7 +298,13 @@ const app = createApp(
 ```
 
 `Escape`, focus trapping/restoration, and outside-click dismissal all work without any
-further code on your part.
+further code on your part. Selecting a menuitem also closes the menu by default (pass
+`closeOnSelect: false` for a checkbox-style menu that should stay open).
+
+One naming difference worth remembering: `createPopup`'s trigger look (icon/ghost/size) is
+configured *inside* the `trigger` object (`trigger: { icon, ghost, size }`), while
+`createDropdown`'s equivalent look is a set of **top-level props** (`label`/`icon`/`ghost`)
+passed alongside `children` — the two components don't share a `trigger` shape.
 
 ---
 
