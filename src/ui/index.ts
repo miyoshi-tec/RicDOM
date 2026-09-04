@@ -101,6 +101,9 @@ export type { DropdownProps, DropdownInstance } from './dropdown.js';
 export { uiInlineMenu } from './inlineMenu.js';
 export type { UiInlineMenuProps, UiInlineMenuAnchor } from './inlineMenu.js';
 
+export { createFocusWhen } from './focusWhen.js';
+export type { FocusWhenInstance } from './focusWhen.js';
+
 // ── パラメータ調整パネル ──
 export { createTweakPanel, inferTweakType } from './tweakPanel.js';
 export type { TweakPanelProps, TweakPanelInstance, TweakKeyOverride, TweakKeys, TweakRowType, TweakInferredType } from './tweakPanel.js';
