@@ -164,6 +164,23 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
 - `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+## 21. パイロット第 2 号の追報 (alpha.2 取り込み後の実機 4 件 + テスト戦略) からの確定事項 (2026-09-04、2.0.0-alpha.3)
+
+- **alpha.2 の裏取り**: 回避策 4 つ (空振り renderNow / 構造セレクタ / align-items 上書き / focus_when 手動再現) を consumer が撤去し、公式 API だけで表現できたことを確認。`focus_when` の使用箇所は 4→1 の訂正あり (grep の出現数と呼び出し数の区別)。設計判断への影響なし
+- **`.ric-dropdown__body` に `position: fixed`** (createDropdown 新設時からの欠落。alpha.2 の退行ではない)。popup 側にはあった — 同種の部品の CSS は**共通コントラクトテストで揃える** (下記)
+- **popup は menuitem の活性化で閉じる** (既定、APG menu button)。`closeOnSelect: false` で opt-out (チェック型メニュー)。実装は項目の `onclick` を包む方式 — body の click 監視だと consumer の `stopPropagation()` で閉じなくなるため。`disabled` / `aria-disabled="true"` / `role` を menuitem 以外に上書きした項目は活性化とみなさない。v1 パリティでもある
+- **`[data-ricdom-theme]` 自身に bg/fg を塗る** (v1 `.ric-page` パリティ)。子孫セレクタは付けない (consumer 要素の背景を勝手に上書きしない)。属性セレクタ 1 つで詳細度を低く保ち、上書きで opt-out できることを FACT 化
+- **dialog の初期フォーカス**: 「既に dialog 内にフォーカスがあれば何もしない」→ `[autofocus]` 優先 → 最初の focusable → root。**`DialogProps.initialFocus` は新設しない** — `autofocus: true` と `createFocusWhen` で表現でき、3 つ目を足すと canon が割れる。再検討の条件: 「フォーカス先が開くたびに動的に変わり、createFocusWhen の条件式でも書けない」実例
+- **テスト方針の転換 (consumer の診断を採用)**: alpha.2 までのテストは「部品内部の決定 (class 名・inline 値)」を assert しており、「利用者が観測する結果 (どこに出る・何にフォーカスがあるか・閉じたか)」を見ていなかった。#9〜#12 はすべてその隙間から出た。以後の実ブラウザテストは観測結果を assert する:
+  - `portalContract.test.ts`: popup / dropdown / tooltip / toast / dialog をパラメタライズ (rect が viewport 内、computed `position: fixed`、flex 縦並び target で兄弟の rect が動かない、トリガーから 32px 以内)
+  - 「落ち着いた後」で assert する: animationend / 700ms バックストップを持つ処理は、必ずその時刻より**後** (800ms) で判定する
+  - `applyTheme` は computed `background-color` / `color` で判定 (変数値ではなく)
+  - `scripts/examplesSmoke.mjs` (`npm run test:examples`、CI 追加): examples/*.html を実ブラウザで開き console/pageerror 0、`aria-haspopup` トリガーを順に開いて rect 確認・Esc で閉じる
+- 「テストが実装と同じメンタルモデルで書かれる以上、盲点は共有される」— **パイロットの実機が最終審査**という運用は維持し、上記でその一部を CI へ前倒しする
+- **既知の未対応 (テスト作成中に露出)**: `createTooltip` に横方向の viewport clamp が無い (トリガーが端に密着すると切れる)。今回の報告対象外なので手を入れず記録のみ。対応の条件: consumer からの実害報告、または次に tooltip に触る変更のとき `computeAnchoredLeft` を流用して揃える
+- **docs の穴を解消**: SPEC §10.3.3 に `createTabs` / `createSplitter` / `createScrollPane` / `createCollapseBox` / `createAccordion` の部品表を追加 (§20 で記録した穴)
+- コア未変更 (gzip 5,107B)。unit 516 / browser 91 / examples 6 ページ
+
 ## 20. パイロット移行第 2 号 (Trend Guard、Electron) からの確定事項 (2026-09-04、2.0.0-alpha.2)
 
 - **移行実績**: v1 v0.4.2 → v2 `916a61c`、Electron 42 / DPI 150%。20 ファイル +806/-711、機械変換 150〜200 行、部品の `setup`/parts 化 313 行、AI 1 セッション約 30 分。第 1 号で入れた `setup` が第 2 号の所要を直接短縮した (パイロットを直列に回す意味の実証)
