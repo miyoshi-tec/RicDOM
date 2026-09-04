@@ -21,18 +21,39 @@
 //   → 戻り値はトリガーボタンの RicNode。
 //   任意の座標に開く: menu.openAt(event) / menu.openAt({ x, y })
 
-import type { RicNode } from '../types.js';
+import type { ClassValue, RicNode, StyleValue } from '../types.js';
 import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard, type Host } from './internal/component.js';
-import { UI_ROLE } from './internal/pureHelpers.js';
-import { clampLeft, computeFlipDir, computeFlipDirAt, type Pos, posToStyle } from './internal/popupPosition.js';
+import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
+import { clampLeft, computeAnchoredLeft, computeFlipDir, computeFlipDirAt, type Pos, posToStyle } from './internal/popupPosition.js';
 import { closeOthers, registerExclusive, unregisterExclusive } from './internal/exclusiveRegistry.js';
 
+/**
+ * トリガーの見た目を `uiButton` 相当 (icon + ghost の丸ボタン等) にしたいケース向けの
+ * オブジェクト形 (2.0.0-alpha.2、v1 parity — v1 の icon/ghost トリガーが再現できず
+ * consumer が構造セレクタで CSS 上書きしていた報告への対応)。`trigger` に直接
+ * `RicNode`/`RicNode[]` (中身をそのままボタンに詰める、既存の形) を渡すのと二者択一。
+ */
+export interface PopupTriggerObject {
+  icon?: RicNode;
+  label?: RicNode | RicNode[];
+  ghost?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  class?: ClassValue;
+  style?: StyleValue;
+}
+
 export interface PopupProps {
-  /** トリガーボタンの中身 */
-  trigger: RicNode | RicNode[];
+  /** トリガーボタンの中身。`RicNode`/`RicNode[]` (中身をそのまま詰める) か、
+   *  見た目を指定する `PopupTriggerObject` のどちらか。 */
+  trigger: RicNode | RicNode[] | PopupTriggerObject;
   /** メニュー項目 (各要素に role="menuitem" が自動付与される) */
   children?: RicNode[];
 }
+
+// trigger が PopupTriggerObject かどうかの判定。RicElementNode は型上 `tag` が必須
+// (設計書 §3.1) なので、「object かつ配列でない かつ tag を持たない」で確実に区別できる。
+const isTriggerObject = (t: PopupProps['trigger']): t is PopupTriggerObject =>
+  t !== null && typeof t === 'object' && !Array.isArray(t) && !('tag' in (t as Record<string, unknown>));
 
 export interface PopupPoint {
   x?: number;
@@ -54,7 +75,9 @@ let nextPopupId = 0;
 const wrapMenuItem = (node: RicNode): RicNode => {
   if (node === null || typeof node !== 'object' || Array.isArray(node)) return node;
   const el = node as unknown as Record<string, unknown>;
-  const existingClass = typeof el.class === 'string' ? el.class : '';
+  // v1 由来の `typeof el.class === 'string' ? el.class : ''` は配列/真偽値マップ形の
+  // class を黙って捨てていた (2.0.0-alpha.2、パイロット第 2 号の報告)。他部品と同じ
+  // mergeClass (internal/pureHelpers.ts) を使い、3 形態すべてを連結する。
   return {
     ...el,
     role: el.role ?? 'menuitem',
@@ -63,7 +86,7 @@ const wrapMenuItem = (node: RicNode): RicNode => {
     // これが無いと handleKeydown が常に items.length===0 で無反応になる (実ブラウザ
     // テストで発見・修正)。
     'data-ricdom-role': UI_ROLE.popupItem,
-    class: existingClass ? `ric-popup__item ${existingClass}` : 'ric-popup__item',
+    class: mergeClass('ric-popup__item', el.class as ClassValue | undefined),
   } as unknown as RicNode;
 };
 
@@ -157,10 +180,10 @@ export const createPopup = (): PopupInstance => {
     }
   };
 
-  const computePos = (rect: DOMRect, chosenDir: 'below' | 'above'): Pos => ({
+  const computePos = (rect: DOMRect, chosenDir: 'below' | 'above', measuredWidth?: number): Pos => ({
     top: chosenDir === 'below' ? rect.bottom + 4 : undefined,
     bottom: chosenDir === 'above' ? window.innerHeight - rect.top + 4 : undefined,
-    left: rect.left,
+    left: computeAnchoredLeft(rect, measuredWidth),
   });
 
   const computePosAt = (x: number, y: number, chosenDir: 'below' | 'above', measuredWidth: number | undefined): Pos => ({
@@ -185,13 +208,24 @@ export const createPopup = (): PopupInstance => {
     const host = guard.ensure();
     if (!host) return null;
 
-    triggerChildrenLast = props.trigger;
     menuChildrenLast = props.children ?? [];
     bindKeydownIfNeeded();
 
+    // object 形トリガー (2.0.0-alpha.2、PopupTriggerObject) は icon/label を
+    // uiButton 相当の見た目 (.ric-button + --ghost + --sm/--lg) に組み立てる。
+    // 従来の RicNode/RicNode[] 形はそのまま children に詰める (後方互換)。
+    const triggerObj = isTriggerObject(props.trigger) ? props.trigger : null;
+    triggerChildrenLast = triggerObj
+      ? [...(triggerObj.icon !== undefined ? [triggerObj.icon] : []), ...(triggerObj.label !== undefined ? (Array.isArray(triggerObj.label) ? triggerObj.label : [triggerObj.label]) : [])]
+      : (props.trigger as RicNode | RicNode[]);
+    const triggerBaseClass = triggerObj
+      ? mergeClass(['ric-button', triggerObj.ghost ? 'ric-button--ghost' : '', triggerObj.size && triggerObj.size !== 'md' ? `ric-button--${triggerObj.size}` : ''].filter(Boolean).join(' '), triggerObj.class)
+      : 'ric-button';
+
     return {
       tag: 'button',
-      class: `ric-button${isOpen ? ' ric-popup__trigger--open' : ''}`,
+      class: `${triggerBaseClass}${isOpen ? ' ric-popup__trigger--open' : ''}`,
+      ...(triggerObj?.style ? { style: triggerObj.style } : {}),
       'aria-haspopup': 'menu',
       'aria-expanded': isOpen ? 'true' : 'false',
       onclick: (ev: MouseEvent) => {
@@ -215,12 +249,11 @@ export const createPopup = (): PopupInstance => {
             guard.host?.notify();
             return;
           }
+          const measuredW = body.offsetWidth;
           const measuredH = body.offsetHeight;
           const newDir = computeFlipDir(rect, measuredH);
-          if (newDir !== dir) {
-            dir = newDir;
-            pos = computePos(rect, newDir);
-          }
+          dir = newDir;
+          pos = computePos(rect, newDir, measuredW);
           isMeasuring = false;
           guard.host?.notify();
         });
@@ -232,7 +265,7 @@ export const createPopup = (): PopupInstance => {
   inst.renderPortal = (): RicNode => {
     if (!guard.host || !isOpen) return null;
     return [
-      { tag: 'div', class: 'ric-popup__overlay', onclick: closeAndRestoreFocus },
+      { tag: 'div', class: 'ric-popup__overlay', 'data-ricdom-role': UI_ROLE.popupOverlay, onclick: closeAndRestoreFocus },
       {
         tag: 'div',
         class: `ric-popup__body ric-popup__body--${dir}${isClosing ? ' ric-popup__body--out' : ''}`,

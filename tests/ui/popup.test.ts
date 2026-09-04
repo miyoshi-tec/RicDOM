@@ -88,6 +88,98 @@ describe('createPopup: トリガーの ARIA 属性', () => {
   });
 });
 
+describe('createPopup: menu 項目の class 正規化 (2.0.0-alpha.2)', () => {
+  it('配列形の class が握りつぶされず ric-popup__item と連結される', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () =>
+      menu ? menu({ trigger: ['⋯'], children: [{ tag: 'button', class: ['foo', 'bar'], children: ['A'] }] }) : null,
+    );
+    menu = handle.use(createPopup());
+    await flush();
+    app.querySelector('button')!.click();
+    await flush();
+    await flush();
+
+    const item = app.querySelector('[role="menuitem"]')!;
+    expect(item.className).toContain('ric-popup__item');
+    expect(item.className).toContain('foo');
+    expect(item.className).toContain('bar');
+  });
+
+  it('真偽値マップ形の class も同様に連結される', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () =>
+      menu ? menu({ trigger: ['⋯'], children: [{ tag: 'button', class: { active: true, hidden: false }, children: ['A'] }] }) : null,
+    );
+    menu = handle.use(createPopup());
+    await flush();
+    app.querySelector('button')!.click();
+    await flush();
+    await flush();
+
+    const item = app.querySelector('[role="menuitem"]')!;
+    expect(item.className).toContain('ric-popup__item');
+    expect(item.className).toContain('active');
+    expect(item.className).not.toContain('hidden');
+  });
+});
+
+describe('createPopup: portal サブパーツの data-ricdom-role (2.0.0-alpha.2、§14 方針の拡張)', () => {
+  it('overlay に data-ricdom-role="popup-overlay" が付く', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () => (menu ? menu({ trigger: ['⋯'], children: [] }) : null));
+    menu = handle.use(createPopup());
+    await flush();
+    app.querySelector('button')!.click();
+    await flush();
+    await flush();
+
+    expect(app.querySelector('.ric-popup__overlay')!.getAttribute('data-ricdom-role')).toBe('popup-overlay');
+  });
+});
+
+describe('createPopup: object 形トリガー (2.0.0-alpha.2、v1 parity)', () => {
+  it('icon/label/ghost/size/class/style から uiButton 相当の見た目を組み立てる', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () =>
+      menu
+        ? menu({
+            trigger: { icon: { tag: 'span', children: ['★'] }, label: '開く', ghost: true, size: 'sm', class: 'my-trigger', style: { color: 'red' } },
+            children: [],
+          })
+        : null,
+    );
+    menu = handle.use(createPopup());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    expect(trigger.getAttribute('aria-haspopup')).toBe('menu');
+    expect(trigger.className).toContain('ric-button');
+    expect(trigger.className).toContain('ric-button--ghost');
+    expect(trigger.className).toContain('ric-button--sm');
+    expect(trigger.className).toContain('my-trigger');
+    expect((trigger as HTMLElement).style.color).toBe('red');
+    expect(trigger.textContent).toContain('★');
+    expect(trigger.textContent).toContain('開く');
+  });
+
+  it('従来の RicNode/RicNode[] 形も引き続き動く (後方互換)', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () => (menu ? menu({ trigger: ['⋯'], children: [] }) : null));
+    menu = handle.use(createPopup());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    expect(trigger.textContent).toBe('⋯');
+    expect(trigger.className).toBe('ric-button');
+  });
+});
+
 describe('createPopup: openAt の入力検証', () => {
   it('不正な point は console.error して何もしない', async () => {
     const app = setupApp();
