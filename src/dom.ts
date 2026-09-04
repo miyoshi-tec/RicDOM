@@ -98,6 +98,23 @@ const removeStyleProp = (el: HTMLElement | SVGElement, key: string): void => {
 };
 
 // =====================================================================
+// 素の属性の適用 (build / patch 共用)
+// =====================================================================
+
+// boolean は有無属性 (true→空文字で setAttribute、false→removeAttribute)、それ以外は
+// 文字列化して setAttribute。null/undefined は呼び出し側に委ねる (build は既存属性が
+// 無いので何もしない、patch は removeAttribute する必要がある ため分岐が非対称) —
+// build/patch 双方で重複していた分岐を 1 箇所に集約する (挙動は変えない、#13 gzip 相殺)。
+const applyPlainAttr = (el: Element, key: string, val: unknown): void => {
+  if (typeof val === 'boolean') {
+    if (val) el.setAttribute(key, '');
+    else el.removeAttribute(key);
+  } else if (val !== null && val !== undefined) {
+    el.setAttribute(key, String(val));
+  }
+};
+
+// =====================================================================
 // 属性適用 (build 用)
 // =====================================================================
 
@@ -116,11 +133,8 @@ const applyAttributesToElement = (el: HTMLElement | SVGElement, normalized: Norm
       else if (val === null) (el as unknown as Record<string, unknown>)[key] = null;
     } else if (DOM_PROPERTY_KEYS.has(key)) {
       (el as unknown as Record<string, unknown>)[key] = val;
-    } else if (typeof val === 'boolean') {
-      if (val) el.setAttribute(key, '');
-      else el.removeAttribute(key);
-    } else if (val !== null && val !== undefined) {
-      el.setAttribute(key, String(val));
+    } else {
+      applyPlainAttr(el, key, val);
     }
   }
 };
@@ -246,13 +260,10 @@ const patchAttributes = (prevNormalized: NormalizedElement, nextNormalized: Norm
     } else if (!isJsonEqual(prevExtra[key], val)) {
       if (DOM_PROPERTY_KEYS.has(key)) {
         (el as unknown as Record<string, unknown>)[key] = val;
-      } else if (typeof val === 'boolean') {
-        if (val) el.setAttribute(key, '');
-        else el.removeAttribute(key);
-      } else if (val !== null && val !== undefined) {
-        el.setAttribute(key, String(val));
-      } else {
+      } else if (val === null || val === undefined) {
         el.removeAttribute(key);
+      } else {
+        applyPlainAttr(el, key, val);
       }
     }
   }
@@ -338,23 +349,33 @@ export const patchChildren = (prevRawChildren: RicNode[], nextRawChildren: RicNo
 // key ベースの差分更新
 // =====================================================================
 
+// n/d は normalized/dom の省略 (このファイルの命名規約の例外)。この interface は
+// patchChildrenByKey 内だけで使う非公開の作業用構造体で、公開 API には一切出てこない。
+// gzip 天井 (#13) に収めるため、頻出するプロパティ名だけ短縮する (esbuild の minify は
+// プロパティ名を書き換えないため、ソースでの命名がそのまま出力バイト数に効く)。
 interface PrevEntry {
-  normalized: NormalizedNode;
-  dom: ChildNode | undefined;
+  n: NormalizedNode;
+  d: ChildNode | undefined;
 }
 
 const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], parentEl: Element): void => {
   const prevDoms = Array.from(parentEl.childNodes);
-  const prevKeyedMap = new Map<string | number, PrevEntry>();
+  // 値を null にできる Map にしておくことで、next 側の走査で「この key はこの pass で
+  // 既に見た」を別の Set を持たずに記録できる (下記ループ参照。#13 の gzip 相殺)。
+  const prevKeyedMap = new Map<string | number, PrevEntry | null>();
   const prevUnkeyed: PrevEntry[] = [];
 
   for (let i = 0; i < prevChildren.length; i++) {
     const normalized = normalizeNode(prevChildren[i] as RicNode);
     const dom = prevDoms[i];
-    if (normalized.kind === 'element' && normalized.key !== null) {
-      prevKeyedMap.set(normalized.key, { normalized, dom });
+    // 重複 key は「2 つ目以降」を unkeyed 扱いに落とす (#13 の修正本体)。
+    // map.set で上書きしたままだと、上書きされた側の DOM が prevKeyedMap からも
+    // prevUnkeyed からも参照されなくなり、削除パス (末尾の for) の対象から漏れて
+    // 常に DOM に残り続ける (= render のたびに子要素が増殖するリーク) ため。
+    if (normalized.kind === 'element' && normalized.key !== null && !prevKeyedMap.has(normalized.key)) {
+      prevKeyedMap.set(normalized.key, { n: normalized, d: dom });
     } else {
-      prevUnkeyed.push({ normalized, dom });
+      prevUnkeyed.push({ n: normalized, d: dom });
     }
   }
 
@@ -365,22 +386,36 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
     const nextNormalized = normalizeNode(nextRaw);
     let targetDom: Node | null = null;
     let prevNormalized: NormalizedNode | null = null;
+    let entry: PrevEntry | undefined;
+    // unkeyed 経路 (prevUnkeyed からの位置ベース再利用) への持ち越しを塞ぐフラグ。
+    // 初出の keyed 要素 (prev に無い正当な新規 key) だけ true にする — ここを塞がずに
+    // 広く unkeyed 経路へ倒すと、たまたま同じ tag の unkeyed prev ノード (例: 入力途中の
+    // input) を横取りしてしまい、無関係な要素同士で DOM/状態が入れ替わる regression に
+    // なる (統括の v1 対照検証で判明、修正の対象外の挙動まで変えてはいけない)。
+    let blockUnkeyedFallback = false;
 
     if (nextNormalized.kind === 'element' && nextNormalized.key !== null) {
-      const entry = prevKeyedMap.get(nextNormalized.key);
-      if (entry) {
-        targetDom = entry.dom ?? null;
-        prevNormalized = entry.normalized;
-        prevKeyedMap.delete(nextNormalized.key);
-      }
-    } else if (prevUnkeyed.length > 0) {
-      const entry = prevUnkeyed[0]!;
-      const sameType = entry.normalized.kind === nextNormalized.kind && (nextNormalized.kind === 'text' || (entry.normalized as NormalizedElement).tag === (nextNormalized as NormalizedElement).tag);
+      const key = (nextNormalized as NormalizedElement).key as string | number;
+      const found = prevKeyedMap.get(key);
+      if (found) entry = found;
+      else blockUnkeyedFallback = found !== null; // undefined = 初出の新規 key、null = 重複の 2 個目以降
+      prevKeyedMap.set(key, null); // 「見た」ことを記録 (元々無かった新規 key でも同様)
+    }
+
+    // 重複 key の 2 つ目以降を毎 render 新規生成するのではなく、位置ベースで
+    // kind/tag が一致する prev ノードを再利用する (#13)。
+    if (!blockUnkeyedFallback && !entry && prevUnkeyed.length > 0) {
+      const candidate = prevUnkeyed[0]!;
+      const sameType = candidate.n.kind === nextNormalized.kind && (nextNormalized.kind === 'text' || (candidate.n as NormalizedElement).tag === (nextNormalized as NormalizedElement).tag);
       if (sameType) {
-        targetDom = entry.dom ?? null;
-        prevNormalized = entry.normalized;
+        entry = candidate;
         prevUnkeyed.shift();
       }
+    }
+
+    if (entry) {
+      targetDom = entry.d ?? null;
+      prevNormalized = entry.n;
     }
 
     if (!targetDom) {
@@ -409,10 +444,12 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
   }
 
   for (const entry of prevKeyedMap.values()) {
-    if (entry.dom && entry.dom.parentNode === parentEl) parentEl.removeChild(entry.dom);
+    // null は「next 側で見た (消費済み、または対応する prev が元々無い新規 key)」の
+    // 印なので削除対象ではない。
+    if (entry && entry.d && entry.d.parentNode === parentEl) parentEl.removeChild(entry.d);
   }
   for (const entry of prevUnkeyed) {
-    if (entry.dom && entry.dom.parentNode === parentEl) parentEl.removeChild(entry.dom);
+    if (entry.d && entry.d.parentNode === parentEl) parentEl.removeChild(entry.d);
   }
 };
 
