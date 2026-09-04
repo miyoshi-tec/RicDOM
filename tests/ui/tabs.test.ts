@@ -159,3 +159,36 @@ describe('createTabs: dispose', () => {
     errorSpy.mockRestore();
   });
 });
+
+describe('createTabs: パネル無しモード (2.0.0-alpha.2、v1 parity — セグメントコントロール用途)', () => {
+  const PANEL_LESS_ITEMS = [
+    { key: 'a', label: 'A' },
+    { key: 'b', label: 'B' },
+    { key: 'c', label: 'C' },
+  ];
+
+  it('全 item に children が無ければ tabpanel を描かず、aria-controls も省略する', async () => {
+    const app = setupApp();
+    let tabs: ReturnType<typeof createTabs>;
+    const handle = createApp('#app', {}, () => (tabs ? tabs({ items: PANEL_LESS_ITEMS }) : null));
+    tabs = handle.use(createTabs());
+    await flush();
+
+    expect(app.querySelector('[role="tabpanel"]')).toBeNull();
+    const firstTab = app.querySelector('[role="tab"]')!;
+    expect(firstTab.hasAttribute('aria-controls')).toBe(false);
+  });
+
+  it('1 つでも children があれば従来どおり tabpanel を描く', async () => {
+    const app = setupApp();
+    const mixedItems = [{ key: 'a', label: 'A' }, { key: 'b', label: 'B', children: [{ tag: 'span', children: ['content-b'] }] }];
+    let tabs: ReturnType<typeof createTabs>;
+    const handle = createApp('#app', {}, () => (tabs ? tabs({ items: mixedItems, active: 'b', onChange: () => {} }) : null));
+    tabs = handle.use(createTabs());
+    await flush();
+
+    expect(app.querySelector('[role="tabpanel"]')).not.toBeNull();
+    const firstTab = app.querySelector('[role="tab"]')!;
+    expect(firstTab.hasAttribute('aria-controls')).toBe(true);
+  });
+});

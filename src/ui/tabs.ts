@@ -81,6 +81,10 @@ export const createTabs = (): TabsInstance => {
 
     const { items = [], active, onChange, variant = 'line', defaultActive } = props;
     const controlled = active !== undefined;
+    // パネル無しモード (2.0.0-alpha.2、v1 parity — セグメントコントロール用途)。
+    // 全 item に children が無ければ tabpanel 自体を描かず、aria-controls も省略する。
+    // 1 つでも children があれば (undefined でない item が 1 つでもあれば) 従来どおり。
+    const hasAnyPanel = items.some((it) => it.children !== undefined);
 
     const select = (key: string): void => {
       onChange?.(key);
@@ -154,7 +158,7 @@ export const createTabs = (): TabsInstance => {
           id: tabId(item.key),
           role: 'tab',
           'aria-selected': isActive ? 'true' : 'false',
-          'aria-controls': panelId,
+          'aria-controls': hasAnyPanel ? panelId : undefined,
           tabIndex: isActive ? 0 : -1,
           onclick: () => {
             if (item.key !== activeKey) select(item.key);
@@ -166,16 +170,18 @@ export const createTabs = (): TabsInstance => {
     };
 
     const activeItem = items.find((it) => it.key === activeKey);
-    const panel = {
-      tag: 'div',
-      class: 'ric-tabs__panel',
-      'data-ricdom-role': UI_ROLE.tabsPanel,
-      id: panelId,
-      role: 'tabpanel',
-      'aria-labelledby': activeKey ? tabId(activeKey) : undefined,
-      tabIndex: 0,
-      children: activeItem ? (activeItem.children ?? []) : [],
-    };
+    const panel = hasAnyPanel
+      ? {
+          tag: 'div',
+          class: 'ric-tabs__panel',
+          'data-ricdom-role': UI_ROLE.tabsPanel,
+          id: panelId,
+          role: 'tabpanel',
+          'aria-labelledby': activeKey ? tabId(activeKey) : undefined,
+          tabIndex: 0,
+          children: activeItem ? (activeItem.children ?? []) : [],
+        }
+      : null;
 
     return {
       tag: 'div',
