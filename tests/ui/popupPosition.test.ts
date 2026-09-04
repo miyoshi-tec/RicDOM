@@ -1,7 +1,7 @@
 // internal/popupPosition.ts (createPopup/createDropdown/createTooltip 共有の位置計算)
 
-import { describe, expect, it } from 'vitest';
-import { clampLeft, computeFlipDir, computeFlipDirAt, posToStyle } from '../../src/ui/internal/popupPosition.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { clampLeft, computeAnchoredLeft, computeFlipDir, computeFlipDirAt, posToStyle } from '../../src/ui/internal/popupPosition.js';
 
 describe('posToStyle', () => {
   it('定義されているキーだけを px 文字列に変換する', () => {
@@ -50,5 +50,36 @@ describe('clampLeft', () => {
     expect(clampLeft(350, 100)).toBe(292); // 右にはみ出し → 400-100-8
     expect(clampLeft(150, 100)).toBe(150); // 収まっていればそのまま
     Object.defineProperty(window, 'innerWidth', { value: originalWidth, configurable: true });
+  });
+});
+
+describe('computeAnchoredLeft (2.0.0-alpha.2、createPopup トリガー経路の横方向 clamp)', () => {
+  const originalWidth = window.innerWidth;
+  afterEach(() => {
+    Object.defineProperty(window, 'innerWidth', { value: originalWidth, configurable: true });
+  });
+
+  it('measuredWidth 未指定 (実測前) は rect.left をそのまま返す', () => {
+    expect(computeAnchoredLeft({ left: 300, right: 340 }, undefined)).toBe(300);
+  });
+
+  it('rect.left から開いて収まるならそのまま (従来どおり)', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 800, configurable: true });
+    expect(computeAnchoredLeft({ left: 100, right: 140 }, 160)).toBe(100);
+  });
+
+  it('viewport 右端付近のトリガーではみ出す場合、トリガーの右端に揃える', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 400, configurable: true });
+    // トリガーが right=392 (viewport 右端 40px 以内相当) にあり、本体幅 160px だと
+    // left=rect.left (352 とする) では 352+160=512 > 400 ではみ出す → rect.right - 160 に揃える
+    const rect = { left: 352, right: 392 };
+    expect(computeAnchoredLeft(rect, 160)).toBe(392 - 160);
+  });
+
+  it('右端揃えでもなお画面外にはみ出す (コンテンツが viewport より広い) 場合は viewport 内に clamp する', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 400, configurable: true });
+    const rect = { left: 10, right: 50 };
+    // 右端揃え候補: 50 - 500 = -450 (大幅に画面外) → clampLeft で margin (8) まで戻す
+    expect(computeAnchoredLeft(rect, 500)).toBe(8);
   });
 });

@@ -55,3 +55,27 @@ export const clampLeft = (left: number, width: number | undefined, margin = 8): 
   const maxLeft = Math.max(margin, window.innerWidth - width - margin);
   return Math.min(Math.max(left, margin), maxLeft);
 };
+
+/**
+ * トリガー (rect) 基準の横位置計算 (2.0.0-alpha.2、パイロット第 2 号 (Trend Guard) の
+ * 実機バグ報告への対応)。`measuredWidth` が未実測 (undefined、初回描画) の間は
+ * `rect.left` をそのまま返す (実測前は「とりあえずトリガー左端」で仮置きし、
+ * measure 後の再描画で確定する — below/above の flip と同じ「実測してから直す」設計)。
+ *
+ * 実測後は 3 段階で決める:
+ *   1. rect.left から開いて viewport 内に収まるならそのまま (従来どおり)
+ *   2. 収まらなければ「トリガーの右端に揃える」(`rect.right - measuredWidth`) —
+ *      v1 の openAt 系 (`clampLeft` だけ) と違い、popup/dropdown のようにトリガー要素を
+ *      持つ経路は「トリガーのすぐ下/上」という視覚的な連続性を保てるところまでは保つ
+ *   3. それでも画面外にはみ出す (コンテンツが viewport 幅より広い) 場合のみ、
+ *      最終手段として `clampLeft` で viewport 内に強制的に収める
+ *
+ * createPopup (トリガー経路) と createDropdown で共有する。openAt 系 (トリガー要素を
+ * 持たない、`computePosAt` 相当) は元々 `clampLeft` だけで正しく動いていたため対象外。
+ */
+export const computeAnchoredLeft = (rect: { left: number; right: number }, measuredWidth: number | undefined, margin = 8): number => {
+  if (measuredWidth === undefined) return rect.left;
+  const overflowsRight = rect.left + measuredWidth > window.innerWidth - margin;
+  const candidate = overflowsRight ? rect.right - measuredWidth : rect.left;
+  return clampLeft(candidate, measuredWidth, margin);
+};

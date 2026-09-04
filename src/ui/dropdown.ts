@@ -28,7 +28,7 @@
 import type { RicNode } from '../types.js';
 import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard, type Host } from './internal/component.js';
 import { UI_ROLE } from './internal/pureHelpers.js';
-import { clampLeft, computeFlipDir, type Pos, posToStyle } from './internal/popupPosition.js';
+import { computeAnchoredLeft, computeFlipDir, type Pos, posToStyle } from './internal/popupPosition.js';
 import { closeOthers, registerExclusive, unregisterExclusive } from './internal/exclusiveRegistry.js';
 import { uiIcon } from './icon.js';
 
@@ -116,7 +116,7 @@ export const createDropdown = (): DropdownInstance => {
   const computePos = (rect: DOMRect, chosenDir: 'below' | 'above', isLabel: boolean, measuredWidth: number | undefined): Pos => ({
     top: chosenDir === 'below' ? rect.bottom + 4 : undefined,
     bottom: chosenDir === 'above' ? window.innerHeight - rect.top + 4 : undefined,
-    left: clampLeft(rect.left, measuredWidth),
+    left: computeAnchoredLeft(rect, measuredWidth),
     ...(isLabel ? { minWidth: rect.width } : {}),
   });
 
