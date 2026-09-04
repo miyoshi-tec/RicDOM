@@ -8,6 +8,10 @@
 //   - a11y を新規実装: role="dialog" + aria-modal + aria-labelledby/describedby、
 //     開いたら最初の focusable にフォーカス、Tab/Shift+Tab の focus trap、Esc で閉じて
 //     起動元へフォーカス復帰、背景を inert (付録 E)。
+//   - 初期フォーカスは「既に dialog 内にフォーカスがある (createFocusWhen 等) なら
+//     何もしない」→「[autofocus] があれば最優先」→「最初の focusable」→「root」の順
+//     (#12、2.0.0-alpha.3。focusFirstElement 参照。DialogProps.initialFocus は新設しない —
+//     autofocus 属性と createFocusWhen で表現できるため、canon 1 つの方針を維持)。
 //
 // 3 つの使い方 (v1 継承):
 //   (1) uncontrolled + 自動トリガー: dlg({ triggerChildren: ['開く'], title, children, actions })
@@ -148,8 +152,19 @@ export const createDialog = (): DialogInstance => {
   const focusFirstElement = (): void => {
     const root = getDialogRootEl();
     if (!root) return;
+    // 既に dialog 内にフォーカスがある (createFocusWhen や consumer が open 直後の
+    // render で focus 済み) なら尊重して何もしない (#12)。`active === root` は root 自身
+    // へのフォールバック focus 状態 (このメソッドが前回、focusables が空で root.focus() した
+    // 結果) なので「dialog 内にフォーカスがある」とはみなさず、続けて最初の要素へ移す —
+    // そうしないと (今回 focusables が非空になっていても) 一生 root に留まってしまう。
+    const active = document.activeElement;
+    if (active && active !== root && root.contains(active)) return;
     const focusables = getFocusables(root);
-    (focusables[0] ?? root).focus();
+    // [autofocus] を持つ可視 focusable を最優先する (HTML 標準の autofocus 属性を
+    // dialog が尊重する形。native <dialog> の focusing steps と同じ考え方、#12)。
+    // 見つからなければ従来どおり最初の focusable、それも無ければ root へフォールバック。
+    const autofocusTarget = focusables.find((el) => el.hasAttribute('autofocus'));
+    (autofocusTarget ?? focusables[0] ?? root).focus();
   };
 
   // 実 CSS アニメーション (ric-dlg-in の animationend) を初期フォーカスの合図にするが、

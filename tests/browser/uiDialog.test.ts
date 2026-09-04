@@ -194,6 +194,31 @@ describe('実ブラウザ: createDialog の focus trap', () => {
     expect(document.activeElement).toBe(unrelated);
   });
 
+  it('[autofocus] を持つ要素があれば、DOM 順で先に来る close ボタンより優先してフォーカスする (#12、700ms バックストップより後で確認)', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () =>
+      dlg
+        ? dlg({
+            triggerChildren: ['開く'],
+            title: 't',
+            // DOM 順は [close (header), 先頭, autofocus 対象, 末尾] — autofocus 属性が
+            // 無ければ close が最初の focusable として勝つはずの配置。
+            children: [uiButton({ children: ['先頭'] }), { tag: 'textarea', autofocus: true }, uiButton({ children: ['末尾'] })],
+          })
+        : null,
+    );
+    dlg = handle.use(createDialog());
+    await flush();
+
+    await userEvent.click(app.querySelector('button')!);
+    await new Promise((r) => setTimeout(r, 800)); // 700ms バックストップより後で確認
+
+    const textarea = app.querySelector('textarea') as HTMLElement;
+    expect(textarea.hasAttribute('autofocus')).toBe(true);
+    expect(document.activeElement).toBe(textarea);
+  });
+
   it('背景 (トリガーボタン側) が inert になる', async () => {
     const app = setupApp();
     let dlg: ReturnType<typeof createDialog>;
