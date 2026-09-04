@@ -36,11 +36,28 @@ export interface DialogProps {
   onClose?: (reason: DialogCloseReason) => void;
   /** ダイアログ幅 (px 数値 or 任意の CSS 長さ文字列)。省略時は CSS 既定 (min(360px,90vw))。 */
   width?: number | string;
+  /**
+   * controlled mode でのフォーカス復帰先の制御 (パイロット移行の報告 #4)。省略時は
+   * APG どおり「開く直前の `document.activeElement`」へ復帰する。フォーカス不可能な
+   * 起動元 (span 等) 経由で開いた場合、既定では「開く直前にたまたまフォーカスされていた
+   * 無関係な要素」(例: 直前に触っていた数値入力) へ復帰してしまう — `false` を指定すると
+   * 復帰処理そのものを行わない (`document.body` へ明示的にフォーカスを逃がすのではなく、
+   * 単に何もしない。dialog の DOM が消えることで activeElement は自然に body になる)。
+   * `Element` を指定すると、その要素へ明示的に復帰する。uncontrolled の `open()` にも
+   * 同名オプションがある (`DialogOpenOptions`)。
+   */
+  returnFocus?: false | Element;
+}
+
+/** `dlg.open(opts)` に渡せるオプション (uncontrolled モード)。`DialogProps.returnFocus` の
+ *  uncontrolled 版 — 意味は同じ (§ 上記 JSDoc 参照)。 */
+export interface DialogOpenOptions {
+  returnFocus?: false | Element;
 }
 
 export interface DialogInstance extends Component<DialogProps> {
   /** 外部から開く (uncontrolled のみ。controlled では no-op) */
-  open(): void;
+  open(opts?: DialogOpenOptions): void;
   /** 外部から閉じる (両モード対応。未 open での呼出は no-op)。既定 reason は 'api'。 */
   close(reason?: DialogCloseReason): void;
   /** uncontrolled モードで現在表示中か (controlled では常に false、v1 継承) */
@@ -72,6 +89,19 @@ const hasLayoutEngine = (doc: Document | null): boolean => !!doc?.body && doc.bo
 const getFocusables = (root: Element): HTMLElement[] => {
   const all = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
   return hasLayoutEngine(root.ownerDocument) ? all.filter(isVisible) : all;
+};
+
+// フォーカス復帰先の決定 (パイロット移行の報告 #4)。`explicit` が:
+//   - `false`      … 復帰しない (null を返す。呼び出し側は既存の「restoreFocusEl が
+//                     null なら .focus() を呼ばない」分岐にそのまま乗るので、実装は
+//                     ここだけで完結する — dialog が閉じて DOM から外れれば
+//                     activeElement は自然に document.body になる)
+//   - `Element`    … その要素へ明示的に復帰する
+//   - 未指定        … 既定 (APG どおり) の「開く直前の document.activeElement」
+const resolveRestoreFocus = (explicit?: false | Element): HTMLElement | null => {
+  if (explicit === false) return null;
+  if (explicit !== undefined) return explicit as HTMLElement;
+  return (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
 };
 
 /**
@@ -206,7 +236,7 @@ export const createDialog = (): DialogInstance => {
     const host = guard.ensure();
     if (!host) return null;
 
-    const { triggerChildren, title = '', children = [], actions = [], open, onClose, width } = props;
+    const { triggerChildren, title = '', children = [], actions = [], open, onClose, width, returnFocus } = props;
 
     const controlled = open !== undefined;
     if (controlled && 'triggerChildren' in props) {
@@ -223,7 +253,7 @@ export const createDialog = (): DialogInstance => {
     if (controlled) {
       if (open && !prevControlledOpen) {
         isClosing = false;
-        restoreFocusEl = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
+        restoreFocusEl = resolveRestoreFocus(returnFocus);
         setInert(true);
         scheduleInitialFocus();
       }
@@ -318,10 +348,10 @@ export const createDialog = (): DialogInstance => {
     guard.dispose();
   };
 
-  inst.open = (): void => {
+  inst.open = (opts?: DialogOpenOptions): void => {
     if (isControlledLast) return;
     if (isOpenInternal || isClosing) return;
-    restoreFocusEl = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null) ?? null;
+    restoreFocusEl = resolveRestoreFocus(opts?.returnFocus);
     isOpenInternal = true;
     setInert(true);
     scheduleInitialFocus();

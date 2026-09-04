@@ -97,6 +97,103 @@ describe('実ブラウザ: createDialog の focus trap', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it('returnFocus: false で開くと、閉じてもフォーカスが復帰しない (パイロット移行の報告 #4)', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () => [
+      { tag: 'input', id: 'unrelated' },
+      dlg ? dlg({ title: 't', children: ['本文'] }) : null,
+    ]);
+    dlg = handle.use(createDialog());
+    await flush();
+
+    // フォーカス不可能なラベル (span) 相当のトリガーから開くケースの再現: 開く直前に
+    // 「たまたまフォーカスされていた無関係な要素」(数値入力等) がある状態で dlg.open() する。
+    const unrelated = app.querySelector('#unrelated') as HTMLInputElement;
+    unrelated.focus();
+    expect(document.activeElement).toBe(unrelated);
+
+    dlg.open({ returnFocus: false });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(app.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.activeElement).not.toBe(unrelated); // 開いた時点でダイアログ内へ移動済み
+
+    dlg.close();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(app.querySelector('[role="dialog"]')).toBeNull();
+    // 復帰しない = 無関係な要素 (unrelated) へは絶対に戻らない。ダイアログの DOM が
+    // 消えたことで activeElement は自然に <body> になる (明示的に .focus() されていない)。
+    expect(document.activeElement).not.toBe(unrelated);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('returnFocus: Element を指定すると、その要素へ復帰する', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () => [
+      { tag: 'input', id: 'unrelated' },
+      { tag: 'button', id: 'explicit-target', children: ['target'] },
+      dlg ? dlg({ title: 't', children: ['本文'] }) : null,
+    ]);
+    dlg = handle.use(createDialog());
+    await flush();
+
+    const unrelated = app.querySelector('#unrelated') as HTMLInputElement;
+    const target = app.querySelector('#explicit-target') as HTMLElement;
+    unrelated.focus();
+
+    dlg.open({ returnFocus: target });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(app.querySelector('[role="dialog"]')).not.toBeNull();
+
+    dlg.close();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(document.activeElement).toBe(target);
+  });
+
+  it('controlled mode: returnFocus: false を props に渡すと復帰しない', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const state = createApp('#app', { show: false }, (s) => [
+      { tag: 'input', id: 'unrelated' },
+      dlg ? dlg({ title: 't', children: ['本文'], open: s.show, returnFocus: false, onClose: () => { s.show = false; } }) : null,
+    ]);
+    dlg = state.use(createDialog());
+    await flush();
+
+    const unrelated = app.querySelector('#unrelated') as HTMLInputElement;
+    unrelated.focus();
+
+    state.show = true;
+    await new Promise((r) => setTimeout(r, 300));
+    expect(app.querySelector('[role="dialog"]')).not.toBeNull();
+
+    state.show = false;
+    await new Promise((r) => setTimeout(r, 300));
+    expect(app.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).not.toBe(unrelated);
+  });
+
+  it('既定 (returnFocus 省略) は従来どおり開く直前の activeElement へ復帰する', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () => [
+      { tag: 'input', id: 'unrelated' },
+      dlg ? dlg({ title: 't', children: ['本文'] }) : null,
+    ]);
+    dlg = handle.use(createDialog());
+    await flush();
+
+    const unrelated = app.querySelector('#unrelated') as HTMLInputElement;
+    unrelated.focus();
+
+    dlg.open();
+    await new Promise((r) => setTimeout(r, 300));
+    dlg.close();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(document.activeElement).toBe(unrelated);
+  });
+
   it('背景 (トリガーボタン側) が inert になる', async () => {
     const app = setupApp();
     let dlg: ReturnType<typeof createDialog>;

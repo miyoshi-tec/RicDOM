@@ -68,7 +68,7 @@ export { uiCodePre } from './codePre.js';
 export type { UiCodePreProps } from './codePre.js';
 
 export { createDialog } from './dialog.js';
-export type { DialogProps, DialogInstance, DialogCloseReason } from './dialog.js';
+export type { DialogProps, DialogInstance, DialogCloseReason, DialogOpenOptions } from './dialog.js';
 
 export { createPopup } from './popup.js';
 export type { PopupProps, PopupInstance, PopupPoint } from './popup.js';
