@@ -355,7 +355,15 @@ special behavior or logs `console.error` and refuses):
 | `nextRender()` | `() => Promise<void>` | See §4 |
 | `use(part)` | `<T extends UsePart>(part: T) => T` | See §6. Idempotent — registering the same part object twice is a no-op |
 | `unmount()` | `() => void` | Disposes all registered parts, stops the scheduler, clears refs. Nothing renders again after this |
-| `refs` | `ReadonlyMap<string, Element>` | Every element with a `ref: 'name'` in the last-rendered tree, keyed by that name; recomputed after each render |
+| `refs` | `ReadonlyMap<string, Element>` | Every element with a `ref: 'name'` in the last-rendered tree, keyed by that name; recomputed after each render, **including elements inside the portal** (§7) |
+
+### FACT: portal `ref`s are collected in the same render they first appear
+
+`refs` collection runs *after* the portal has been patched for that render (not before),
+so a `ref` on an element returned from a stateful component's `renderPortal()` (a dialog
+body input, say) is already present in `app.refs` by the time that render's `nextRender()`
+promise resolves — there is no "wait one extra render" step. This is what makes
+`createFocusWhen` (§10.3.1a) usable on the very render a dialog opens.
 
 ---
 
@@ -438,6 +446,22 @@ part of `target`'s child list (it is not a sentinel node inside the app's own tr
 Multiple independent `createApp()` calls each get (or are given) their own portal — there
 is no global/shared portal registry and no cross-app portal stacking order to reason
 about.
+
+### FACT: Electron — portal elements need `-webkit-app-region: no-drag`
+
+If your app's title bar (or any ancestor of the portal element) has
+`-webkit-app-region: drag` set (the standard way to make an Electron custom title bar
+draggable), that region also swallows clicks on anything rendered inside it — including a
+dialog/popup/toast/tooltip mounted into ricdom's portal, if the portal happens to sit under
+that draggable area. `-webkit-app-region` is not a normal CSS property that stops at
+`position: fixed`/`z-index` stacking contexts the way you'd expect; it is inherited
+independently of the box model. Add this one rule to your own stylesheet (not something
+`ricdom-ui.css` sets on your behalf — it's Electron-specific and irrelevant to every other
+target):
+
+```css
+[data-ricdom-role="portal"] { -webkit-app-region: no-drag; }
+```
 
 ---
 
@@ -583,9 +607,9 @@ override the binding.
 
 | Component | Notes |
 |---|---|
-| `uiCol(props)` | Vertical flex container. No color/background of its own — inherits theme from an ancestor `applyTheme`d element |
-| `uiRow(props)` | Horizontal flex container |
-| `uiGrid(props)` | CSS grid. `columns`/`rows`: a number expands to `N` × `1fr`; a string passes through to `grid-template-*` as-is; `'auto-fit 200px'`/`'auto-fill 120px'` expand to `repeat(auto-fit, minmax(200px, 1fr))` |
+| `uiCol(props)` | Vertical flex container. `gap?: string \| number` (a number is px) writes to `style.gap`. No color/background of its own — inherits theme from an ancestor `applyTheme`d element |
+| `uiRow(props)` | Horizontal flex container. Same `gap` as `uiCol` |
+| `uiGrid(props)` | CSS grid. `columns`/`rows`: a number expands to `N` × `1fr`; a string passes through to `grid-template-*` as-is; `'auto-fit 200px'`/`'auto-fill 120px'` expand to `repeat(auto-fit, minmax(200px, 1fr))`. `gap` is the same as `uiCol`/`uiRow` |
 | `uiPanel(props)` | Surface/background/border container. `layout: 'col' \| 'row'`. `disabled: true` sets the native `inert` attribute (disables focus, click, and text selection on every descendant) — dims via `.ric-panel[inert]` CSS, not inline style |
 
 ### 10.3 Stateful — dialog / popup / toast / tooltip / dropdown
@@ -598,10 +622,26 @@ completes even without `ricdom-ui.css` present, it just skips the animation.
 | Component | ARIA / a11y contract |
 |---|---|
 | `createDialog()` | Modal. `role="dialog"` + `aria-modal="true"` + `aria-labelledby`/`aria-describedby`. Opening moves focus to the first focusable descendant (visible-element–filtered); `Tab`/`Shift+Tab` are trapped inside; `Escape` closes and returns focus to the triggering element; every sibling of the portal is set `inert` while open. Three usage modes: uncontrolled + auto trigger (`triggerChildren` given → call returns a trigger `RicNode`), uncontrolled + your own trigger (`triggerChildren` omitted → call `dlg.open()`/`dlg.close()`), or controlled (`open`/`onClose(reason)` where `reason` is `'overlay' \| 'close-button' \| 'escape' \| 'api'`). `returnFocus` (§10.3.1) controls where focus goes on close |
-| `createPopup()` | `role="menu"` dropdown. Trigger gets `aria-haspopup="menu"` + `aria-expanded`; every menu child is auto-wrapped with `role="menuitem"`. `ArrowUp`/`ArrowDown`/`Home`/`End` move focus among items; `Escape` closes and restores focus to the trigger. `openAt({x,y} \| MouseEvent)` opens at an arbitrary point instead of a trigger button. Menu-open state is exclusive with `createDropdown` within the same app (opening one closes any other open popup/dropdown) |
+| `createPopup()` | `role="menu"` dropdown. Trigger gets `aria-haspopup="menu"` + `aria-expanded`; every menu child is auto-wrapped with `role="menuitem"`, its `class` merged (not replaced) with `.ric-popup__item`. `ArrowUp`/`ArrowDown`/`Home`/`End` move focus among items; `Escape` closes and restores focus to the trigger. `openAt({x,y} \| MouseEvent)` opens at an arbitrary point instead of a trigger button. `trigger` accepts a `RicNode`/`RicNode[]` (used as-is) or a `{ icon?, label?, ghost?, size?, class?, style? }` object (§10.3.1a). Menu-open state is exclusive with `createDropdown` within the same app (opening one closes any other open popup/dropdown) |
 | `createToast()` | `toast.show(msg, { type, duration })` queues a notification; `type: 'error'` renders `role="alert"`/`aria-live="assertive"`, everything else `role="status"`/`aria-live="polite"`. `duration: 0` disables auto-dismiss (manual close only). Never steals focus |
 | `createTooltip()` | `aria-describedby` links trigger ↔ popup; shown on hover or focus, dismissed on blur/mouseleave/`Escape`. `dir: 'auto' \| 'top' \| 'bottom' \| 'right' \| 'left'`, `'auto'` picks a direction that fits the viewport |
 | `createDropdown()` | Generic popover (not a menu): trigger gets `aria-haspopup="dialog"` + `aria-expanded`; body content's semantics are entirely up to you. `label`+`chevron` mode or `icon` mode for the trigger. Shares position-flip logic and the exclusive-open registry with `createPopup` |
+
+### FACT: `createPopup`/`createDropdown` horizontal position rule
+
+Both flip below/above the trigger based on available vertical space (as before), and
+resolve their horizontal position in the same three steps once the body's width is known:
+1. If it fits starting at the trigger's left edge (`rect.left`), that's where it goes.
+2. Otherwise, align it to the trigger's **right edge** instead (`rect.right - width`) — this
+   keeps the body visually anchored under/over the trigger rather than jumping to an
+   unrelated part of the screen.
+3. If even that overflows the viewport (content wider than the viewport itself), the
+   position is clamped into `[8px, innerWidth - width - 8px]` as a last resort.
+
+Before the body's width has been measured (the first paint of an open, pre-`requestAnimationFrame`),
+step 1's `rect.left` is used as a placeholder; the real position from the steps above
+replaces it once measured. `openAt({x,y})`, which has no trigger rect to anchor to, skips
+straight to clamping (step 3) — unchanged from before.
 
 #### 10.3.1 FACT: dialog focus-return control (`returnFocus`)
 
@@ -624,6 +664,55 @@ there can surface as spurious `focusin` events to app-level focus listeners.
   takes over. This is "do nothing," not "explicitly focus `document.body`."
 - an `Element`: restore focus to that element specifically, regardless of what was focused
   when the dialog opened.
+
+### 10.3.1a FACT: `createPopup`'s two `trigger` forms
+
+`PopupProps.trigger` accepts either:
+- a `RicNode`/`RicNode[]` — used verbatim as the trigger `<button>`'s `children`, styled as
+  a plain `.ric-button` (unchanged from earlier versions), or
+- a `{ icon?, label?, ghost?, size?, class?, style? }` object — `icon` and `label` are
+  concatenated into the button's children (icon first), and the button is styled the same
+  way `uiButton({ ghost, size })` would be (`.ric-button` + `.ric-button--ghost` +
+  `.ric-button--sm`/`--lg` as applicable), with `class`/`style` merged/applied on top.
+
+`aria-haspopup="menu"`/`aria-expanded` are set on the trigger regardless of which form was
+passed. `createDropdown`'s existing `label`/`icon`/`ghost` top-level props cover the same
+icon/ghost-button use case for that component — it does not have a separate `trigger`
+object form.
+
+### 10.3.1b FACT: `createTabs` panel-less mode
+
+If no `TabItem` in `items` has a `children` field, `createTabs` renders only the tab list
+(no `tabpanel`, and no `aria-controls` on the tab buttons) — for segmented-control-style
+usage where selecting a tab doesn't reveal an associated content panel. If even one item in
+`items` has `children`, the panel is rendered as before (for every item — items without
+`children` simply show an empty panel when active).
+
+### 10.3.2 Stateful — `createFocusWhen`
+
+The `ricdom/ui` successor to v1's `focus_when`, for moving focus to a specific element on a
+condition's rising edge — a case `createDialog`'s own "focus the first focusable element on
+open" behavior doesn't cover (you want a *particular* field focused, or you want this
+outside of a dialog opening at all, e.g. once a streamed response finishes).
+
+```ts
+const fw = app.use(createFocusWhen());
+// inside render:
+fw(refName: string, condition: boolean): null
+```
+
+- Registered via `app.use()` like the other stateful components (§6); calling it without
+  `use()` logs the same one-time `console.error` and does nothing.
+- Call it during `render`, once per `ref` you want to drive. It tracks each `refName`'s
+  previous `condition` independently, so one instance can drive multiple refs.
+- On the **false→true rising edge only**, once that render has committed (§5's portal-ref
+  FACT — this works even for a `ref` inside a portal that's appearing for the first time in
+  this same render), it calls `app.refs.get(refName)?.focus()`. `condition` staying `true`
+  across renders does not refocus; a false→false or true→false transition does nothing.
+- If `refName` doesn't resolve to a focusable element by the time the render commits, it
+  logs one `console.warn` (dev builds only) and otherwise does nothing — it never throws.
+- Always returns `null` — it exists for its side effect, not to contribute to the render
+  tree.
 
 ### 10.4 Stateless — text
 
@@ -689,15 +778,26 @@ is the one exception to the usual row shape: because `uiCheckbox` renders its ow
 Every `ricdom/ui` component's rendered root (and several internal parts) carries a
 `data-ricdom-role` attribute for stable E2E/CSS targeting that does not depend on class
 names or DOM structure. Portal-root elements of dialog/popup/toast/tooltip/dropdown carry
-this too, distinct from their trigger element's role (if any):
+this too, distinct from their trigger element's role (if any). As of 2.0.0-alpha.2 this
+extends to sub-parts of the portal-mounted components, not just their root:
 
 `button` `input` `textarea` `checkbox` `radiogroup` `select` `range` `color` `separator`
-`text` `icon` `col` `row` `grid` `panel` `md-pre` `code-pre` — `dialog` `popup`
-`popup-item` `toast` `tooltip` `dropdown` `dropdown-trigger` — `scroll-pane` `splitter`
-`splitter-side` `splitter-main` `splitter-divider` `splitter-toggle` `collapse-box`
-`accordion` `accordion-item` `accordion-header` `accordion-body` `accordion-title` `tabs`
-`tabs-bar` `tabs-tab` `tabs-panel` `inline-menu` — `tweak-panel` `tweak-folder`
-`tweak-folder-header` `tweak-folder-body` `tweak-row` (§10.6).
+`text` `icon` `col` `row` `grid` `panel` `md-pre` `code-pre` — `dialog` `dialog-overlay`
+`dialog-header` `dialog-body` `dialog-footer` `dialog-close` `popup` `popup-overlay`
+`popup-item` `toast` `toast-item` `toast-close` `tooltip` `dropdown` `dropdown-trigger` —
+`scroll-pane` `splitter` `splitter-side` `splitter-main` `splitter-divider`
+`splitter-toggle` `collapse-box` `accordion` `accordion-item` `accordion-header`
+`accordion-body` `accordion-title` `tabs` `tabs-bar` `tabs-tab` `tabs-panel` `inline-menu`
+— `tweak-panel` `tweak-folder` `tweak-folder-header` `tweak-folder-body` `tweak-row`
+(§10.6).
+
+`popup-overlay` is shared by `createPopup` and `createDropdown` — both use the same
+`.ric-popup__overlay` element and role. Dialog's sub-part roles map onto its existing CSS
+classes one-to-one: `dialog-overlay` → `.ric-dialog__overlay`, `dialog-header` →
+`.ric-dialog__header`, `dialog-body` → `.ric-dialog__body`, `dialog-footer` →
+`.ric-dialog__footer`, `dialog-close` → `.ric-dialog__close`. Tooltip has only one
+sub-part (its floating popup), which already carried `data-ricdom-role="tooltip"` — no
+change there.
 
 The core library itself uses `data-ricdom-role="portal"` for the auto-generated portal
 sentinel (§7) and `data-ricdom-ref` (a different attribute) for `ref`-registered elements

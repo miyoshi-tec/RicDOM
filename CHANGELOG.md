@@ -5,6 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.2] — not yet published
+
+Ten fixes/additions from feedback on the second pilot migration (Trend Guard, an Electron
+app).
+
+### Fixed
+
+- **`createPopup` trigger-path horizontal clamp**: opening a popup from a trigger near the
+  right edge of the viewport could render the body partially off-screen — the trigger path
+  only ever positioned at `rect.left`, with no fallback, while `openAt` already clamped
+  correctly. Position calculation (below/above flip, horizontal placement) is now shared
+  via `internal/popupPosition.ts`'s `computeAnchoredLeft`, used by both `createPopup`'s
+  trigger path and `createDropdown`: fits at `rect.left` when possible, aligns to the
+  trigger's right edge when it doesn't, and falls back to `clampLeft` only if the content
+  is wider than the viewport.
+- **Core: portal `ref`s available one render late**: `createApp`'s render cycle collected
+  `data-ricdom-ref` elements (`registerRefs`) *before* patching the portal, so a `ref`
+  inside a dialog/popup/toast — anything mounted through `renderPortal()` — wasn't visible
+  via `app.refs.get()` until the *next* render. `registerRefs` now runs after the portal
+  patch, and collects from both `target` and an external `portalTo` element.
+- **`wrapMenuItem` (popup menu items) dropped non-string `class`**: an array- or
+  boolean-map-form `class` on a menu item was silently discarded instead of being merged
+  with `.ric-popup__item`. Now uses the same `mergeClass` every other component uses.
+- **`.ric-popup__item` icon/text vertical alignment**: the item wrapper's
+  `display: flex !important` had no `align-items`, so it fell back to the CSS default
+  (`stretch`) — an icon of fixed height next to text could appear vertically off-center.
+  Added `align-items: center` and `gap`. (`.ric-dropdown`/`.ric-inline-menu` don't
+  auto-wrap arbitrary content the way `createPopup` does, so they weren't affected.)
+
+### Added
+
+- **`uiRow`/`uiCol`: `gap` prop**: v1's `ui_row({ gap })` was a first-class prop; in v2 it
+  fell through the rest-spread and became a stray `gap` DOM attribute instead of
+  `style.gap` — a silent regression hit in 25+ places during the pilot. `gap?: string |
+  number` (a number is treated as px) now writes to `style.gap`, matching `uiGrid`'s
+  existing `gap`.
+- **`createPopup`: object-form `trigger`**: `trigger` now also accepts
+  `{ icon?, label?, ghost?, size?, class?, style? }` in addition to the existing
+  `RicNode | RicNode[]` form — v1's icon+ghost round trigger button couldn't be
+  reproduced through the plain-children form, so consumers were overriding it with
+  structural CSS selectors. The object form renders a `uiButton`-equivalent look
+  (`.ric-button` + `--ghost`/`--sm`/`--lg`). `aria-haspopup`/`aria-expanded` are set either
+  way. `createDropdown`'s existing `label`/`icon`/`ghost` props already cover the same
+  ground for that component.
+- **`createTabs`: panel-less mode**: if no `item` in `items` has `children`, `createTabs`
+  renders no `tabpanel` and omits `aria-controls` from the tab buttons — for
+  segmented-control-style usage where tabs don't drive a content panel. Any single item
+  with `children` restores the previous (panel) behavior for all items.
+- **`createFocusWhen`** (`ricdom/ui`), the v1 `focus_when` successor: a stateful helper
+  (`app.use(createFocusWhen())`) called as `fw(refName, condition)` during `render` that
+  moves focus to `app.refs.get(refName)` on the false→true rising edge of `condition`,
+  once that render has committed (implemented via a synchronous `host.app.nextRender()`
+  call during `render`, which resolves at the end of that same render per the `nextRender`
+  contract). Continuing `true` doesn't refocus; a missing ref logs one `console.warn` in
+  dev and does nothing otherwise. One instance tracks each `refName`'s previous condition
+  independently, so a single `createFocusWhen()` can drive multiple refs. Fills a gap
+  `createDialog`'s own initial-focus-first-focusable behavior doesn't cover: focusing a
+  *specific* element, or focusing outside of a dialog-open event entirely.
+- **`data-ricdom-role` on portal sub-parts**: dialog (`dialog-overlay`, `dialog-header`,
+  `dialog-body`, `dialog-footer`, `dialog-close`), popup/dropdown (`popup-overlay`,
+  shared), toast (`toast-item`, `toast-close`) — extending the existing per-component root
+  role to their sub-parts for stable E2E/CSS targeting. (Tooltip's single sub-part already
+  carried `data-ricdom-role="tooltip"`.)
+
+### Changed
+
+- Core gzip size: **5,107B** (was 5,091B), still under the 5,120B budget. The only core
+  change is the portal-ref fix above; the registerRefs implementation was written to
+  minimize the increase.
+- SPEC.md: documents the popup/dropdown position rule (fit → right-align to trigger →
+  clamp), the portal-ref collection timing, `gap`, the new `data-ricdom-role`s, the two
+  `trigger` forms, panel-less tabs, `createFocusWhen`, and an Electron-specific footnote:
+  give portal elements `-webkit-app-region: no-drag` (`[data-ricdom-role="portal"] {
+  -webkit-app-region: no-drag; }`) or interactive UI mounted under a draggable
+  `-webkit-app-region: drag` titlebar region becomes unclickable.
+
 ## [2.0.0-alpha.1] — not yet published
 
 Five fixes/additions from feedback on the first pilot migration (歯車DXFジェネレーター).

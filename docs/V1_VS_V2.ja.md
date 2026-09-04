@@ -47,8 +47,10 @@
 | テーマ | `create_ui_page({theme})` / `make_css_vars` / `create_theme` / `export_theme` | **`applyTheme(el, {theme, density, fontSize})`** (`data-ricdom-theme` 付与 + `color-scheme`) / `createTheme` / `exportTheme`。変数名 `--ric-*` は継続 |
 | page 部品 | `create_ui_page` (テーマ + CSS 注入 + portal drain の要) | **廃止** (役割は `applyTheme` / CSS 1 枚 / portal ホストに分解) |
 | a11y | 意図的に最小 (inline_menu に ARIA なし、dialog に focus trap なし) | **APG 準拠を初期設計に**: dialog = focus trap + `inert` + Esc 復帰、menu = 矢印キー、tabs = roving tabindex、splitter = 矢印キーリサイズ、toast = `aria-live` |
-| popup | `create_ui_popup` (label / icon / menu モード混在、`open_at` v0.4.3) | **`createPopup` = menu 専用** (`openAt` 継承) + **`createDropdown`** (Popover、新設) |
-| tabs | controlled のみ (`bind_tabs`) | controlled / **uncontrolled** |
+| popup | `create_ui_popup` (label / icon / menu モード混在、`open_at` v0.4.3) | **`createPopup` = menu 専用** (`openAt` 継承) + **`createDropdown`** (Popover、新設)。トリガーの見た目 (icon+ghost の丸ボタン等) は `trigger` に **object 形** `{ icon?, label?, ghost?, size?, class?, style? }` を渡すと再現できる (alpha.2、v1 parity)。従来の `RicNode`/`RicNode[]` 形と二択 |
+| tabs | controlled のみ (`bind_tabs`) | controlled / **uncontrolled**。全 item に `children` が無ければ tabpanel を描かない**パネル無しモード** (alpha.2、セグメントコントロール用途) |
+| layout の `gap` | `ui_row({gap})` は正式 prop | **`uiRow`/`uiCol` の `gap` prop は復活** (alpha.2 — v2 は当初 rest 経由の属性化で黙って崩れていた、25 箇所以上で報告)。`uiGrid` の `gap` は元から存在 |
+| `focus_when` | 条件の立ち上がりで ref 先へ focus (4 箇所で使用) | **`createFocusWhen`** (`ricdom/ui`、alpha.2)。`app.use()` 登録 + `fw(refName, condition)`。dialog の既定初期フォーカスでは代替できない「特定要素へ」「dialog 以外のタイミングでも」のケース向け |
 | tweak パネル | `create_ui_tweak_panel` + `ui_tweak_row` + folder | **`createTweakPanel` 1 部品** (Tier1 `data` / Tier2 `keys` / Tier3 `rows`) |
 | 排他制御 | モジュール level の registry (削除なし) | **app 単位** + `dispose` で解除 |
 | アニメ完了待ち | `animationend` のみ | `animationend` / `transitionend` + **700ms バックストップ** (CSS 未ロードでも固まらない) |
