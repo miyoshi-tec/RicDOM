@@ -164,6 +164,20 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
 - `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+## 19. パイロット移行第 1 号 (歯車DXFジェネレーター) からの確定事項 (2026-09-03、2.0.0-alpha.1)
+
+- **移行実績**: v1 v0.4.2 → v2 、機能フル動作。機械変換 ~450 行 (ctx→children 73 箇所、関数名 11 種 40 箇所、handle→app 35 箇所)、手動 150〜180 行。歯形エンジン (変更禁止ゾーン) は無変更 = 「UI 層だけ差し替えられる」設計が実証された
+- **API の穴 3 件を採用**: ① に / (data に無い計算値の行を keys だけで宣言可、v1  相当) + フォルダ単位  ②全 leaf row に  +  (checkbox 行にラベル span が無いことは FACT) ③ (v1 parity)
+- **dialog のフォーカス復帰**: 既定は APG (開く前の activeElement へ) を維持。 で無効化/明示指定。「フォーカス不可能な起動元 → 直前の入力欄に着地 → アプリの document 直付け focusin 監視が誤発火」は consumer 側の相互作用として SPEC に FACT
+- ****: 初回同期描画の直前に 1 回呼ばれ、中で  した部品を初回 render から使える (「プレースホルダ + renderNow の 2 段構え」を不要に)。TUTORIAL/examples はこのパターンに統一。**コア gzip 5,097B (天井まで 23B)** — setup 実装は 61B に圧縮した (naive 実装は天井超え)。**以後コアは完全凍結**: 追加が要る場合は同量以上の削減とセット
+- **相互作用 FACT**: hidden タブでは rAF に加え setTimeout も ~1s に throttle されるためバックストップも遅れる (v1 と同じ)。即時反映が要るテストは - **良かった点として確認された v1 継承の性質**:  の代入操作感、NOOP の壊れ方 (console.error だけで白画面にならない → 原因特定が速い)、tweak の  毎 render 契約、クラス名 ( 等) の据え置き、、MIT
+
+## 18. Phase 4a (docs) での確定事項 (2026-09-02)
+
+- 内部記録 (本設計書・API_AUDIT) は「内部記録」注記を付けて**公開リポジトリに残す** (OSS の ADR と同じ扱い。AI 統括の関与は Co-Authored-By で透明)。利用者向け docs (README / SPEC / TUTORIAL / CHANGELOG / CONTRIBUTING) には制作過程語を入れない
+- README の部品数は実数を書く (FACT 方針)。CHANGELOG の未公開版は「not yet published」と明記し日付を捏造しない
+- README の Quick start は render 内で引数  を使う例に統一 (「元 state を直接変えても反応しない」FACT と一貫)
+
 ## 17. Phase 3d (API 整合レビュー) での確定事項 (2026-09-02)
 
 - 監査結果は `docs/API_AUDIT.ja.md`。命名逸脱 1 (内部関数、許容)、型重複 1 (`IconDescriptor` に一本化済み、`ricdom/ui` → `ricdom/icons` は type-only import)、dead code 2 (削除済み)、公開関数 29 に JSDoc 補完済み。flake 3 連走ゼロ
