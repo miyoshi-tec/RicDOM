@@ -74,6 +74,8 @@
     "test": "vitest run --project unit",
     "pretest:browser": "npm run build",
     "test:browser": "vitest run --project browser",
+    "pretest:examples": "npm run build",
+    "test:examples": "node scripts/examplesSmoke.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
