@@ -110,6 +110,16 @@ const BUTTON_CSS = `
 .ric-button--ghost:hover:not(:disabled) {
   border-color: ${fm};
   background: ${bd};
+}
+.ric-button--sm {
+  height: 22px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+.ric-button--lg {
+  height: 36px;
+  font-size: 16px;
+  padding: 0 14px;
 }`;
 
 const INPUT_CSS = `

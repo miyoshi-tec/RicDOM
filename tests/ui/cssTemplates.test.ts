@@ -30,4 +30,9 @@ describe('buildStylesheet: 状態を持たない部品の規則を含む', () =>
     expect(css).toContain('.ric-toast__item');
     expect(css).toContain('.ric-tooltip__popup');
   });
+
+  it('uiButton の size (.ric-button--sm/--lg) の規則を含む (v1 css_templates.js から移植)', () => {
+    expect(css).toContain('.ric-button--sm');
+    expect(css).toContain('.ric-button--lg');
+  });
 });

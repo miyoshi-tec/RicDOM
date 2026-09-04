@@ -46,6 +46,18 @@ describe('uiButton', () => {
     expect(node.disabled).toBe(true);
   });
 
+  it('size: 既定 (md) は寸法クラスを付与しない', () => {
+    const node = uiButton({ children: ['x'] }) as unknown as TestButtonNode;
+    expect(node.class).toBe('ric-button');
+  });
+
+  it('size: sm/lg がクラスに反映される (variant と併用可)', () => {
+    const sm = uiButton({ size: 'sm', children: ['x'] }) as unknown as TestButtonNode;
+    expect(sm.class).toBe('ric-button ric-button--sm');
+    const lg = uiButton({ variant: 'primary', size: 'lg', children: ['x'] }) as unknown as TestButtonNode;
+    expect(lg.class).toBe('ric-button ric-button--primary ric-button--lg');
+  });
+
   it('rest スプレッドで onclick/id/data-* 等の任意属性を透過する (基底クラスは保たれる)', () => {
     let clicked = false;
     const node = uiButton({

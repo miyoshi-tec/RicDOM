@@ -12,10 +12,16 @@ import type { ClassValue, RicElementNode, RicNode } from '../types.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export type UiButtonVariant = 'default' | 'primary' | 'ghost';
+/** ボタンの寸法 (v1 ric_ui/css_templates.js の .ric-button--sm/--lg を移植、既定は 'md')。 */
+export type UiButtonSize = 'sm' | 'md' | 'lg';
 
 export interface UiButtonProps {
   children?: RicNode | RicNode[];
   variant?: UiButtonVariant;
+  /** 既定 'md' — コア (.ric-button) の高さ/フォントサイズをそのまま使うので 'md' 用の
+   *  修飾クラスは付与しない (v1 は .ric-button--md を明示定義していたが、値がコアの
+   *  既定と同じため v2 では冗長なクラスを増やさない)。 */
+  size?: UiButtonSize;
   disabled?: boolean;
   class?: ClassValue;
   onclick?: (ev: MouseEvent) => void;
@@ -24,10 +30,12 @@ export interface UiButtonProps {
 
 /**
  * ボタン。状態を持たない純粋関数。
- *   uiButton({ children: ['保存'], variant: 'primary', onclick: () => save() })
+ *   uiButton({ children: ['保存'], variant: 'primary', size: 'sm', onclick: () => save() })
  */
-export const uiButton = ({ children = [], variant = 'default', disabled = false, class: extraClass, ...rest }: UiButtonProps = {}): RicNode => {
-  const baseClass = variant === 'default' ? 'ric-button' : `ric-button ric-button--${variant}`;
+export const uiButton = ({ children = [], variant = 'default', size = 'md', disabled = false, class: extraClass, ...rest }: UiButtonProps = {}): RicNode => {
+  const baseClass = [variant === 'default' ? 'ric-button' : `ric-button ric-button--${variant}`, size !== 'md' ? `ric-button--${size}` : null]
+    .filter(Boolean)
+    .join(' ');
   return {
     ...rest,
     tag: 'button',
