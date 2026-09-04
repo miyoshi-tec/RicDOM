@@ -399,6 +399,221 @@ describe('createTweakPanel: radiobutton 行の name 既知制約 (v1 から移�
   });
 });
 
+describe('createTweakPanel: keys の get/set (計算値の行、data に無いキーもキーだけで宣言できる)', () => {
+  it('data に存在するキーでも get/set があれば data[k] を触らずそちらに委ねる', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { size: 10 };
+    let backing = 5;
+    const handle = createApp('#app', {}, () =>
+      tweak
+        ? tweak({
+            data,
+            keys: {
+              size: {
+                get: () => backing,
+                set: (v) => {
+                  backing = v as number;
+                },
+              },
+            },
+          })
+        : null,
+    );
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const input = app.querySelector('input[type="number"]') as HTMLInputElement;
+    expect(input.value).toBe('5'); // get() の戻り値 (5) が表示される。data.size (10) ではない
+    input.value = '42';
+    input.dispatchEvent(new Event('input'));
+    expect(backing).toBe(42);
+    expect(data.size).toBe(10); // data[k] には一切書き込まれない
+  });
+
+  it('data に無いキーでも keys.get だけで行を宣言できる (計算値、歯車DXF のユースケース)', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { module: 2, teeth: 20 };
+    const handle = createApp('#app', {}, () =>
+      tweak
+        ? tweak({
+            data,
+            keys: {
+              // 中心距離 a = module * teeth / 2 (data に存在しない計算値)
+              centerDistance: { label: '中心距離', get: () => (data.module * data.teeth) / 2 },
+            },
+          })
+        : null,
+    );
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const labels = Array.from(app.querySelectorAll('.ric-tweak-row__label')).map((n) => n.textContent);
+    expect(labels).toEqual(['module', 'teeth', '中心距離']); // data 由来の行の後ろに置かれる
+    const rows = app.querySelectorAll('[data-ricdom-tweak-key]');
+    const last = rows[rows.length - 1] as HTMLElement;
+    expect(last.getAttribute('data-ricdom-tweak-key')).toBe('centerDistance');
+    expect((last.querySelector('input') as HTMLInputElement).value).toBe('20');
+  });
+
+  it('get 未指定 (set のみ、または override 無し) の data に無いキーは行が生成されない', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { a: 1 };
+    const handle = createApp('#app', {}, () =>
+      tweak
+        ? tweak({
+            data,
+            keys: { orphan: { set: () => {} } },
+          })
+        : null,
+    );
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const labels = Array.from(app.querySelectorAll('.ric-tweak-row__label')).map((n) => n.textContent);
+    expect(labels).toEqual(['a']);
+  });
+
+  it('data 省略 + keys.get のみでもパネルを組める', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const handle = createApp('#app', {}, () => (tweak ? tweak({ keys: { computed: { get: () => 'hi' } } }) : null));
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const input = app.querySelector('input[type="text"]') as HTMLInputElement;
+    expect(input.value).toBe('hi');
+  });
+
+  it('get が例外を投げても render は落ちず console.error のみ (throw しない方針)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { a: 1 };
+    const handle = createApp('#app', {}, () =>
+      tweak
+        ? tweak({
+            data,
+            keys: {
+              bad: {
+                get: () => {
+                  throw new Error('boom');
+                },
+              },
+            },
+          })
+        : null,
+    );
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    expect(app.querySelector('.ric-tweak')).not.toBeNull();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+});
+
+describe('createTweakPanel: folder override の rows (Tier3 の folder 版)', () => {
+  it('folder override.rows がその folder 本体の末尾に描画される', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { nested: { inner: 1 } };
+    const handle = createApp('#app', {}, () =>
+      tweak
+        ? tweak({
+            data,
+            keys: {
+              nested: {
+                open: true,
+                rows: [{ tag: 'div', class: 'folder-custom-row', children: ['x'] }],
+              },
+            },
+          })
+        : null,
+    );
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const body = app.querySelector('.ric-tweak-folder__body-inner') as HTMLElement;
+    const children = Array.from(body.children);
+    expect(children[children.length - 1]!.className).toBe('folder-custom-row');
+    // 自動生成された 'inner' 行より後ろに位置する
+    expect(children.length).toBe(2);
+  });
+});
+
+describe('createTweakPanel: leaf row の安定フック (data-ricdom-role="tweak-row" + data-ricdom-tweak-key)', () => {
+  it('各行種別のコンテナに role/key 属性が付く', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = {
+      num: 10,
+      flag: true,
+      name: 'x',
+      tint: '#ff0000',
+    };
+    const handle = createApp('#app', {}, () =>
+      tweak
+        ? tweak({
+            data,
+            keys: {
+              num: { type: 'range', min: 0, max: 100 },
+              mode: { type: 'select', options: ['a', 'b'] },
+            },
+          })
+        : null,
+    );
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const rows = app.querySelectorAll('[data-ricdom-role="tweak-row"]');
+    // num(range) / flag(checkbox) / name(text) / tint(color) の 4 行 (mode は data に無いので出ない)
+    expect(rows.length).toBe(4);
+    const keys = Array.from(rows).map((el) => el.getAttribute('data-ricdom-tweak-key'));
+    expect(keys.sort()).toEqual(['flag', 'name', 'num', 'tint']);
+  });
+
+  it('checkbox 行はラベル span が無い (uiCheckbox 内蔵の label のみ) が role/key は付く', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { flag: true };
+    const handle = createApp('#app', {}, () => (tweak ? tweak({ data }) : null));
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const row = app.querySelector('[data-ricdom-role="tweak-row"]') as HTMLElement;
+    expect(row.getAttribute('data-ricdom-tweak-key')).toBe('flag');
+    expect(row.querySelector('.ric-tweak-row__label')).toBeNull();
+  });
+
+  it('key path はネストで dot 連結される (folder 内の行)', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { outer: { inner: 1 } };
+    const handle = createApp('#app', {}, () => (tweak ? tweak({ data, keys: { outer: { open: true } } }) : null));
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const row = app.querySelector('[data-ricdom-role="tweak-row"]') as HTMLElement;
+    expect(row.getAttribute('data-ricdom-tweak-key')).toBe('outer.inner');
+  });
+
+  it('計算値 (keys.get) の行にも role/key が付く', async () => {
+    const app = setupApp();
+    let tweak: ReturnType<typeof createTweakPanel>;
+    const data = { a: 1 };
+    const handle = createApp('#app', {}, () => (tweak ? tweak({ data, keys: { computed: { get: () => 42 } } }) : null));
+    tweak = handle.use(createTweakPanel());
+    await flush();
+
+    const rows = app.querySelectorAll('[data-ricdom-role="tweak-row"]');
+    const keys = Array.from(rows).map((el) => el.getAttribute('data-ricdom-tweak-key'));
+    expect(keys).toContain('computed');
+  });
+});
+
 describe('createTweakPanel: dispose', () => {
   it('unmount 後は再度呼んでも描画されない', async () => {
     const app = setupApp();

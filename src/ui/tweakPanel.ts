@@ -96,7 +96,7 @@ export const inferTweakType = (value: unknown): TweakInferredType => {
 export type TweakRowType = 'number' | 'range' | 'checkbox' | 'text' | 'select' | 'radiobutton' | 'color';
 
 /** `keys` で 1 プロパティ (行 or folder) を部分上書きする指定。leaf 行用のフィールドと
- *  folder 用のフィールド (`open`/`keys`) を同じ形に持たせ、データの形 (plain object か否か)
+ *  folder 用のフィールド (`open`/`keys`/`rows`) を同じ形に持たせ、データの形 (plain object か否か)
  *  でどちらとして解釈するかが決まる (v1 と同じ設計)。 */
 export interface TweakKeyOverride {
   /** 表示ラベル (省略時はプロパティ名) */
@@ -119,6 +119,27 @@ export interface TweakKeyOverride {
   open?: boolean;
   /** folder の子プロパティに対する再帰的な上書き */
   keys?: TweakKeys;
+  /**
+   * folder 本体の末尾に並べる自由 RicNode (Tier3 `rows` の folder 版)。パネル全体の
+   * `rows` は末尾追記専用だが、これはこの folder の中の特定位置 (末尾) に置ける
+   * (パイロット移行の報告 #1 で判明した不足)。
+   */
+  rows?: RicNode[];
+  /**
+   * この行の読み取りを `data[k]` の代わりに委ねる (歯車DXF の「中心距離 = module から
+   * 逆算」のような、data に無い計算値の行を作るための指定)。`get` だけ指定して行を
+   * 宣言でき、そのとき `data` 側に同名キーが存在する必要は無い (data 由来の行の後ろに
+   * 追加される。宣言順は `keys` のキー順)。get が例外を投げても render は落とさない
+   * (console.error + undefined 扱い、uiMdPre の transformText と同じ方針)。
+   */
+  get?: () => unknown;
+  /**
+   * この行の書き込みを `data[k] = v` の代わりに委ねる。`get`/`set` のどちらか一方だけの
+   * 指定も可能 (get のみ = 読み取り専用の計算値行、set のみ = 表示は `undefined` 扱いだが
+   * 書き込みだけ横取りする、通常は get と対で使う)。書き込み後は `ctx.notify()` が呼ばれる。
+   * set が例外を投げても render は落とさない (console.error のみ)。
+   */
+  set?: (v: unknown) => void;
 }
 
 /** `false` を指定すると、そのプロパティの行 (or folder) を非表示にする (v1 継承)。 */
@@ -151,26 +172,38 @@ interface RowArgs {
   value: unknown;
   set?: (v: unknown) => void;
   override?: TweakKeyOverride;
+  /** dot 連結のキー鎖 (`data-ricdom-tweak-key` に出す安定フック、パイロット移行の報告 #2) */
+  path: string;
 }
 
-const buildLabelRow = (labelText: string, control: RicNode): RicElementNode =>
+// leaf row の安定フック (設計書「tweak の leaf row に安定フック」)。number/range/checkbox/
+// text/select/radiobutton/color/計算値、全ての行コンテナに付与する。checkbox 行だけは
+// uiCheckbox 自体が <label> を内蔵するため row 側にラベル span が無い (JSDoc/SPEC 明記)。
+const rowHookAttrs = (path: string): Record<string, string> => ({
+  'data-ricdom-role': UI_ROLE.tweakRow,
+  'data-ricdom-tweak-key': path,
+});
+
+const buildLabelRow = (labelText: string, control: RicNode, path: string): RicElementNode =>
   ({
     tag: 'label',
     class: 'ric-tweak-row',
+    ...rowHookAttrs(path),
     children: [{ tag: 'span', class: 'ric-tweak-row__label', children: [labelText] }, control],
   }) as unknown as RicElementNode;
 
-const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
+const buildRow = ({ label, value, set, override, path }: RowArgs): RicNode => {
   const type: TweakInferredType | TweakRowType = override?.type ?? inferTweakType(value);
   const disabled = override?.disabled ?? false;
   const hasSet = typeof set === 'function';
 
   if (type === 'checkbox') {
     // checkbox は uiCheckbox 自体が <label> を内蔵するため、row 側では別途ラベルを出さない
-    // (v1 継承)。
+    // (v1 継承。FACT: この行だけ .ric-tweak-row__label span が存在しない)。
     return {
       tag: 'div',
       class: 'ric-tweak-row ric-tweak-row--checkbox',
+      ...rowHookAttrs(path),
       children: [
         uiCheckbox({
           checked: !!value,
@@ -217,6 +250,7 @@ const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
             }
           : {}),
       }),
+      path,
     );
   }
 
@@ -235,6 +269,7 @@ const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
         disabled,
         ...(hasSet ? { oninput: (ev: Event) => set!(parseFloat((ev.target as HTMLInputElement).value)) } : {}),
       }),
+      path,
     );
   }
 
@@ -248,6 +283,7 @@ const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
         style: { flex: 1 },
         ...(hasSet ? { onchange: (ev: Event) => set!((ev.target as HTMLSelectElement).value) } : {}),
       }),
+      path,
     );
   }
 
@@ -259,6 +295,7 @@ const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
     return {
       tag: 'fieldset',
       class: 'ric-tweak-row ric-tweak-row--radiobutton',
+      ...rowHookAttrs(path),
       children: [
         { tag: 'legend', class: 'ric-tweak-row__label', children: [label] },
         uiRadiobutton({
@@ -290,6 +327,7 @@ const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
         disabled,
         ...(hasSet ? { oninput: (ev: Event) => set!((ev.target as HTMLInputElement).value) } : {}),
       }),
+      path,
     );
   }
 
@@ -304,10 +342,12 @@ const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
         ...(override?.maxlength != null ? { maxlength: override.maxlength } : {}),
         ...(hasSet ? { oninput: (ev: Event) => set!((ev.target as HTMLInputElement).value) } : {}),
       }),
+      path,
     );
   }
 
-  // ── json (フォールバック、v1 の json_preview) ──
+  // ── json (フォールバック、v1 の json_preview。data に無い計算値の get が非プリミティブを
+  //   返した場合もここに落ちる) ──
   let display: string;
   try {
     display = JSON.stringify(value, null, 2) ?? String(value);
@@ -317,6 +357,7 @@ const buildRow = ({ label, value, set, override }: RowArgs): RicNode => {
   return {
     tag: 'div',
     class: 'ric-tweak-row',
+    ...rowHookAttrs(path),
     children: [
       { tag: 'span', class: 'ric-tweak-row__label', children: [label] },
       { tag: 'pre', class: 'ric-tweak-row__json', children: [display] },
@@ -343,7 +384,8 @@ const buildFolder = (path: string, label: string, obj: Record<string, unknown>, 
   const headerId = `ricdom-tweak-${ctx.fid}-${encodePathSegment(path)}-header`;
   const bodyId = `ricdom-tweak-${ctx.fid}-${encodePathSegment(path)}-body`;
 
-  const childRows = buildRows(obj, override?.keys ?? {}, path, ctx);
+  // folder 本体の子行 + この folder 専用の Tier3 rows (末尾追記、パイロット移行の報告 #1)。
+  const childRows = [...buildRows(obj, override?.keys ?? {}, path, ctx), ...(override?.rows ?? [])];
 
   return {
     tag: 'div',
@@ -383,31 +425,79 @@ const buildFolder = (path: string, label: string, obj: Record<string, unknown>, 
   } as unknown as RicElementNode;
 };
 
+// get/set 行 (data に無い計算値、パイロット移行の報告 #1) は consumer 提供のコールバックを
+// render 中に同期実行するため、uiMdPre の transformText/transformImageSrc と同じ方針で
+// 例外を握りつぶす (throw しない・グルーコードを連鎖破壊しない、v1 A9 継承)。
+const safeGetOverrideValue = (label: string, get: () => unknown): unknown => {
+  try {
+    return get();
+  } catch (e) {
+    console.error(`RicDOM UI: createTweakPanel の keys.get ('${label}') が例外を投げました。`, e);
+    return undefined;
+  }
+};
+
+const safeSetOverrideValue = (label: string, set: (v: unknown) => void, val: unknown): void => {
+  try {
+    set(val);
+  } catch (e) {
+    console.error(`RicDOM UI: createTweakPanel の keys.set ('${label}') が例外を投げました。`, e);
+  }
+};
+
+// 1 プロパティ分の行を組み立てる。`override.get`/`set` が指定されていれば data[k] を
+// 一切読み書きせず (folder としての解釈もしない = 常に leaf 行)、それ以外は従来どおり
+// data[k] を読み書きする (パイロット移行の報告 #1)。
+const buildDataDrivenRow = (k: string, data: Record<string, unknown>, ov: TweakKeyOverride | undefined, pathPrefix: string, ctx: FolderCtx): RicNode => {
+  const path = pathPrefix ? `${pathPrefix}.${k}` : k;
+  const label = (ov && ov.label) || k;
+  const hasGetOverride = typeof ov?.get === 'function';
+  const hasSetOverride = typeof ov?.set === 'function';
+
+  if (hasGetOverride || hasSetOverride) {
+    const value = hasGetOverride ? safeGetOverrideValue(label, ov!.get!) : undefined;
+    return buildRow({
+      label,
+      value,
+      set: hasSetOverride ? (val: unknown) => { safeSetOverrideValue(label, ov!.set!, val); ctx.notify(); } : undefined,
+      override: ov,
+      path,
+    });
+  }
+
+  const v = data[k];
+  if (isPlainObject(v)) return buildFolder(path, label, v, ov, ctx);
+  return buildRow({
+    label,
+    value: v,
+    set: (val: unknown) => {
+      data[k] = val;
+      ctx.notify();
+    },
+    override: ov,
+    path,
+  });
+};
+
 const buildRows = (data: Record<string, unknown>, keys: TweakKeys, pathPrefix: string, ctx: FolderCtx): RicNode[] => {
   const rows: RicNode[] = [];
+  const dataKeys = new Set(Object.keys(data));
+
   for (const k of Object.keys(data)) {
     const ov = keys[k];
     if (ov === false) continue;
-    const path = pathPrefix ? `${pathPrefix}.${k}` : k;
-    const v = data[k];
-    const label = (ov && ov.label) || k;
-
-    if (isPlainObject(v)) {
-      rows.push(buildFolder(path, label, v, ov, ctx));
-    } else {
-      rows.push(
-        buildRow({
-          label,
-          value: v,
-          set: (val: unknown) => {
-            data[k] = val;
-            ctx.notify();
-          },
-          override: ov,
-        }),
-      );
-    }
+    rows.push(buildDataDrivenRow(k, data, ov, pathPrefix, ctx));
   }
+
+  // keys だけで宣言された計算値行 (data に同名キーが無く、get が指定されているものだけ)。
+  // 宣言順は keys の Object.keys 順、data 由来の行の後ろに置く (パイロット移行の報告 #1)。
+  for (const k of Object.keys(keys)) {
+    if (dataKeys.has(k)) continue;
+    const ov = keys[k];
+    if (!ov || typeof ov.get !== 'function') continue;
+    rows.push(buildDataDrivenRow(k, data, ov, pathPrefix, ctx));
+  }
+
   return rows;
 };
 
@@ -435,7 +525,8 @@ export const createTweakPanel = (): TweakPanelInstance => {
     const notify = (): void => guard.host?.notify();
     const ctx: FolderCtx = { fid, openMap, notify };
 
-    const autoRows = data ? buildRows(data, keys, '', ctx) : [];
+    // data 省略でも keys だけで get 行を宣言できる (パイロット移行の報告 #1)。
+    const autoRows = data || Object.keys(keys).length > 0 ? buildRows(data ?? {}, keys, '', ctx) : [];
 
     const mergedStyle: StyleValue = {
       ...(width != null ? { width: typeof width === 'number' ? `${width}px` : width } : {}),
