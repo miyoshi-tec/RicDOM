@@ -228,12 +228,20 @@ const createResolvedApp = <S extends object>(
   let pendingResolve: (() => void) | null = null;
   let pendingPromise: Promise<void> | null = null;
 
-  const registerRefs = (root: Element): void => {
+  // 2.0.0-alpha.2: portal 内 ref の 1 render 遅れ修正 (パイロット第 2 号の報告)。
+  // 単一 root ではなく target + (portalTo 指定時のみ) 外部 portal を両方集める —
+  // 呼び出しタイミングを doRender 内で portal パッチの「後」に動かすのと対 (下記)。
+  // ownPortal のときは portalEl が targetEl の子孫なので targetEl 側の
+  // querySelectorAll だけで portal 内の ref も一緒に拾える (二重登録の心配は無い、
+  // Map への set は同じ要素なら同じ結果)。
+  const registerRefs = (): void => {
     refsMap.clear();
-    const nodes = root.querySelectorAll<HTMLElement>('[data-ricdom-ref]');
-    for (const node of nodes) {
-      const name = node.dataset.ricdomRef;
-      if (name) refsMap.set(name, node);
+    const roots = portalEl && !ownPortal ? [targetEl, portalEl] : [targetEl];
+    for (const root of roots) {
+      for (const node of root.querySelectorAll<HTMLElement>('[data-ricdom-ref]')) {
+        const name = node.dataset.ricdomRef;
+        if (name) refsMap.set(name, node);
+      }
     }
   };
 
@@ -273,13 +281,17 @@ const createResolvedApp = <S extends object>(
       flushPendingAttach(); // portal 確定前に use() された part があれば、ここで初めて attach する
     }
 
-    registerRefs(targetEl);
-
     if (portalEl) {
       const nextPortalChildren = collectPortalChildren();
       patchChildren(prevPortalChildren, nextPortalChildren, portalEl);
       prevPortalChildren = nextPortalChildren;
     }
+
+    // registerRefs は portal パッチの「後」に呼ぶ (2.0.0-alpha.2 修正)。旧実装は
+    // target パッチ直後・portal パッチ前に呼んでいたため、dialog 等 portal 内の
+    // `ref` は当該 render の DOM にはまだ反映されておらず、次の render まで
+    // `app.refs.get()` で取れなかった (パイロット第 2 号の報告、コアのバグ)。
+    registerRefs();
 
     if (pendingResolve) {
       const resolve = pendingResolve;

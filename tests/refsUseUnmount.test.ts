@@ -29,6 +29,31 @@ describe('refs', () => {
     await flush();
     expect(handle.refs.get('x')).toBeUndefined();
   });
+
+  it('portal 内の ref は同じ render サイクル内で取得できる (2.0.0-alpha.2、コアのバグ修正)', async () => {
+    // 修正前: doRender は「target パッチ → registerRefs(targetEl) → portal パッチ」の
+    // 順で、portal 内に新しく現れた ref はその render では registerRefs に拾われず、
+    // 次の render まで app.refs.get() で取れなかった。registerRefs を portal パッチの
+    // 「後」に動かし、target + portal 両方から集めるよう修正した。
+    setupApp();
+    const handle = createApp('#app', {}, () => ({ tag: 'div' }));
+    const part: UsePart = { renderPortal: () => ({ tag: 'input', ref: 'portalRef' }) };
+    handle.use(part); // 初回 render 後の use() → attach 直後に scheduleRender() が走る
+    await flush();
+    expect(handle.refs.get('portalRef')).toBeInstanceOf(HTMLInputElement);
+  });
+
+  it('portalTo (外部要素) 側の ref も収集される', async () => {
+    document.body.innerHTML = '<div id="app"></div><div id="external"></div>';
+    const app = document.getElementById('app')!;
+    const external = document.getElementById('external')!;
+    const handle = createApp('#app', {}, () => ({ tag: 'div' }), { portalTo: external });
+    const part: UsePart = { renderPortal: () => ({ tag: 'input', ref: 'extRef' }) };
+    handle.use(part);
+    await flush();
+    expect(handle.refs.get('extRef')).toBe(external.querySelector('input'));
+    void app;
+  });
 });
 
 describe('use() (正式な部品契約、設計書 §3.4)', () => {
