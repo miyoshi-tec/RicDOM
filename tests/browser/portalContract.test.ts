@@ -195,6 +195,77 @@ const CASES: PortalCase[] = [
   },
 ];
 
+// #14 (2.0.0-alpha.5): popup (トリガー経路) と dropdown 共通の横幅測定バグ。
+// 実測 render (visibility:hidden) の間、本体が `left: rect.left` のままだと、
+// position:fixed + 幅未指定 (shrink-to-fit) の本体が使える横幅が
+// `innerWidth - rect.left` に制限され、トリガーが viewport 右端に近いと折り返し可能な
+// 長文が本来より狭く折り返されて offsetWidth が過小に測られる (uiDropdown.test.ts /
+// uiPopup.test.ts の個別再現テストと同じ原因)。ここでは「部品固有の値ではなく利用者が
+// 観測できる結果を見る」というこのファイルの方針に沿い、offsetWidth が本来幅 (viewport
+// 左端近くのトリガーで開いたときの幅) と一致するかを popup/dropdown 共通の形で検証する
+// (パイロット第 2 号からの「部品横断で捕まえる」提案への対応)。tooltip は
+// computeAnchoredLeft 系のロジックを使わない (中心揃え + transform のみ) ため対象外、
+// toast/dialog はそもそも横幅がトリガー位置に依存しないため対象外。
+const LONG_TEXT = 'Alpha bravo charlie delta echo';
+
+interface WidthCase {
+  name: string;
+  bodySelector: string;
+  build: (triggerStyle: { left?: string; right?: string }) => Promise<{ width: number; right: number }>;
+}
+
+const measureBody = (app: HTMLElement, bodySelector: string): { width: number; right: number } => {
+  const body = app.querySelector(bodySelector) as HTMLElement;
+  return { width: body.offsetWidth, right: body.getBoundingClientRect().right };
+};
+
+const WIDTH_CASES: WidthCase[] = [
+  {
+    name: 'createPopup (トリガー経路)',
+    bodySelector: '[data-ricdom-role="popup"]',
+    build: async (triggerStyle) => {
+      const app = setupApp();
+      let menu: ReturnType<typeof createPopup>;
+      // `.ric-button` は white-space:nowrap を持つため使わない (uiPopup.test.ts と同じ理由)。
+      const handle = createApp('#app', {}, () => (menu ? menu({ trigger: ['⋯'], children: [{ tag: 'div', children: [LONG_TEXT] }] }) : null));
+      menu = handle.use(createPopup());
+      await flush();
+      const trigger = app.querySelector('button')!;
+      Object.assign(trigger.style, { position: 'fixed', top: '50px' }, triggerStyle);
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 100));
+      return measureBody(app, '[data-ricdom-role="popup"]');
+    },
+  },
+  {
+    name: 'createDropdown',
+    bodySelector: '[data-ricdom-role="dropdown"]',
+    build: async (triggerStyle) => {
+      const app = setupApp();
+      let dd: ReturnType<typeof createDropdown>;
+      const handle = createApp('#app', {}, () => (dd ? dd({ label: '選択肢', children: [{ tag: 'div', children: [LONG_TEXT] }] }) : null));
+      dd = handle.use(createDropdown());
+      await flush();
+      const trigger = app.querySelector('button')!;
+      Object.assign(trigger.style, { position: 'fixed', top: '50px' }, triggerStyle);
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 100));
+      return measureBody(app, '[data-ricdom-role="dropdown"]');
+    },
+  },
+];
+
+describe('実ブラウザ: ポータル部品の横幅測定コントラクト (#14)', () => {
+  for (const c of WIDTH_CASES) {
+    it(`${c.name}: offsetWidth が本来幅と一致する (位置依存の過小測定なし)`, async () => {
+      const reference = await c.build({ left: '8px' });
+      const actual = await c.build({ right: '8px' });
+      expect(Math.abs(actual.width - reference.width)).toBeLessThanOrEqual(2);
+      expect(actual.right).toBeLessThanOrEqual(window.innerWidth - 8 + 1);
+    });
+  }
+});
+
 describe('実ブラウザ: ポータル部品の共通コントラクト', () => {
   for (const c of CASES) {
     describe(c.name, () => {

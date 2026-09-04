@@ -24,7 +24,7 @@
 import type { ClassValue, RicNode, StyleValue } from '../types.js';
 import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard, type Host } from './internal/component.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
-import { clampLeft, computeAnchoredLeft, computeFlipDir, computeFlipDirAt, type Pos, posToStyle } from './internal/popupPosition.js';
+import { clampLeft, computeAnchoredLeft, computeFlipDir, computeFlipDirAt, measuringLeft, type Pos, posToStyle } from './internal/popupPosition.js';
 import { closeOthers, registerExclusive, unregisterExclusive } from './internal/exclusiveRegistry.js';
 
 /**
@@ -219,16 +219,21 @@ export const createPopup = (): PopupInstance => {
     }
   };
 
+  // #14 (2.0.0-alpha.5): 実測前 (measuredWidth undefined、= 実測 render の間) は
+  // `measuringLeft()` で本体を viewport マージン位置に仮置きし、実測を横幅制約なしで
+  // 行う (popupPosition.ts の `measuringLeft` コメント参照)。実測後は従来どおり
+  // `computeAnchoredLeft`/`clampLeft` で最終位置を決める。トリガー経路・openAt 経路の
+  // 両方で同じ関数を使う (dropdown とも共有)。
   const computePos = (rect: DOMRect, chosenDir: 'below' | 'above', measuredWidth?: number): Pos => ({
     top: chosenDir === 'below' ? rect.bottom + 4 : undefined,
     bottom: chosenDir === 'above' ? window.innerHeight - rect.top + 4 : undefined,
-    left: computeAnchoredLeft(rect, measuredWidth),
+    left: measuredWidth === undefined ? measuringLeft() : computeAnchoredLeft(rect, measuredWidth),
   });
 
   const computePosAt = (x: number, y: number, chosenDir: 'below' | 'above', measuredWidth: number | undefined): Pos => ({
     top: chosenDir === 'below' ? y + 4 : undefined,
     bottom: chosenDir === 'above' ? window.innerHeight - y + 4 : undefined,
-    left: clampLeft(x, measuredWidth),
+    left: measuredWidth === undefined ? measuringLeft() : clampLeft(x, measuredWidth),
   });
 
   const beginMeasuredOpen = (initialDir: 'below' | 'above', initialPos: Pos, remeasure: () => void): void => {

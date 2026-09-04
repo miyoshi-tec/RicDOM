@@ -1,7 +1,7 @@
 // internal/popupPosition.ts (createPopup/createDropdown/createTooltip 共有の位置計算)
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { clampLeft, computeAnchoredLeft, computeFlipDir, computeFlipDirAt, posToStyle } from '../../src/ui/internal/popupPosition.js';
+import { clampLeft, computeAnchoredLeft, computeFlipDir, computeFlipDirAt, measuringLeft, posToStyle } from '../../src/ui/internal/popupPosition.js';
 
 describe('posToStyle', () => {
   it('定義されているキーだけを px 文字列に変換する', () => {
@@ -81,5 +81,15 @@ describe('computeAnchoredLeft (2.0.0-alpha.2、createPopup トリガー経路の
     const rect = { left: 10, right: 50 };
     // 右端揃え候補: 50 - 500 = -450 (大幅に画面外) → clampLeft で margin (8) まで戻す
     expect(computeAnchoredLeft(rect, 500)).toBe(8);
+  });
+});
+
+describe('measuringLeft (2.0.0-alpha.5、#14 バグ修正: 実測 render 専用の仮 left 位置)', () => {
+  it('既定 margin (8px) を返す', () => {
+    expect(measuringLeft()).toBe(8);
+  });
+
+  it('margin を明示指定すればそれを返す (clampLeft/computeAnchoredLeft の margin と揃えられる)', () => {
+    expect(measuringLeft(16)).toBe(16);
   });
 });

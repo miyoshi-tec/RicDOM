@@ -79,3 +79,35 @@ export const computeAnchoredLeft = (rect: { left: number; right: number }, measu
   const candidate = overflowsRight ? rect.right - measuredWidth : rect.left;
   return clampLeft(candidate, measuredWidth, margin);
 };
+
+/**
+ * 実測 render (`visibility: hidden` で一瞬だけ本体を描画し `offsetWidth`/`offsetHeight` を
+ * 読む段階) 専用の仮 left 位置 (2.0.0-alpha.5、#14 バグ修正)。
+ *
+ * 経緯: popup (トリガー経路・openAt 経路) / dropdown はいずれも、実測 render の間
+ * `left: rect.left` (または openAt の `left: x`) のまま本体を置いていた。本体は
+ * `position: fixed` + 幅未指定 (shrink-to-fit) なので、その時点で使える横幅は
+ * `innerWidth - rect.left` に制限される。トリガーが viewport 右端に近いと、本来
+ * 折り返さない内容でも折り返され、`offsetWidth` が本来より小さく測られてしまう
+ * (実測例: rect.left 1213.33 → 実測 offsetWidth 224、本来 417)。過小な幅で
+ * `computeAnchoredLeft`/`clampLeft` の右端揃えをすると、本体は本来より狭いまま
+ * viewport 右端に張り付き、右マージンが消える。
+ *
+ * 対策: 実測 render の間だけ `left: margin` (= 既定の viewport マージン、
+ * `clampLeft`/`computeAnchoredLeft` の既定値と揃えた 8px) に置く。`visibility: hidden`
+ * なので実測中の見た目上の位置はどこでも問題ない — 本体は `right` を指定していない
+ * (`position: fixed` + shrink-to-fit) ので、これで実測時に使える横幅は
+ * `innerWidth - margin` (viewport 右端いっぱいまで、ほぼ viewport 全幅) になり、
+ * 「viewport に収まる最大幅」が正しく測れる。測定後の再描画では、この正しい幅を使って
+ * `computeAnchoredLeft`/`clampLeft` が最終位置を決める (そちらのロジックは変更なし)。
+ *
+ * `width: max-content` (CSS だけで shrink-to-fit の制約を外す案) は採らなかった —
+ * viewport よりコンテンツが広いケースで、最終的な折り返し幅 (clamp 後の利用可能幅で
+ * 折り返した幅) と実測時の幅 (無制限に伸びた幅) が食い違ってしまうため。
+ *
+ * popup (トリガー経路・openAt 経路) と dropdown の 3 箇所で共有する (バラバラに
+ * 書かない)。上下方向 (below/above の flip) の実測ロジックはこの対象外 — 高さ側は
+ * 実測 render 中も `position: fixed` の `top`/`bottom` がトリガー基準のまま計算されて
+ * おり、横方向のような「利用可能幅が縮む」問題が構造的に起きないため変更不要。
+ */
+export const measuringLeft = (margin = 8): number => margin;

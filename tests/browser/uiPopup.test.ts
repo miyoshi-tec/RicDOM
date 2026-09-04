@@ -127,6 +127,65 @@ describe('実ブラウザ: createPopup', () => {
     expect(rect.left).toBeGreaterThanOrEqual(0);
   });
 
+  // #14 (2.0.0-alpha.5): 上のテストは「画面外にはみ出さない」ことしか見ていなかったため、
+  // 「本体が本来より狭く測られたまま右端に張り付く」(はみ出しはしないが右マージンが消える)
+  // バグは検知できていなかった。ここでは offsetWidth 自体が本来幅と一致するかを見る
+  // (dropdown 側と同じ再現方法・同じ許容差)。
+  const LONG_TEXT = 'Alpha bravo charlie delta echo';
+
+  it('トリガー経路: viewport 右端に密着したトリガーから開いても、実測幅が本来幅より狭くならない (2.0.0-alpha.5、#14 バグ修正)', async () => {
+    const buildAndMeasure = async (triggerStyle: { left?: string; right?: string }): Promise<{ width: number; right: number }> => {
+      const app = setupApp();
+      let menu: ReturnType<typeof createPopup>;
+      // 項目は `.ric-button` ではなく plain な div にする — `.ric-button` は
+      // `white-space: nowrap` を持つため、折り返し可能な長文での再現条件 (available
+      // width が狭いと折り返されて過小に測られる) が成り立たない。`.ric-popup__item`
+      // 自体には white-space 指定が無いので既定 (normal、折り返し可) のまま使える。
+      const handle = createApp('#app', {}, () => (menu ? menu({ trigger: ['⋯'], children: [{ tag: 'div', children: [LONG_TEXT] }] }) : null));
+      menu = handle.use(createPopup());
+      await flush();
+      const trigger = app.querySelector('button')!;
+      Object.assign(trigger.style, { position: 'fixed', top: '50px' }, triggerStyle);
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 100)); // rAF 実測フェーズ + 再描画を待つ
+      const body = app.querySelector('[role="menu"]') as HTMLElement;
+      return { width: body.offsetWidth, right: body.getBoundingClientRect().right };
+    };
+
+    const reference = await buildAndMeasure({ left: '8px' });
+    const actual = await buildAndMeasure({ right: '8px' });
+
+    expect(Math.abs(actual.width - reference.width)).toBeLessThanOrEqual(2);
+    expect(actual.right).toBeLessThanOrEqual(window.innerWidth - 8 + 1);
+  });
+
+  it('openAt 経路: viewport 右端近くの座標に開いても、実測幅が本来幅より狭くならない (2.0.0-alpha.5、#14 バグ修正)', async () => {
+    const buildAndMeasure = async (x: number): Promise<{ width: number; right: number }> => {
+      const app = setupApp();
+      let menu: ReturnType<typeof createPopup>;
+      // 項目は `.ric-button` ではなく plain な div にする — `.ric-button` は
+      // `white-space: nowrap` を持つため、折り返し可能な長文での再現条件 (available
+      // width が狭いと折り返されて過小に測られる) が成り立たない。`.ric-popup__item`
+      // 自体には white-space 指定が無いので既定 (normal、折り返し可) のまま使える。
+      const handle = createApp('#app', {}, () => (menu ? menu({ trigger: ['⋯'], children: [{ tag: 'div', children: [LONG_TEXT] }] }) : null));
+      menu = handle.use(createPopup());
+      await flush();
+      menu.openAt({ x, y: 50 });
+      await new Promise((r) => setTimeout(r, 100)); // rAF 実測フェーズ + 再描画を待つ
+      const body = app.querySelector('[role="menu"]') as HTMLElement;
+      return { width: body.offsetWidth, right: body.getBoundingClientRect().right };
+    };
+
+    // 本来幅の参照値: viewport 左端近くの座標に開く (利用可能幅が広い)。
+    const reference = await buildAndMeasure(8);
+    // 再現条件: viewport 右端近くの座標に開く (openAt には rect がなく、修正前は
+    // `left: x` のまま実測していた)。
+    const actual = await buildAndMeasure(window.innerWidth - 8);
+
+    expect(Math.abs(actual.width - reference.width)).toBeLessThanOrEqual(2);
+    expect(actual.right).toBeLessThanOrEqual(window.innerWidth - 8 + 1);
+  });
+
   it('アイコン+テキストの menu 項目は中心 y が一致する (2.0.0-alpha.2、.ric-popup__item の align-items 修正)', async () => {
     const app = setupApp();
     let menu: ReturnType<typeof createPopup>;
