@@ -48,6 +48,15 @@ export interface PopupProps {
   trigger: RicNode | RicNode[] | PopupTriggerObject;
   /** メニュー項目 (各要素に role="menuitem" が自動付与される) */
   children?: RicNode[];
+  /**
+   * menuitem の活性化 (click。button 項目なら Enter/Space は native click として発火する)
+   * で自動的に閉じてトリガーへフォーカス復帰するか (APG menu button パターン、既定 true、
+   * 2.0.0-alpha.3 #10)。チェック型メニュー (選択後も開いたままにしたい) 向けの opt-out。
+   * `disabled: true` または `aria-disabled="true"` の項目には無関係に効かない (そもそも
+   * 活性化とみなさない)。role を明示的に上書きした項目 (`role !== 'menuitem'`、例:
+   * separator) にも効かない。
+   */
+  closeOnSelect?: boolean;
 }
 
 // trigger が PopupTriggerObject かどうかの判定。RicElementNode は型上 `tag` が必須
@@ -72,21 +81,50 @@ export interface PopupInstance extends Component<PopupProps> {
 
 let nextPopupId = 0;
 
-const wrapMenuItem = (node: RicNode): RicNode => {
+/** wrapMenuItem に渡す「閉じる」側の依存 (#10)。close は closeAndRestoreFocus を渡す。 */
+interface WrapMenuItemOptions {
+  closeOnSelect: boolean;
+  close: () => void;
+}
+
+// disabled 判定 (#10): `disabled: true` prop (ネイティブ disabled 属性、button/input 等が
+// 対象) または `aria-disabled="true"` (見た目だけの soft disabled、クリック自体は発火しうる
+// 要素向け) のどちらか。ネイティブ disabled な <button> は元々ブラウザが click を発火させ
+// ないため、ここでの判定は主に aria-disabled 側の「クリックは通るが活性化とはみなさない」
+// ケースを拾う。
+const isMenuItemDisabled = (el: Record<string, unknown>): boolean => el.disabled === true || el['aria-disabled'] === 'true';
+
+const wrapMenuItem = (node: RicNode, opts: WrapMenuItemOptions): RicNode => {
   if (node === null || typeof node !== 'object' || Array.isArray(node)) return node;
   const el = node as unknown as Record<string, unknown>;
+  const role = (el.role as string | undefined) ?? 'menuitem';
+  // menuitem の活性化 (click) で閉じる (#10、APG menu button パターン)。項目の onclick を
+  // 先に呼んでから閉じる — consumer の onclick が `ev.stopPropagation()` していても
+  // (ドキュメント全体の Esc/外側クリック監視をバイパスする意図であっても) 確実に閉じる
+  // ため、popup 側は「項目の click イベント」ではなく「項目の onclick 呼び出しそのもの」を
+  // 包む。role が 'menuitem' 以外に明示上書きされている項目 (separator 等) は活性化の
+  // 対象外として素通しする。
+  const originalOnclick = el.onclick as ((ev: MouseEvent) => void) | undefined;
+  const shouldCloseOnActivate = role === 'menuitem' && opts.closeOnSelect && !isMenuItemDisabled(el);
+  const onclick = shouldCloseOnActivate
+    ? (ev: MouseEvent): void => {
+        if (typeof originalOnclick === 'function') originalOnclick(ev);
+        opts.close();
+      }
+    : originalOnclick;
   // v1 由来の `typeof el.class === 'string' ? el.class : ''` は配列/真偽値マップ形の
   // class を黙って捨てていた (2.0.0-alpha.2、パイロット第 2 号の報告)。他部品と同じ
   // mergeClass (internal/pureHelpers.ts) を使い、3 形態すべてを連結する。
   return {
     ...el,
-    role: el.role ?? 'menuitem',
+    role,
     tabIndex: -1,
     // getMenuItems() (矢印キー/Home/End のフォーカス移動) が問い合わせる安定セレクタ。
     // これが無いと handleKeydown が常に items.length===0 で無反応になる (実ブラウザ
     // テストで発見・修正)。
     'data-ricdom-role': UI_ROLE.popupItem,
     class: mergeClass('ric-popup__item', el.class as ClassValue | undefined),
+    onclick,
   } as unknown as RicNode;
 };
 
@@ -108,6 +146,7 @@ export const createPopup = (): PopupInstance => {
   let escBound = false;
   let triggerChildrenLast: RicNode | RicNode[] = [];
   let menuChildrenLast: RicNode[] = [];
+  let closeOnSelectLast = true;
   let restoreFocusEl: HTMLElement | null = null;
 
   const getBodyEl = (): HTMLElement | null => (typeof document === 'undefined' ? null : document.querySelector(`[data-ricdom-popup-id="${bodyMarker}"]`));
@@ -209,6 +248,7 @@ export const createPopup = (): PopupInstance => {
     if (!host) return null;
 
     menuChildrenLast = props.children ?? [];
+    closeOnSelectLast = props.closeOnSelect ?? true;
     bindKeydownIfNeeded();
 
     // object 形トリガー (2.0.0-alpha.2、PopupTriggerObject) は icon/label を
@@ -274,7 +314,7 @@ export const createPopup = (): PopupInstance => {
         'data-ricdom-popup-id': bodyMarker,
         style: { ...posToStyle(pos), ...(isMeasuring ? { visibility: 'hidden' } : {}) },
         onanimationend: handleAnimEnd,
-        children: menuChildrenLast.map(wrapMenuItem),
+        children: menuChildrenLast.map((child) => wrapMenuItem(child, { closeOnSelect: closeOnSelectLast, close: closeAndRestoreFocus })),
       },
     ] as unknown as RicNode;
   };
