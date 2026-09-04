@@ -8,6 +8,8 @@ import type { ClassValue, RicElementNode, RicNode, StyleValue } from '../types.j
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export interface UiColProps {
+  /** v1 parity (2.0.0-alpha.2)。uiRow の `gap` と同じ意味・実装 (row.ts のヘッダコメント参照)。 */
+  gap?: string | number;
   children?: RicNode | RicNode[];
   style?: StyleValue;
   class?: ClassValue;
@@ -18,12 +20,14 @@ export interface UiColProps {
  * 縦方向フレックスコンテナ。状態を持たない純粋関数。
  *   uiCol({ children: [uiText({ children: ['a'] }), uiText({ children: ['b'] })] })
  */
-export const uiCol = ({ children = [], style, class: extraClass, ...rest }: UiColProps = {}): RicNode =>
-  ({
+export const uiCol = ({ children = [], style, gap, class: extraClass, ...rest }: UiColProps = {}): RicNode => {
+  const finalStyle: StyleValue | undefined = gap !== undefined ? { ...style, gap: typeof gap === 'number' ? `${gap}px` : gap } : style;
+  return {
     ...rest,
     tag: 'div',
     class: mergeClass('ric-col', extraClass),
     'data-ricdom-role': UI_ROLE.col,
-    ...(style ? { style } : {}),
+    ...(finalStyle ? { style: finalStyle } : {}),
     children,
-  }) as RicElementNode;
+  } as RicElementNode;
+};

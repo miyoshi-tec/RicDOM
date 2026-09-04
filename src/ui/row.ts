@@ -7,6 +7,13 @@ import type { ClassValue, RicElementNode, RicNode, StyleValue } from '../types.j
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export interface UiRowProps {
+  /**
+   * v1 parity (2.0.0-alpha.2、パイロット第 2 号の報告 — v1 `ui_row({gap})` は正式 prop
+   * だったが、v2 は当初 rest スプレッドに紛れて `setAttribute('gap', ...)` になり
+   * 黙って効かなくなっていた、25 箇所以上で発生)。`style.gap` に書く。数値は px 扱い。
+   * 省略時はテーマの `--ric-gap-md` (既存 CSS の既定値、変更なし)。
+   */
+  gap?: string | number;
   children?: RicNode | RicNode[];
   style?: StyleValue;
   class?: ClassValue;
@@ -17,12 +24,14 @@ export interface UiRowProps {
  * 横方向フレックスコンテナ。状態を持たない純粋関数。
  *   uiRow({ children: [uiButton({ children: ['OK'] }), uiButton({ children: ['Cancel'] })] })
  */
-export const uiRow = ({ children = [], style, class: extraClass, ...rest }: UiRowProps = {}): RicNode =>
-  ({
+export const uiRow = ({ children = [], style, gap, class: extraClass, ...rest }: UiRowProps = {}): RicNode => {
+  const finalStyle: StyleValue | undefined = gap !== undefined ? { ...style, gap: typeof gap === 'number' ? `${gap}px` : gap } : style;
+  return {
     ...rest,
     tag: 'div',
     class: mergeClass('ric-row', extraClass),
     'data-ricdom-role': UI_ROLE.row,
-    ...(style ? { style } : {}),
+    ...(finalStyle ? { style: finalStyle } : {}),
     children,
-  }) as RicElementNode;
+  } as RicElementNode;
+};

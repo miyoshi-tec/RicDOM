@@ -32,6 +32,22 @@ describe('uiCol', () => {
     expect(node.id).toBe('c1');
     expect(node.class).toBe('ric-col extra');
   });
+
+  it('gap prop は style.gap に書かれ、属性 (data-*) には出ない (2.0.0-alpha.2 v1 parity)', () => {
+    const node = uiCol({ gap: '4px' }) as unknown as TestNode;
+    expect(node.style).toEqual({ gap: '4px' });
+    expect('gap' in node).toBe(false); // rest 経由で setAttribute('gap',...) にならない
+  });
+
+  it('gap: number は px 化される', () => {
+    const node = uiCol({ gap: 8 }) as unknown as TestNode;
+    expect(node.style?.gap).toBe('8px');
+  });
+
+  it('gap と style を同時に渡すとマージされる', () => {
+    const node = uiCol({ gap: 4, style: { color: 'red' } }) as unknown as TestNode;
+    expect(node.style).toEqual({ color: 'red', gap: '4px' });
+  });
 });
 
 describe('uiRow', () => {
@@ -47,6 +63,17 @@ describe('uiRow', () => {
     expect(withStyle.style).toEqual({ gap: '4px' });
     const withoutStyle = uiRow() as unknown as TestNode;
     expect('style' in withoutStyle).toBe(false);
+  });
+
+  it('gap prop は style.gap に書かれる (2.0.0-alpha.2 v1 parity、25 箇所以上で rest 経由の属性化に崩れていた報告への対応)', () => {
+    const node = uiRow({ gap: '12px' }) as unknown as TestNode;
+    expect(node.style).toEqual({ gap: '12px' });
+    expect('gap' in node).toBe(false);
+  });
+
+  it('gap: number は px 化される', () => {
+    const node = uiRow({ gap: 8 }) as unknown as TestNode;
+    expect(node.style?.gap).toBe('8px');
   });
 });
 
