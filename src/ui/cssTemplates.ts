@@ -225,6 +225,8 @@ const POPUP_CSS = `
 
 .ric-popup__item {
   display: flex !important;
+  align-items: center;
+  gap: ${g};
   width: 100%;
   justify-content: flex-start;
   text-align: left;

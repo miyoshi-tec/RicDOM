@@ -35,4 +35,11 @@ describe('buildStylesheet: 状態を持たない部品の規則を含む', () =>
     expect(css).toContain('.ric-button--sm');
     expect(css).toContain('.ric-button--lg');
   });
+
+  it('.ric-popup__item は align-items:center を持つ (2.0.0-alpha.2、アイコン+テキスト項目の中心 y 不一致の実機バグ修正)', () => {
+    const itemRuleMatch = css.match(/\.ric-popup__item\s*\{[^}]*\}/);
+    expect(itemRuleMatch).not.toBeNull();
+    expect(itemRuleMatch![0]).toContain('align-items: center');
+    expect(itemRuleMatch![0]).toContain('gap:');
+  });
 });
