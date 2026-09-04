@@ -77,10 +77,11 @@ export const createToast = (): ToastInstance => {
         class: `ric-toast__item${item.entering ? ' ric-toast__item--in' : ''}${item.type !== 'default' ? ` ric-toast__item--${item.type}` : ''}${item.closing ? ' ric-toast__item--out' : ''}`,
         role: item.type === 'error' ? 'alert' : 'status',
         'aria-live': item.type === 'error' ? 'assertive' : 'polite',
+        'data-ricdom-role': UI_ROLE.toastItem,
         onanimationend: item.closing ? () => remove(item.id) : item.entering ? () => { item.entering = false; } : undefined,
         children: [
           { tag: 'span', class: 'ric-toast__msg', children: [item.msg] },
-          { tag: 'button', class: 'ric-toast__close', 'aria-label': 'Close', onclick: () => beginClose(item), children: ['✕'] },
+          { tag: 'button', class: 'ric-toast__close', 'data-ricdom-role': UI_ROLE.toastClose, 'aria-label': 'Close', onclick: () => beginClose(item), children: ['✕'] },
         ],
       })),
     } as unknown as RicNode;

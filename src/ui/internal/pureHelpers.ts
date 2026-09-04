@@ -45,9 +45,20 @@ export const UI_ROLE = {
   codePre: 'code-pre',
   // ── 状態を持つ部品 ──
   dialog: 'dialog',
+  /** dialog の背景オーバーレイ (2.0.0-alpha.2 追補、§14 の全部品方針をサブパーツへ拡張) */
+  dialogOverlay: 'dialog-overlay',
+  dialogHeader: 'dialog-header',
+  /** dialog の本文コンテナ (`.ric-dialog__body`)。dialog 自身 (portal ルート) は `dialog` のまま */
+  dialogBody: 'dialog-body',
+  dialogFooter: 'dialog-footer',
+  dialogClose: 'dialog-close',
   popup: 'popup',
   popupItem: 'popup-item',
+  /** popup/dropdown で共有する背景オーバーレイ (`.ric-popup__overlay`、両部品が同じ要素を使う) */
+  popupOverlay: 'popup-overlay',
   toast: 'toast',
+  toastItem: 'toast-item',
+  toastClose: 'toast-close',
   tooltip: 'tooltip',
   scrollPane: 'scroll-pane',
   splitter: 'splitter',

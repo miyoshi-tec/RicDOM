@@ -305,6 +305,7 @@ export const createDialog = (): DialogInstance => {
       {
         tag: 'div',
         class: `ric-dialog__overlay${isClosing ? ' ric-dialog__overlay--out' : ''}`,
+        'data-ricdom-role': UI_ROLE.dialogOverlay,
         onclick: () => requestClose('overlay'),
       },
       {
@@ -326,13 +327,14 @@ export const createDialog = (): DialogInstance => {
           {
             tag: 'div',
             class: 'ric-dialog__header',
+            'data-ricdom-role': UI_ROLE.dialogHeader,
             children: [
               { tag: 'span', class: 'ric-dialog__title', id: titleId, children: [titleLast] },
-              { tag: 'button', class: 'ric-dialog__close', 'aria-label': 'Close', onclick: () => requestClose('close-button'), children: ['✕'] },
+              { tag: 'button', class: 'ric-dialog__close', 'data-ricdom-role': UI_ROLE.dialogClose, 'aria-label': 'Close', onclick: () => requestClose('close-button'), children: ['✕'] },
             ],
           },
-          { tag: 'div', class: 'ric-dialog__body', id: bodyId, children: bodyChildrenLast },
-          actionsLast.length ? { tag: 'div', class: 'ric-dialog__footer', children: actionsLast } : null,
+          { tag: 'div', class: 'ric-dialog__body', id: bodyId, 'data-ricdom-role': UI_ROLE.dialogBody, children: bodyChildrenLast },
+          actionsLast.length ? { tag: 'div', class: 'ric-dialog__footer', 'data-ricdom-role': UI_ROLE.dialogFooter, children: actionsLast } : null,
         ],
       },
     ] as unknown as RicNode;

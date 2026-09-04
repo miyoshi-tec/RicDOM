@@ -116,4 +116,21 @@ describe('createToast: role/aria-live', () => {
     await flush();
     expect(app.querySelector('.ric-toast__item')).toBeNull();
   });
+
+  it('item/close に data-ricdom-role が付く (2.0.0-alpha.2、§14 方針の拡張)', async () => {
+    const app = setupApp();
+    let toast: ReturnType<typeof createToast>;
+    const handle = createApp('#app', {}, () => {
+      toast?.();
+      return { tag: 'div' };
+    });
+    toast = handle.use(createToast());
+    await flush();
+
+    toast!.show('通知');
+    await flush();
+
+    expect(app.querySelector('.ric-toast__item')!.getAttribute('data-ricdom-role')).toBe('toast-item');
+    expect(app.querySelector('.ric-toast__close')!.getAttribute('data-ricdom-role')).toBe('toast-close');
+  });
 });

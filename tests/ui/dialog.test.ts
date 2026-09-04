@@ -95,6 +95,24 @@ describe('createDialog: uncontrolled', () => {
   });
 });
 
+describe('createDialog: サブパーツの data-ricdom-role (2.0.0-alpha.2、§14 方針の拡張)', () => {
+  it('overlay/header/body/footer/close にそれぞれの role が付く', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () => (dlg ? dlg({ triggerChildren: ['開く'], title: 't', children: ['本文'], actions: [{ tag: 'button', children: ['OK'] }] }) : null));
+    dlg = handle.use(createDialog());
+    await flush();
+    app.querySelector('button')!.click();
+    await flush();
+
+    expect(app.querySelector('.ric-dialog__overlay')!.getAttribute('data-ricdom-role')).toBe('dialog-overlay');
+    expect(app.querySelector('.ric-dialog__header')!.getAttribute('data-ricdom-role')).toBe('dialog-header');
+    expect(app.querySelector('.ric-dialog__body')!.getAttribute('data-ricdom-role')).toBe('dialog-body');
+    expect(app.querySelector('.ric-dialog__footer')!.getAttribute('data-ricdom-role')).toBe('dialog-footer');
+    expect(app.querySelector('.ric-dialog__close')!.getAttribute('data-ricdom-role')).toBe('dialog-close');
+  });
+});
+
 describe('createDialog: controlled', () => {
   it('open props で開閉し、onClose に reason が渡る', async () => {
     const app = setupApp();

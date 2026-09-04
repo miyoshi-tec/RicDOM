@@ -145,6 +145,19 @@ describe('createDropdown: 開閉', () => {
     expect(dd!.isOpen()).toBe(false);
     expect(app.querySelector('.ric-dropdown__body')).toBeNull();
   });
+
+  it('overlay に data-ricdom-role="popup-overlay" が付く (createPopup と共有、2.0.0-alpha.2)', async () => {
+    const app = setupApp();
+    let dd: ReturnType<typeof createDropdown>;
+    const handle = createApp('#app', {}, () => (dd ? dd({ label: 'x', children: [] }) : null));
+    dd = handle.use(createDropdown());
+    await flush();
+    app.querySelector('button')!.click();
+    await flush();
+    await flush();
+
+    expect(app.querySelector('.ric-popup__overlay')!.getAttribute('data-ricdom-role')).toBe('popup-overlay');
+  });
 });
 
 describe('createDropdown: 排他制御 (host.app 単位、popup 系で共有)', () => {

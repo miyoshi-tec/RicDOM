@@ -190,7 +190,7 @@ export const createDropdown = (): DropdownInstance => {
   inst.renderPortal = (): RicNode => {
     if (!guard.host || !isOpen) return null;
     return [
-      { tag: 'div', class: 'ric-popup__overlay', onclick: closeAndRestoreFocus },
+      { tag: 'div', class: 'ric-popup__overlay', 'data-ricdom-role': UI_ROLE.popupOverlay, onclick: closeAndRestoreFocus },
       {
         tag: 'div',
         class: `ric-dropdown__body ric-popup__body--${dir}${isClosing ? ' ric-popup__body--out' : ''}`,
