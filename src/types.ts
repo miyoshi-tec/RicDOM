@@ -194,7 +194,19 @@ export type App<S extends object> = S & {
  * `createApp` の第 4 引数 (省略可)。
  * `portalTo`: portal の描画先を任意の要素に差し替える (設計書 §3.5、v1 の `portal_to` 要望を吸収)。
  * 省略時は `createApp` が target 直下に `<div data-ricdom-role="portal">` を自動生成する。
+ * `setup`: パイロット移行 (歯車DXFジェネレーター) の報告 #5 対応。初回 render の直前
+ * (app と portal が用意された後) に 1 回だけ呼ばれる。ここで `app.use()` した部品は
+ * 初回 render から使える — `setup` を使わない場合、`app.use()` は初回 render の
+ * *後*にしか実行できないため (`createApp` は生成時に同期初回描画する)、初回だけは
+ * 「プレースホルダを返し、use() 後に renderNow()」の 2 段構えが必要になっていた
+ * (設計書に言及なし、実装からのフィードバックで追加)。
  */
-export interface CreateAppOptions {
+export interface CreateAppOptions<S extends object = any> {
   portalTo?: Element;
+  /**
+   * 初回 render の直前に 1 回だけ呼ばれるセットアップ関数。例外は `console.error` に
+   * 変換され、初回 render はそのまま続行される (throw しない方針の継承)。
+   * 無効な `target`/`state`/`render` で NOOP App が返る場合は呼ばれない。
+   */
+  setup?: (app: App<S>) => void;
 }

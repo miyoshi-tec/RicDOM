@@ -70,14 +70,14 @@ export const createApp = <S extends object>(
   target: string | Element,
   state: S,
   render: RenderFn<S>,
-  options?: CreateAppOptions,
+  options?: CreateAppOptions<S>,
 ): App<S> => createAppImpl(target, state, render, options);
 
 const createAppImpl = <S extends object>(
   target: string | Element,
   state: S,
   render: RenderFn<S>,
-  options: CreateAppOptions | undefined,
+  options: CreateAppOptions<S> | undefined,
 ): App<S> => {
   // ── 引数バリデーション (throw しない: console.error + NOOP App、設計書 §3.6) ──
   if (typeof target !== 'string' && !isDomElement(target)) {
@@ -128,7 +128,7 @@ const createDeferredApp = <S extends object>(
   target: string | Element,
   bufferState: S,
   render: RenderFn<S>,
-  options: CreateAppOptions | undefined,
+  options: CreateAppOptions<S> | undefined,
 ): App<S> => {
   let inner: App<S> | null = null;
 
@@ -202,7 +202,7 @@ const createResolvedApp = <S extends object>(
   targetEl: Element,
   state: S,
   initialRender: RenderFn<S>,
-  options: CreateAppOptions | undefined,
+  options: CreateAppOptions<S> | undefined,
 ): App<S> => {
   let isDestroyed = false;
   let currentRenderFn: RenderFn<S> = initialRender;
@@ -396,6 +396,30 @@ const createResolvedApp = <S extends object>(
       return Reflect.deleteProperty(target, prop);
     },
   }) as App<S>;
+
+  // setup オプション (パイロット移行の報告 #5): 初回 render の直前に 1 回だけ呼ぶ。
+  // ownPortal は通常 PORTAL_SENTINEL 経由で初回 doRender() の中で初めて portalEl が
+  // 確定する (attach() もそれ以降) が、setup 内の use() を初回 render から効かせるには
+  // その前に portal を確定させる必要があるため、ここで前倒しして 1 回だけ構築する
+  // (setup 省略時はこの分岐に入らず、既存の遅延生成のまま)。
+  if (options?.setup) {
+    if (ownPortal && portalEl === null) {
+      targetEl.innerHTML = ''; // 初回 doRender() 側の「初回だけクリア」を前倒しする
+      isFirstRender = false;
+      portalEl = buildDomNode(PORTAL_SENTINEL, targetEl.namespaceURI) as Element;
+      targetEl.appendChild(portalEl);
+      // 前倒しで作った portal を「前回の描画結果」として扱う。normalizeChildren が
+      // 不可視要素を落とすので、prevChildren は正規化後 [PORTAL_SENTINEL] の 1 件になり
+      // 上で appendChild した実 DOM ノードと index が一致する (key-based reconciliation が
+      // 同一ノードとして再利用する)。
+      prevTargetChildren = [PORTAL_SENTINEL];
+    }
+    try {
+      options.setup(appHandle);
+    } catch (err) {
+      console.error('RicDOM: setup 失敗', err);
+    }
+  }
 
   // 生成時に同期初回描画する (v1 踏襲)
   doRender();

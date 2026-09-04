@@ -50,7 +50,10 @@
     },
   };
 
-  // 状態を持つ部品は createApp の戻り値を受け取った後に use() する (設計書 §3.4)。
+  // 状態を持つ部品は createApp の第 4 引数 setup で登録する (パイロット移行の報告 #5)。
+  // setup は初回 render の直前に 1 回だけ呼ばれるので、tweak は初回 render から使える
+  // (setup を使わない場合の代替: 初回はプレースホルダを返し、`app.use()` の後で
+  // `app.renderNow()`/次の state 変更を待つ、という 2 段構えが必要になる)。
   let tweak;
 
   const shapeNode = (p) =>
@@ -73,50 +76,57 @@
     '#app',
     state,
     (s) =>
-      !tweak
-        ? { tag: 'div' }
-        : U.uiPanel({
-            class: 'app-shell',
+      U.uiPanel({
+        class: 'app-shell',
+        children: [
+          { tag: 'h1', children: ['RicDOM 2 — tweak panel'] },
+          U.uiText({ children: ['data だけ渡すと型から行が自動生成され (Tier1)、keys で一部だけ上書きできる (Tier2)。パネルを弄ると右の図形がその場で変わる。'] }),
+          {
+            tag: 'div',
+            class: 'demo-row',
             children: [
-              { tag: 'h1', children: ['RicDOM 2 — tweak panel'] },
-              U.uiText({ children: ['data だけ渡すと型から行が自動生成され (Tier1)、keys で一部だけ上書きできる (Tier2)。パネルを弄ると右の図形がその場で変わる。'] }),
-              {
-                tag: 'div',
-                class: 'demo-row',
-                children: [
-                  tweak({
-                    title: 'パラメータ',
-                    width: 260,
-                    data: s.params,
-                    keys: {
-                      size: { type: 'range', min: 40, max: 220, step: 2 },
-                      rotation: { type: 'range', min: 0, max: 360, step: 5 },
-                      rounded: { type: 'range', min: 0, max: 60 },
-                      mode: { type: 'radiobutton', options: ['square', 'circle'] },
-                      border: {
-                        label: '枠線',
-                        open: true,
-                        keys: { width: { type: 'range', min: 0, max: 10 } },
-                      },
+              tweak({
+                title: 'パラメータ',
+                width: 260,
+                data: s.params,
+                keys: {
+                  size: { type: 'range', min: 40, max: 220, step: 2 },
+                  rotation: { type: 'range', min: 0, max: 360, step: 5 },
+                  rounded: { type: 'range', min: 0, max: 60 },
+                  mode: { type: 'radiobutton', options: ['square', 'circle'] },
+                  border: {
+                    label: '枠線',
+                    open: true,
+                    keys: { width: { type: 'range', min: 0, max: 10 } },
+                  },
+                  // data に無い計算値の行 (keys.get、パイロット移行の報告 #1)。面積は
+                  // size から逆算するだけの表示専用の値で、s.params には持たない。
+                  area: { label: '面積 (概算)', get: () => Math.round(s.params.size * s.params.size) },
+                },
+                // Tier3: 自動生成行の後ろに自前の行 (リセットボタン) を足す
+                rows: [
+                  U.uiButton({
+                    children: ['既定値に戻す'],
+                    onclick: () => {
+                      s.params = { size: 120, color: '#4f8ef7', rotation: 0, rounded: 16, mode: 'square', showLabel: true, label: 'RicDOM', border: { width: 2, color: '#1e293b' } };
                     },
-                    // Tier3: 自動生成行の後ろに自前の行 (リセットボタン) を足す
-                    rows: [
-                      U.uiButton({
-                        children: ['既定値に戻す'],
-                        onclick: () => {
-                          s.params = { size: 120, color: '#4f8ef7', rotation: 0, rounded: 16, mode: 'square', showLabel: true, label: 'RicDOM', border: { width: 2, color: '#1e293b' } };
-                        },
-                      }),
-                    ],
                   }),
-                  { tag: 'div', class: 'stage', children: [shapeNode(s.params)] },
                 ],
-              },
+              }),
+              { tag: 'div', class: 'stage', children: [shapeNode(s.params)] },
             ],
-          }),
+          },
+        ],
+      }),
+    {
+      // setup は app と portal が用意された後、初回 render の直前に 1 回だけ呼ばれる
+      // (設計書「createApp に setup オプション」)。ここで use() した tweak は
+      // render 内から最初の呼び出しで使える (上のプレースホルダ分岐が不要になる)。
+      setup: (a) => {
+        tweak = a.use(U.createTweakPanel());
+      },
+    },
   );
-
-  tweak = app.use(U.createTweakPanel());
 
   U.applyTheme(document.getElementById('app'), { theme: state.theme });
 </script>
