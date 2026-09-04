@@ -164,6 +164,21 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
 - `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+## 20. パイロット移行第 2 号 (Trend Guard、Electron) からの確定事項 (2026-09-04、2.0.0-alpha.2)
+
+- **移行実績**: v1 v0.4.2 → v2 `916a61c`、Electron 42 / DPI 150%。20 ファイル +806/-711、機械変換 150〜200 行、部品の `setup`/parts 化 313 行、AI 1 セッション約 30 分。第 1 号で入れた `setup` が第 2 号の所要を直接短縮した (パイロットを直列に回す意味の実証)
+- **popup/dropdown のトリガー経路の横位置**: `computeAnchoredLeft(rect, width)` = 「`rect.left` に収まればそのまま → 収まらなければトリガー右端揃え (`rect.right - width`) → それでも負なら clamp」を popup・dropdown・`openAt` で共有。§15 の再検討条件 (「右端トリガーで左に展開してほしい」実害) が来たので、v1 の論理コンテナ・ヒューリスティックではなく**右端揃えフォールバック**で解消 (viewport 基準は維持)
+- **portal 内 `ref`**: `registerRefs` は portal patch の**後**、`target` と `portalTo` の両方から収集 (コア修正。gzip 5,107B、天井まで 13B — コアはこれで本当に打ち止め)
+- **v1 で正式 prop だったものは復活が原則** (`uiRow`/`uiCol` の `gap`)。rest スプレッド契約は「未知 prop を属性に流す」ため、廃止した prop は黙って崩れる — 廃止するなら V1_VS_V2 に明記し、原則は復活
+- 部品側の `class` 取り扱いはコアと同じ正規化 (`mergeClass`) を使う。string 判定の握りつぶしは禁止
+- `.ric-popup__item` は `align-items:center; gap: var(--ric-gap)` (専用トークン `--ric-gap-sm` は作らない、既存トークンを使う)
+- portal 系サブパーツにも `data-ricdom-role` (dialog-overlay/header/body/footer/close、popup-overlay、toast-item/close)。**クラス名は据え置き対象と明言しない** (role が公式フック)
+- `createPopup` の `trigger` は `RicNode | { icon, label, ghost, size, class, style }` の 2 形 (`tag` キーの有無で判別)。`createDropdown` は既存の top-level `label/icon/ghost` があるため object 形を**追加しない** (canon 1 つ)
+- `createTabs`: 全 item に `children` が無ければ tabpanel も `aria-controls` も描かない (セグメントコントロール用途)
+- **`createFocusWhen`** (v1 `focus_when` 後継): `use()` 部品、`fw(refName, condition)` を render 内で呼ぶ、false→true の立ち上がりで当該 render 完了後に focus。「render 中に `nextRender()` を呼ぶとその render の完了で resolve する」契約を利用
+- **Electron FACT**: portal 要素に `-webkit-app-region: no-drag` が要る (SPEC §7 脚注)
+- **docs の穴 (要フォローアップ)**: SPEC に `createTabs` / `createSplitter` / `createScrollPane` / `createCollapseBox` / `createAccordion` の部品表が無い (Phase 3b の部品群)。alpha.3 の docs 整備で追加する
+
 ## 19. パイロット移行第 1 号 (歯車DXFジェネレーター) からの確定事項 (2026-09-03、2.0.0-alpha.1)
 
 - **移行実績**: v1 v0.4.2 → v2 `a2f444e`、機能フル動作。機械変換 ~450 行 (ctx→children 73 箇所、関数名 11 種 40 箇所、handle→app 35 箇所)、手動 150〜180 行。歯形エンジン (変更禁止ゾーン) は無変更 = 「UI 層だけ差し替えられる」設計が実証された
