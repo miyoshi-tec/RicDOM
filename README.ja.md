@@ -50,7 +50,7 @@ import { createApp } from 'https://esm.sh/ricdom@2';
 | Preact + htm | タグ付きテンプレート | VDOM 差分 (+Signals) | ~4KB | 可 | あり | npm/CDN |
 | Solid.js | JSX | signal (VDOM なし) | ~7.6KB | **不可** | 一級 | npm |
 | Mithril | `m(sel, attrs, children)` → vnode | VDOM 差分、手動 redraw | ~8.8KB | 可 | 同梱 | npm/CDN |
-| **ricdom** | **手書き plain object** | **Proxy (浅い + dev 警告)** | **≤ 5KB (コア)** | 可 | 一級 | npm/jsDelivr |
+| **ricdom** | **手書き plain object** | **Proxy (浅い + dev 警告)** | **≤ 5.1KB (コア)** | 可 | 一級 | npm/jsDelivr |
 
 「手書きの plain object ツリー × Proxy 再描画 × 利用側ビルド不要」を同時に満たす
 組み合わせは、この領域では他に見当たらない。
@@ -59,7 +59,7 @@ import { createApp } from 'https://esm.sh/ricdom@2';
 
 - **`ricdom`** — コア: plain object のツリー → 実 DOM、浅い Proxy によるリアクティビティ、
   rAF + タイムアウトのバックストップを持つ描画スケジューラ、外部管理サブツリー用の島。
-  コアバンドルは gzip ≤ 5,120B。
+  コアバンドルは gzip ≤ 5,200B。
 - **`ricdom/ui`** — 29 部品 (ボタン・入力・レイアウト・Markdown/コード表示・dialog・
   popup・toast・tooltip・dropdown・splitter・tabs・accordion・dat.GUI 風パラメータ調整
   パネル 他)。それぞれが後付けではない本物の WAI-ARIA APG アクセシビリティ契約

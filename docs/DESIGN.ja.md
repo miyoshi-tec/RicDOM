@@ -164,6 +164,16 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **v1 の潜在バグを移植時に発見**: `bind_textarea` だけ `...options` を value/oninput の後に展開しており、options が計算済み値を上書きできた。v2 は 5 つとも「options → 計算済み」の順で統一 (rest スプレッド契約 A15 と同じ)。v1 側は保守モードのため記録のみ
 - `uiIcon` の「descriptor 手書き禁止」は **Phase 3c (アイコン同梱データ + `ricdom-icon` CLI 移植) で完成**。それまでテスト/デモは v1 の検証済み descriptor を再利用
 - CSS: cyber/aqua のみ定義する `--ric-popup-blur` / `--ric-panel-shadow` は `var(--x, fallback)` で他テーマにも既定値を持たせる (宣言全体が invalid になるのを防ぐ)
+## 22. パイロット第 2 号の追報 3 (#13 重複 key) からの確定事項 (2026-09-04、2.0.0-alpha.4)
+
+- **バグ**: 兄弟内で `key` が重複すると render ごとに子要素が増殖・リークする (5 → 7 → 9 → 11 → 13)。`patchChildrenByKey` の prev 側 Map 上書きで DOM が削除パスから漏れ、next 側は 2 個目以降を毎回新規生成していた。**v1 の `patch_children_by_key` から継承したバグ** (v1 でも同じ入力で同じ増殖を再現。v1 は v0.4.5 として develop に修正、警告なし)
+- **修正の範囲は「重複」に限定する**: prev 側は各 key の最初の 1 個だけ keyed map へ、2 個目以降は unkeyed キューへ。next 側は「同じ pass で既出の key (= 重複の 2 個目以降)」のときだけ位置ベースの unkeyed 経路へフォールスルーし、**新規 key (prev に無く同 pass でも初出) は従来どおり新規生成**。広く「map miss なら unkeyed 経路」に倒すと、keyed/unkeyed 混在リストで新規 keyed 要素が同 tag の unkeyed prev DOM (input の入力状態など) を奪う挙動変更になるため (統括レビューで差し戻し)。実装は consumed を delete せず `null` でマークして `get()` の undefined/null で「初出/既出」を区別する sentinel 方式 (Set 方式より gzip で 29B 小さい)
+- **dev 警告**: 重複を検知したら `isDevMode()` (reactivity.ts から export、定義は 1 箇所) で `console.warn` を親要素 1 render につき 1 回。検知は next 側のみで十分 (prev 側の重複は前回 render の next 側で検知済み)。初回 mount は `buildDomNode` 経由で `patchChildrenByKey` を通らないため対象外
+- **コア gzip 天井を 5,120B → 5,200B に再設定 (ユーザー決定)**: 修正のみで 5,126B (+6B)、警告込みで 5,215B。相殺 (属性適用分岐の `applyPlainAttr` 共通化、内部構造体のプロパティ名短縮) を尽くしても収まらず、選択肢 (修正のみ / 短い警告 / 長い警告 / 入れない) を実測付きで提示 → **修正 + 短い警告文言 (5,169B)、天井 5,200B** を採用。理由: 「silent failure を dev 警告で可視化する」は v2 の思想 (README の競合表にも掲げている) で、バグ修正に付随する警告まで削るのは本末転倒。README の「≤ 5KB (core) / ≤ 5,120B」は「≤ 5.1KB / ≤ 5,200B」に更新。**§13 の「コアに機能を足さない」は継続** — 今回はバグ修正 + その可視化であり、機能追加ではない。残り 31B
+- 警告文言は gzip に効く (日本語長文 +95B → 短文 +49B → 英語短文 +27B)。既存の警告が日本語なので一貫性を優先して日本語短文。以後コアの文字列は最小に
+- **SPEC FACT**: key は兄弟内で一意であること。重複は 2 個目以降が unkeyed 扱い (位置ベース、tag 一致なら再利用)、新規 key は新規生成、dev で console.warn
+- 移行プロンプトの罠 11 に追加 (v1 全版と alpha.3 以前は増殖する)。**v1 consumer 全員に潜在する穴**なので、v0.4.5 のリリース時に告知する
+
 ## 21. パイロット第 2 号の追報 (alpha.2 取り込み後の実機 4 件 + テスト戦略) からの確定事項 (2026-09-04、2.0.0-alpha.3)
 
 - **alpha.2 の裏取り**: 回避策 4 つ (空振り renderNow / 構造セレクタ / align-items 上書き / focus_when 手動再現) を consumer が撤去し、公式 API だけで表現できたことを確認。`focus_when` の使用箇所は 4→1 の訂正あり (grep の出現数と呼び出し数の区別)。設計判断への影響なし

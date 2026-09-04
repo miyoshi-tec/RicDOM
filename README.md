@@ -49,7 +49,7 @@ import { createApp } from 'https://esm.sh/ricdom@2';
 | Preact + htm | tagged templates | VDOM diff (+ Signals) | ~4KB | yes | yes | npm/CDN |
 | Solid.js | JSX | signals (no VDOM) | ~7.6KB | **no** | first-class | npm |
 | Mithril | `m(sel, attrs, children)` → vnode | VDOM diff, manual redraw | ~8.8KB | yes | bundled | npm/CDN |
-| **ricdom** | **hand-written plain objects** | **Proxy (shallow + dev warnings)** | **≤ 5KB (core)** | yes | first-class | npm/jsDelivr |
+| **ricdom** | **hand-written plain objects** | **Proxy (shallow + dev warnings)** | **≤ 5.1KB (core)** | yes | first-class | npm/jsDelivr |
 
 Nothing else in this space combines a hand-written plain-object tree, Proxy-driven
 re-rendering, and zero required build step for the consumer, at the same time.
@@ -58,7 +58,7 @@ re-rendering, and zero required build step for the consumer, at the same time.
 
 - **`ricdom`** — the core: plain-object tree → real DOM, shallow-Proxy reactivity, a
   render scheduler with an rAF+timeout backstop, islands for externally-managed subtrees.
-  Core bundle is ≤ 5,120B gzipped.
+  Core bundle is ≤ 5,200B gzipped.
 - **`ricdom/ui`** — 29 components (buttons, inputs, layout, markdown/code display, dialog,
   popup, toast, tooltip, dropdown, splitter, tabs, accordion, a dat.GUI-style tweak panel,
   and more), each with a real WAI-ARIA APG accessibility contract (focus trap, roving

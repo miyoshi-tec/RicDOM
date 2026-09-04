@@ -16,8 +16,8 @@ siblings caused the affected children to multiply on every render.
   every render (#13)**: with a repeated `key` among siblings, the count of DOM children for
   that duplicate would grow every render (5 → 7 → 9 → 11 → 13 for the reproduction case) —
   this bug was inherited unmodified from v1's identically-named algorithm
-  (`src/ricdom.js`'s `patch_children_by_key`), so v1 (in maintenance mode) has the same
-  behavior and was not changed. Root cause: on the "previous" side, building the keyed
+  (`src/ricdom.js`'s `patch_children_by_key`), so every v1 release up to v0.4.4 has the same
+  behavior (v1 gets the same fix, without the warning, as v0.4.5). Root cause: on the "previous" side, building the keyed
   lookup map overwrote the map entry for a repeated `key`, and the overwritten entry's DOM
   node then had no reference left (not in the map, not in the unkeyed pool) to be found by
   the removal pass, so it leaked and stayed in the DOM forever. On the "next" side, once the
@@ -39,15 +39,17 @@ siblings caused the affected children to multiply on every render.
 
 ### Notes
 
-- The fix itself already grew the core IIFE bundle above its previous gzip ceiling of
-  5,120B (5,107B baseline → 5,126B fix-only, 6B over — offset with a shared
+- **Core gzip ceiling re-baselined: 5,120B → 5,200B.** The fix alone already exceeded the
+  previous ceiling (5,107B baseline → 5,126B, 6B over, even after offsetting with a shared
   `applyPlainAttr` helper for build/patch and short internal-only property names on the
-  patch-time working struct, `PrevEntry`, which is not part of any public API). Adding the
-  dev warning on top brings it to 5,215B (95B over). No further behavior-preserving
-  reduction elsewhere in the core was found that closes the remaining gap without either
-  hurting readability disproportionately or touching code unrelated to #13. Shipped as two
-  separate commits (fix, then warning) so the ceiling itself can be revisited as a
-  standalone decision.
+  patch-time working struct `PrevEntry`, which is not part of any public API). The dev
+  warning adds more, and its message text turned out to dominate the cost (a long Japanese
+  message: 5,215B; the short one shipped: **5,169B**). No further behavior-preserving
+  reduction was found without hurting readability or touching code unrelated to #13, so the
+  ceiling was raised once, deliberately, to keep the warning — making a silent failure
+  visible in dev is a stated design goal, and dropping it to save bytes would defeat the
+  fix's purpose. The "no new core features" rule (design doc §13) still stands: this is a bug
+  fix plus its visibility, not a feature. README now says "≤ 5.1KB (core)" / "≤ 5,200B".
 
 ### Tests
 

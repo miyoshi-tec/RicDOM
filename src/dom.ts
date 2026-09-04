@@ -459,7 +459,7 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
   }
 
   if (hasDuplicateKey && isDevMode()) {
-    console.warn('RicDOM: 兄弟の key が重複しています (重複分は unkeyed 扱い)。key は一意にしてください。');
+    console.warn('RicDOM: 兄弟の key が重複しています。');
   }
 };
 
