@@ -4,7 +4,14 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyTheme } from '../../src/ui/theme.js';
+import { injectStyles } from '../../src/ui/injectStyles.js';
 import { setupApp } from '../_helpers/dom.js';
+
+// #11 の検証には ricdom-ui.css ( `[data-ricdom-theme] { background; color; }` ) が
+// 実際に読み込まれている必要がある — CSS 変数の適用だけを見る既存のテスト (applyTheme が
+// el.style に直接書く値) と違い、こちらは属性セレクタ経由の規則が computed style に
+// 反映されるかを見るため。
+injectStyles(document);
 
 describe('実ブラウザ: applyTheme の color-scheme が computed style に反映される', () => {
   it('light → dark のテーマ切替で computed color-scheme が変わる', () => {
@@ -34,5 +41,68 @@ describe('実ブラウザ: applyTheme の color-scheme が computed style に反
 
     applyTheme(app, { theme: 'dark' });
     expect(getComputedStyle(app).getPropertyValue('--ric-color-fg').trim()).toBe('#e5e7eb');
+  });
+});
+
+// #11: applyTheme した要素に background-color/color が塗られない (v1 create_ui_page パリティ
+// の欠落)。ricdom-ui.css の `[data-ricdom-theme] { background: var(--ric-color-bg); color:
+// var(--ric-color-fg); }` (cssTemplates.ts THEME_PAINT_CSS) の実 computed style を見る —
+// jsdom は attribute セレクタの CSS 適用は解釈できるが、ここでは意図的に他のテーマテストと
+// 揃えて実ブラウザで検証する (injectStyles を読み込んだ状態での回帰確認)。
+const hexToRgb = (hex: string): string => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+};
+
+describe('実ブラウザ: applyTheme した要素に background/color が塗られる (#11)', () => {
+  it('theme: "light"/"dark" (テーマ名指定) で computed background-color/color がテーマの bg/fg と一致する', () => {
+    const app = setupApp();
+    applyTheme(app, { theme: 'light' });
+    const light = getComputedStyle(app);
+    expect(light.backgroundColor).toBe(hexToRgb('#f9fafb')); // COLOR_VARS_LIGHT の --ric-color-bg
+    expect(light.color).toBe(hexToRgb('#111827')); // COLOR_VARS_LIGHT の --ric-color-fg
+
+    applyTheme(app, { theme: 'dark' });
+    const dark = getComputedStyle(app);
+    expect(dark.backgroundColor).toBe(hexToRgb('#111318')); // COLOR_VARS_DARK の --ric-color-bg
+    expect(dark.color).toBe(hexToRgb('#e5e7eb')); // COLOR_VARS_DARK の --ric-color-fg
+  });
+
+  it('theme: ThemeVars (自前テーマオブジェクト) でも background/color が塗られる — 属性値は空文字だが [data-ricdom-theme] は空値にもマッチする', () => {
+    const app = setupApp();
+    applyTheme(app, { theme: { '--ric-color-bg': '#ff0000', '--ric-color-fg': '#00ff00' } });
+
+    // ThemeVars 指定でも data-ricdom-theme の属性値自体は applyTheme が常に '' を書く仕様
+    // (theme.ts)。属性セレクタ `[data-ricdom-theme]` は「属性の有無」で一致するので、
+    // 値が空文字でも規則が適用されることを確認する。
+    expect(app.getAttribute('data-ricdom-theme')).toBe('');
+
+    const computed = getComputedStyle(app);
+    expect(computed.backgroundColor).toBe(hexToRgb('#ff0000'));
+    expect(computed.color).toBe(hexToRgb('#00ff00'));
+  });
+
+  it('自分の CSS で上書きできる (属性セレクタ 1 つだけなので詳細度が低い、SPEC §8 の FACT)', () => {
+    const app = setupApp();
+    applyTheme(app, { theme: 'dark' });
+
+    const override = document.createElement('style');
+    override.textContent = '.no-paint { background-color: red !important; }';
+    document.head.appendChild(override);
+    app.classList.add('no-paint');
+
+    expect(getComputedStyle(app).backgroundColor).toBe('rgb(255, 0, 0)');
+    document.head.removeChild(override);
+  });
+
+  it('ネストした島 (子孫で再度 applyTheme された要素) は自分の bg を塗る (v1 と同じ意図どおりの挙動)', () => {
+    const app = setupApp();
+    applyTheme(app, { theme: 'light' });
+    app.innerHTML = '<div id="nested"></div>';
+    const nested = document.getElementById('nested')!;
+    applyTheme(nested, { theme: 'dark' });
+
+    expect(getComputedStyle(app).backgroundColor).toBe(hexToRgb('#f9fafb'));
+    expect(getComputedStyle(nested).backgroundColor).toBe(hexToRgb('#111318'));
   });
 });

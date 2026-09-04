@@ -299,6 +299,23 @@ const TOOLTIP_CSS = `
 
 // ── 状態を持たない部品とレイアウト (設計書 §4/§13) ─────────────
 
+// applyTheme した要素そのものに背景色・文字色を塗る (#11、v1 の create_ui_page が
+// `.ric-page` に bg/fg を塗っていたパリティ)。v2 には page 部品が無く、applyTheme は
+// 単に el.style へ CSS 変数を当てるだけ (theme.ts) だったため、要素自体は透明・無色の
+// ままだった — CSS 変数は子孫には継承で届くが、要素自身の background/color を決めるのは
+// このルール。子孫セレクタを付けない (`[data-ricdom-theme] *` にしない) のは、ネストした
+// 島 (子孫で再度 applyTheme された要素) が自分の bg で上書きするのは意図どおりだが、
+// それ以外の子孫まで一律に塗ると consumer 自身の要素の背景を勝手に上書きしてしまうため
+// (v1 も `.ric-page` 自身だけを塗っていた)。属性セレクタ 1 つだけなので詳細度は低く、
+// 塗りたくない consumer は自分の CSS で上書きできる (SPEC §8 に FACT として明記)。
+// `[data-ricdom-theme]` は属性の「有無」で一致する — ThemeVars 指定時に applyTheme が
+// 付与する空文字値 (`data-ricdom-theme=""`) にもマッチする。
+const THEME_PAINT_CSS = `
+[data-ricdom-theme] {
+  background: ${bg};
+  color: ${fg};
+}`;
+
 // ページ全体のスクロールバー既定スタイル (v1 の `.ric-page, .ric-page *` 相当)。
 // v2 に page 部品が無いため、applyTheme(el) が付与する `data-ricdom-theme` 属性を
 // スコープ用マーカーとして使う (設計書 §13 で確定した方式)。属性を持つ要素自身と、
@@ -1175,6 +1192,7 @@ export const buildStylesheet = (): string =>
     POPUP_CSS,
     TOAST_CSS,
     TOOLTIP_CSS,
+    THEME_PAINT_CSS,
     SCROLLBAR_CSS,
     TEXTAREA_CSS,
     CHECKBOX_CSS,

@@ -181,7 +181,10 @@ const computeThemeVars = ({ theme, density, fontSize }: ApplyThemeOptions): Them
  * `data-ricdom-theme` 属性を el に付与する (設計書 §13 で確定した方式)。
  * v1 はページ全体のスクロールバー既定スタイルを `.ric-page, .ric-page *` に適用していたが、
  * v2 に page 部品が無いため、この属性を CSS 側 (`[data-ricdom-theme]`/`[data-ricdom-theme] *`)
- * のスコープ用マーカーとして使う (cssTemplates.ts 参照)。
+ * のスコープ用マーカーとして使う (cssTemplates.ts 参照)。同じ属性を使い、el 自身にも
+ * `background`/`color` を塗る規則が ricdom-ui.css 側にある (#11、2.0.0-alpha.3。
+ * v1 の create_ui_page が `.ric-page` に塗っていたパリティ — この関数自体は CSS 変数を
+ * 当てるだけで、実際に塗るのは CSS 側の `[data-ricdom-theme]` 規則)。
  */
 export const applyTheme = (el: Element, opts: ApplyThemeOptions = {}): void => {
   if (!el || typeof (el as HTMLElement).style === 'undefined') {
