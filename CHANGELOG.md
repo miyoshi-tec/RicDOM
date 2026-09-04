@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.4] — not yet published
+
+A single bug report from the second pilot migration (Trend Guard): duplicate `key`s among
+siblings caused the affected children to multiply on every render.
+
+### Fixed
+
+- **`patchChildrenByKey`: duplicate sibling `key` caused affected children to multiply on
+  every render (#13)**: with a repeated `key` among siblings, the count of DOM children for
+  that duplicate would grow every render (5 → 7 → 9 → 11 → 13 for the reproduction case) —
+  this bug was inherited unmodified from v1's identically-named algorithm
+  (`src/ricdom.js`'s `patch_children_by_key`), so v1 (in maintenance mode) has the same
+  behavior and was not changed. Root cause: on the "previous" side, building the keyed
+  lookup map overwrote the map entry for a repeated `key`, and the overwritten entry's DOM
+  node then had no reference left (not in the map, not in the unkeyed pool) to be found by
+  the removal pass, so it leaked and stayed in the DOM forever. On the "next" side, once the
+  first occurrence of a repeated `key` consumed the map entry, every subsequent occurrence
+  found nothing and built a brand-new DOM node from scratch on every render. Fixed by
+  treating a duplicate `key` as unkeyed starting from its second occurrence (matched
+  position-based against previous unkeyed siblings, same-tag/same-kind) instead of losing
+  track of it — see the new SPEC FACT under §2.2. A first occurrence of a genuinely new
+  `key` (not a repeat) is unaffected and still built fresh as before; the reconciliation
+  logic is careful not to let a legitimately-new keyed sibling steal a DOM node from an
+  unrelated unkeyed one (e.g. an `<input>` mid-edit) just because its own `key` wasn't found
+  — an earlier, broader version of this fix had exactly that regression, caught during
+  cross-checking against v1's behavior before release.
+- **dev warning for duplicate sibling `key`s**: `NODE_ENV !== 'production'` builds now emit
+  one `console.warn` per render (per parent element) when a duplicate `key` is detected
+  among siblings, so the mistake is visible instead of silently degrading to
+  position-based-only identity. Production builds stay silent, matching every other dev-only
+  warning in this library.
+
+### Notes
+
+- The fix itself already grew the core IIFE bundle above its previous gzip ceiling of
+  5,120B (5,107B baseline → 5,126B fix-only, 6B over — offset with a shared
+  `applyPlainAttr` helper for build/patch and short internal-only property names on the
+  patch-time working struct, `PrevEntry`, which is not part of any public API). Adding the
+  dev warning on top brings it to 5,215B (95B over). No further behavior-preserving
+  reduction elsewhere in the core was found that closes the remaining gap without either
+  hurting readability disproportionately or touching code unrelated to #13. Shipped as two
+  separate commits (fix, then warning) so the ceiling itself can be revisited as a
+  standalone decision.
+
+### Tests
+
+- **`tests/keyReconciliation.test.ts`**: duplicate `key` (string and number) doesn't
+  multiply children across repeated renders; the DOM node for a duplicate is reused
+  (identity-stable) across renders; removing the duplication in a later render removes the
+  now-unmatched extra element; a genuinely new keyed sibling in a keyed/unkeyed mixed list
+  does not steal an existing unkeyed sibling's DOM node; the dev warning fires once per
+  render with a duplicate present (not on the very first mount, which builds fresh via
+  `buildDomNode` and never calls `patchChildrenByKey`), stays silent in production, and
+  stays silent for ordinary non-duplicate key-based reconciliation.
+
+### Docs
+
+- SPEC.md §2.2: new FACT that `key` must be unique among siblings, what happens when it
+  isn't (unkeyed fallback from the second occurrence on, new keys unaffected), and the dev
+  warning.
+
 ## [2.0.0-alpha.3] — not yet published
 
 Four bug reports plus a test-strategy proposal from the second pilot migration (Trend

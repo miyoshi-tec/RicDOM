@@ -109,6 +109,20 @@ the whole sibling list is reconciled by key:
 - Unmatched previous entries are removed from the DOM; unmatched next entries are built
   fresh and inserted at the correct position.
 
+#### FACT: `key` must be unique among siblings
+
+`key` must be unique within a single sibling list (both in the previous and the next
+children array). A duplicate `key` is treated as **unkeyed** starting from its second
+occurrence: it is matched against previous unkeyed siblings in order, by same-tag/same-kind
+(the same rule as a key-less child, §2.2 above) — it does **not** get a fresh DOM node built
+on every render, but it also loses key-based identity (position-based reuse only). A first
+occurrence of a `key` that is genuinely new (not present in the previous list, and not a
+repeat within the current pass) is unaffected and is still built fresh as usual — duplicate
+handling never steals a DOM node from an unrelated, legitimately-new keyed sibling. In a
+dev build (`NODE_ENV !== 'production'`), a duplicate `key` triggers one `console.warn` per
+render (per parent element) identifying the problem; production builds stay silent (#13,
+fixed in 2.0.0-alpha.4 — this bug was inherited from v1's identically-named algorithm).
+
 ### 2.3 Position-based reconciliation
 
 If no sibling has a `key`, children are reconciled by index. To avoid two different
