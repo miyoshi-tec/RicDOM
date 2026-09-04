@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.5] — not yet published
+
+A single bug report from a pilot migration, confirmed against the code by the maintainer.
+
+### Fixed
+
+- **`createPopup`/`createDropdown`: the measuring render under-measured a body's width when
+  its trigger sat near the viewport's right edge, so `offsetWidth`-based positioning left no
+  right margin (#14)**: both components open by rendering the body once at
+  `visibility: hidden` to measure `offsetWidth`/`offsetHeight`, then reposition based on the
+  measurement. During that measuring render, the body (`position: fixed`, no explicit
+  width — shrink-to-fit) was left at `left: rect.left` (the trigger's own position; `left: x`
+  for `createPopup().openAt()`), which constrains the width available to the shrink-to-fit
+  algorithm to `innerWidth - rect.left`. A trigger close to the right edge left barely any
+  width to measure in, so wrappable content wrapped tighter than it needs to and
+  `offsetWidth` came back smaller than the content's real width. Reproduction from a pilot
+  consumer at 150% DPI, `innerWidth` 1361: trigger `rect.left` 1213.33 → measured
+  `offsetWidth` 224 (true width 417) → final `left` 1011.33 → body `right` 1361.33, flush
+  against the viewport edge with none of the usual 8px margin to spare. Fixed by placing the
+  body at `left: 8px` (the same margin the final positioning clamps into) for the duration of
+  the measuring render only, regardless of the trigger's position — since the render is
+  `visibility: hidden`, where it sits on screen during measurement doesn't matter, and this
+  gives the shrink-to-fit algorithm close to the full viewport width to measure against. The
+  new `measuringLeft()` helper in `src/ui/internal/popupPosition.ts` is shared by all three
+  affected call sites (`createDropdown`'s trigger path, `createPopup`'s trigger path and its
+  `openAt()` path) rather than reimplemented per component. The final positioning logic
+  (`computeAnchoredLeft`/`clampLeft`, the below/above flip) is unchanged — it was already
+  correct once given an accurate width.
+
+### Tests
+
+- **`tests/browser/uiDropdown.test.ts`, `tests/browser/uiPopup.test.ts`**: one reproduction
+  test each for `createDropdown`'s trigger path and `createPopup`'s trigger path and
+  `openAt()` path — a trigger pinned to the viewport's right edge, opening a body with
+  wrappable single-line content, asserting the measured `offsetWidth` is within 2px of the
+  same content measured from a left-edge trigger (the "true" width) and that the body's
+  right edge stays within the viewport's usual 8px margin. Confirmed red against the
+  pre-fix code (`git stash` on the three changed `src/ui` files) before the fix: dropdown
+  measured 132px narrower than the reference, `createPopup`'s trigger and `openAt` paths
+  each measured 30px narrower.
+- **`tests/browser/portalContract.test.ts`**: added a second parameterized block (`createPopup`
+  trigger path + `createDropdown`) checking the same "measured width matches a left-edge-
+  trigger reference" invariant, alongside the existing per-component tests — catching the bug
+  class across components rather than one at a time, per the second pilot's earlier test-
+  strategy proposal (`2.0.0-alpha.3`, #1).
+- **`tests/ui/popupPosition.test.ts`**: unit coverage for the new `measuringLeft()` helper
+  (default margin, explicit margin).
+
+### Docs
+
+- SPEC.md: the `createPopup`/`createDropdown` horizontal position rule FACT now describes
+  the `left: 8px` placeholder used during the measuring render, and why anchoring it to the
+  trigger instead (the pre-`2.0.0-alpha.5` behavior) under-measured wrappable content near
+  the viewport's right edge.
+
 ## [2.0.0-alpha.4] — not yet published
 
 A single bug report from the second pilot migration (Trend Guard): duplicate `key`s among

@@ -673,10 +673,16 @@ resolve their horizontal position in the same three steps once the body's width 
 3. If even that overflows the viewport (content wider than the viewport itself), the
    position is clamped into `[8px, innerWidth - width - 8px]` as a last resort.
 
-Before the body's width has been measured (the first paint of an open, pre-`requestAnimationFrame`),
-step 1's `rect.left` is used as a placeholder; the real position from the steps above
-replaces it once measured. `openAt({x,y})`, which has no trigger rect to anchor to, skips
-straight to clamping (step 3) — unchanged from before.
+Before the body's width has been measured (the first paint of an open, pre-`requestAnimationFrame`,
+body rendered `visibility: hidden`), the body is placed at `left: 8px` — the same margin steps 2/3
+clamp into — rather than at the trigger's own position (`rect.left`, or `x` for `openAt`); the real
+position from steps 1–3 replaces this placeholder once measured (`2.0.0-alpha.5`, #14). This keeps
+the width available to the body during measurement close to the full viewport width regardless of
+where the trigger sits, so `offsetWidth` reflects what the content actually needs — anchoring the
+placeholder near the trigger instead (`2.0.0-alpha.4` and earlier) constrained that available width
+to `innerWidth - rect.left`, so a trigger near the viewport's right edge measured a falsely small
+`offsetWidth` for wrappable content, which steps 2/3 then anchored flush against the right edge
+with no margin to spare.
 
 #### 10.3.1 FACT: dialog focus-return control (`returnFocus`)
 
