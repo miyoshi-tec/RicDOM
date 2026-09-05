@@ -10,6 +10,15 @@
 //   - v1 の `create_density` / `create_font_size` / `export_settings` は
 //     最小移植スコープに含めない (設計書 §4 が明示するのは applyTheme / createTheme /
 //     exportTheme の 3 つ)。必要になった時点で追加を検討する。
+//   - **無効な theme/density/fontSize 名を console.warn する** (2.0.0-alpha.7)。v1 は
+//     タイポ (例 `density: 'md'` — 正しくは comfortable/compact/tight) を黙って既定値に
+//     落としており、consumer が誤設定に気づかないまま動いていた実例がある。挙動 (既定値
+//     フォールバック) 自体は変えず、気づけるようにするだけ (`src/ui/focusWhen.ts` /
+//     `src/ui/inlineMenu.ts` と同じ dev-only warn の慣例に揃える — `ricdom/ui` はコアへの
+//     実行時依存ゼロなので、コアの `isDevMode` を import せず `internal/pureHelpers.ts` に
+//     複製されたものを使う)。
+
+import { isDevMode } from './internal/pureHelpers.js';
 
 export type ThemeName = 'light' | 'dark' | 'teal' | 'cyber' | 'aqua';
 export type DensityName = 'comfortable' | 'compact' | 'tight';
@@ -136,18 +145,38 @@ const FONT_VARS_SM: ThemeVars = { '--ric-font-size': '12px' };
 const FONT_VARS_MD: ThemeVars = { '--ric-font-size': '14px' };
 const FONT_VARS_LG: ThemeVars = { '--ric-font-size': '16px' };
 
+// 有効な名前一覧 (無効値検知 + warn メッセージ組み立ての両方に使う、2.0.0-alpha.7)。
+const THEME_NAMES: readonly ThemeName[] = ['light', 'dark', 'teal', 'cyber', 'aqua'];
+const DENSITY_NAMES: readonly DensityName[] = ['comfortable', 'compact', 'tight'];
+const FONT_SIZE_NAMES: readonly FontSizeName[] = ['sm', 'md', 'lg'];
+
+/**
+ * 無効な theme/density/fontSize の文字列値を検知して console.warn する
+ * (2.0.0-alpha.7、dev ビルドのみ — focusWhen/inlineMenu と同じ慣例)。object (ThemeVars)
+ * や既知の名前、`undefined` (= 省略。既定値を使う正常系) は対象外。
+ */
+const warnIfInvalidName = <T extends string>(kind: string, value: T | ThemeVars | undefined, validNames: readonly T[], fallbackLabel: string): void => {
+  if (value === undefined || typeof value === 'object') return;
+  if ((validNames as readonly string[]).includes(value)) return;
+  if (!isDevMode()) return;
+  console.warn(`RicDOM UI: applyTheme の ${kind} "${value}" は無効です (有効: ${validNames.join(' / ')})。既定値 ${fallbackLabel} を使います。`);
+};
+
 const resolveColorVars = (theme: ThemeName | ThemeVars | undefined): ThemeVars => {
   if (theme && typeof theme === 'object') return theme;
+  warnIfInvalidName('theme', theme, THEME_NAMES, 'light');
   return theme === 'dark' ? COLOR_VARS_DARK : theme === 'teal' ? COLOR_VARS_TEAL : theme === 'cyber' ? COLOR_VARS_CYBER : theme === 'aqua' ? COLOR_VARS_AQUA : COLOR_VARS_LIGHT;
 };
 
 const resolveSizeVars = (density: DensityName | ThemeVars | undefined): ThemeVars => {
   if (density && typeof density === 'object') return density;
+  warnIfInvalidName('density', density, DENSITY_NAMES, 'comfortable');
   return density === 'tight' ? SIZE_VARS_TIGHT : density === 'compact' ? SIZE_VARS_COMPACT : SIZE_VARS_COMFORTABLE;
 };
 
 const resolveFontVars = (fontSize: FontSizeName | ThemeVars | undefined): ThemeVars => {
   if (fontSize && typeof fontSize === 'object') return fontSize;
+  warnIfInvalidName('fontSize', fontSize, FONT_SIZE_NAMES, 'md');
   return fontSize === 'sm' ? FONT_VARS_SM : fontSize === 'lg' ? FONT_VARS_LG : FONT_VARS_MD;
 };
 

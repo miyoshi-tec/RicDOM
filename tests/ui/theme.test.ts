@@ -1,6 +1,6 @@
 // applyTheme / createTheme / exportTheme (設計書 §4)
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyTheme, createTheme, exportTheme } from '../../src/ui/theme.js';
 
 const THEMES = ['light', 'dark', 'teal', 'cyber', 'aqua'] as const;
@@ -61,6 +61,67 @@ describe('applyTheme: 5 テーマの color-scheme が bg 明暗と整合する',
     expect(el.hasAttribute('data-ricdom-theme')).toBe(false);
     applyTheme(el, { theme: 'dark' });
     expect(el.hasAttribute('data-ricdom-theme')).toBe(true);
+  });
+});
+
+describe('applyTheme: 無効な theme/density/fontSize の warn (2.0.0-alpha.7)', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warnSpy.mockRestore());
+
+  it('無効な theme 名は console.warn 1 回 + light にフォールバックする', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { theme: 'nope' as unknown as 'light' });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]![0]).toContain('theme "nope" は無効です');
+    expect(el.style.getPropertyValue('color-scheme')).toBe('light'); // 既定 (light) にフォールバック
+  });
+
+  it('無効な density 名は console.warn 1 回 + comfortable にフォールバックする', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { density: 'md' as unknown as 'comfortable' });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]![0]).toContain('density "md" は無効です');
+    expect(el.style.getPropertyValue('--ric-control-h')).toBe('36px'); // comfortable の値
+  });
+
+  it('無効な fontSize 名は console.warn 1 回 + md にフォールバックする', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { fontSize: 'huge' as unknown as 'md' });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]![0]).toContain('fontSize "huge" は無効です');
+    expect(el.style.getPropertyValue('--ric-font-size')).toBe('14px'); // md の値
+  });
+
+  it('applyTheme を呼ぶたびに warn する (「1 回だけ」memo ではない)', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { theme: 'nope' as unknown as 'light' });
+    applyTheme(el, { theme: 'nope' as unknown as 'light' });
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('有効な文字列名では warn しない', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { theme: 'dark', density: 'compact', fontSize: 'lg' });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('ThemeVars (object) を渡した場合は warn しない (theme/density/fontSize いずれも)', () => {
+    const el = document.createElement('div');
+    applyTheme(el, {
+      theme: { '--ric-color-fg': '#000' },
+      density: { '--ric-gap': '2px' },
+      fontSize: { '--ric-font-size': '20px' },
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('省略時 (undefined) は warn しない', () => {
+    const el = document.createElement('div');
+    applyTheme(el, {});
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 
