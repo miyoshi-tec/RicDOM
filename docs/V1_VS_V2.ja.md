@@ -55,7 +55,7 @@
 | 排他制御 | モジュール level の registry (削除なし) | **app 単位** + `dispose` で解除 |
 | アニメ完了待ち | `animationend` のみ | `animationend` / `transitionend` + **700ms バックストップ** (CSS 未ロードでも固まらない) |
 | アイコン | docs/icons/icons.json + ピッカー + `ricdom-icon` CLI | **`ricdom/icons`** の named export (tree-shakable) + `svgToDescriptor` + CLI (パリティ)。descriptor 形式 `{ v?, s?, p }` は同じ |
-| スクロールバー既定 | `.ric-page`/`.ric-page *` 配下 (v0.4.2〜、`scrollbar-color: var(--ric-scrollbar-thumb) transparent` 常時 + hover で濃く) | `[data-ricdom-theme]`/`[data-ricdom-theme] *` 配下、**既定値そのものは v0.4.2 以降の v1 と同一** (`scrollbar-color: var(--ric-scrollbar-thumb) transparent` 常時 + hover で濃く)。変わったのは**スコープのみ** (`.ric-page` → `[data-ricdom-theme]`)。v1 の v0.3.x 時代 (常時 transparent + hover のみアクセント色) の既定値は v0.4.2 で置き換え済みで、現行 v1 (v0.4.4、移行元として pin される版) には残っていない — v0.4.2 より前の v1 を直接見た記憶に基づく「既定値も変わった」という想定は誤りなので注意 |
+| スクロールバー既定 | `.ric-page`/`.ric-page *` 配下 (v0.4.2〜、`scrollbar-color: var(--ric-scrollbar-thumb) transparent` 常時 + hover で濃く) | `[data-ricdom-theme]`/`[data-ricdom-theme] *` 配下、**既定値そのものは v0.4.2 以降の v1 と同一** (`scrollbar-color: var(--ric-scrollbar-thumb) transparent` 常時 + hover で濃く)。変わったのは**スコープのみ** (`.ric-page` → `[data-ricdom-theme]`)。ただし **v0.4.1 以前の v1 から移るアプリは既定値も変わって見える** (v0.3.x〜v0.4.1 は常時 transparent、hover のみアクセント色。v0.4.2 で現行の既定値に置き換わった)。内側にスクロール領域を持つアプリは、移行元の版を確認すること |
 
 ## 移行の目安 (Phase 5 で検証)
 

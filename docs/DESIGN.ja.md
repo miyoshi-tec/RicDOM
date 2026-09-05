@@ -176,6 +176,15 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 25. パイロット移行第 4 号 (章動減速機 設計ツール v8、classic script) からの確定事項 (2026-09-05、2.0.0-alpha.7)
+
+- **移行実績**: v1 v0.3.37 → v2 alpha.5、**部分的** (1 機能のみ不可 = accordion を外から閉じる)。ricdom は右ペイン 1 木 (アコーディオン 5 節 + 表 2 + 散布図 SVG、部品呼び出し 251 箇所、9 部品のみ、portal 系不使用)。**アダプタ 1 ファイルが先にあった**ため機械変換は `ctx`→`children` 1 種類 295 箇所、呼び出し側は 1 文字も変えず。差分全行を逆変換して突合 (不一致 0)。テスト 1,654 件・全スイート 277 秒
+- **`createAccordion` に controlled モード** (`open: Record<id, bool>` + `onToggle(id, nextOpen, nextMap)`)。**`setOpen()` は作らない** — 外部制御の canon は controlled 1 つ、`createTabs` (`active` + `onChange`) と一貫。`nextMap` は「uncontrolled ならこうなっていた」次状態 (`multi: false` なら現在の items 全 id から作った他閉じ map) で、consumer は代入するだけ。controlled + `onToggle` 未指定はクリックで何も起きない (tabs と同規則)。`isOpen(id)` は両モードで有効。v1 の `_om` 私的プロパティ直接操作の公式代替
+- **`applyTheme` の無効な theme / density / fontSize を dev で `console.warn`** (有効値一覧 + 使う既定値)。挙動 (既定へのフォールバック) は変えない。consumer が `density: 'md'` (無効) を v1 から気づかず持ち越していた実例。dev ゲートは UI 側の `isDevMode` (コアへの実行時依存ゼロは維持)
+- **移行ガイドの穴 (docs)**: (1) 対応表の `app.use()` セルに `setup` が無く、表どおりに書くと初回 render で未登録 error を必ず 1 回踏む → setup を明記し、v1 の state キー ↔ setup 内 use の 1 対 1 例を追加。**仕組み (未登録 = error + 未描画) は consumer も「絶対に残して」と評価、変えない** (2) `applyTheme` が塗るのは bg / fg / font-size のみ、`padding` / `overflow` / `box-sizing` は塗らない (テーマ要素 = ページ全体とは限らない) → 補償 CSS のスニペット (3) スクロールバー: 既定値は v1 v0.4.2 以降と同一、変わったのはスコープ。ただし v0.3.x からの移行者には既定値も変わって見える (v0.3.x は常時透明・hover でアクセント) と両方書く (4) 機械変換の取りこぼし 2 形 (ES2015 短縮記法 `{ …, ctx }` と後付け代入 `node.ctx =`、壊れ方は静か) と「`ctx` を使うが ricdom の木ではない vnode 層」の併存 → リポジトリ全体に変換をかけない (5) **推奨手順「まず v1 依存を 1 ファイル (アダプタ) に寄せてから移る」** — 第 3 号・第 4 号がこれで手の量を 300 行台に抑えた
+- 第 4 号の「良かった点」7 件 (未登録 error / CSS 1 枚 + warn / setup / data-ricdom-role 全部品 / gap 復活 / renderNow・nextRender の契約 / エラーの「✅ 例:」) は据え置き対象
+- コア未変更 (gzip 5,169B)、ui gzip 23,649→23,949B。unit 537 / browser 104。パイロット 4 アプリで計 28 件 (第 4 号 = API 1 + warn 1 + docs 5)
+
 ## 24. パイロット移行第 3 号 (Unizon 展示ビューア、kiosk/embed、file:// 直開き) からの確定事項 (2026-09-05、2.0.0-alpha.6)
 
 - **移行実績**: v1 v0.4.2 → v2 alpha.5。RicDOM で描くのは再生パネル 1 枚 (3D/2D は three.js / 生 SVG で非依存) という**極小利用**。前段で v1 依存を `mount_ui()` 1 関数に隔離するリファクタを v1 のまま独立コミット → v2 化は「アダプタ 2 行 + 機械変換 40 行」、計約 35 分。**検証方法 (移行前後で同じ computed style probe を全要素・両テーマで採取して比較) は他 consumer への推奨手順として採用**
