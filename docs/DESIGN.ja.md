@@ -176,6 +176,15 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 24. パイロット移行第 3 号 (Unizon 展示ビューア、kiosk/embed、file:// 直開き) からの確定事項 (2026-09-05、2.0.0-alpha.6)
+
+- **移行実績**: v1 v0.4.2 → v2 alpha.5。RicDOM で描くのは再生パネル 1 枚 (3D/2D は three.js / 生 SVG で非依存) という**極小利用**。前段で v1 依存を `mount_ui()` 1 関数に隔離するリファクタを v1 のまま独立コミット → v2 化は「アダプタ 2 行 + 機械変換 40 行」、計約 35 分。**検証方法 (移行前後で同じ computed style probe を全要素・両テーマで採取して比較) は他 consumer への推奨手順として採用**
+- **portal の空要素が flex/grid の gap に数えられる**: コアは `portalTo` 無指定で target 末尾に portal 要素を常に置く (§3.5、変更しない)。UI CSS に `[data-ricdom-role="portal"]:empty { display: none }` を追加 (consumer 提案 (a))。子が入れば `:empty` が外れる。`display: contents` は不採用 — Electron consumer が portal の box に `-webkit-app-region: no-drag` を当てる SPEC §7 脚注と衝突し、a11y ツリーの既知の癖もある。コアのみ (UI CSS なし) の利用者は同じ 1 行を自分で入れるか `portalTo` (SPEC §7 FACT)。再検討の条件: コアのみ利用者から同じ実害報告が来たら、コア側で `hidden` の切替を実測して検討 (残り 31B)
+- **`applyTheme` は `font-size` も塗る**: `[data-ricdom-theme]` の規則に `font-size: var(--ric-font-size)` を追加。§21 の bg/fg と同じ v1 `.ric-page` パリティ。「`fontSize` オプションが panel/md-pre 以外では無効」は docs からも読めない穴だった。**既存 v2 consumer の見た目が変わりうる変更** (テーマ要素直下のテキストが 16px→14px) なので CHANGELOG は Changed、移行プロンプト B-13 に追記
+- **`.ric-button` の詳細度低下 (0,2,0 → 0,1,0) で consumer の CSS が初めて効くようになった**件は v2 が正しい (§9 単一クラス方針)。対応なし、注意点として記録
+- 極小利用の consumer が「部品を 1 つも portal しない」「テーマ要素の直下にテキストを置く」という、フル利用の第 1・2 号では踏まない経路を通した。パイロットは用途の違うアプリで直列に回す意味の実証 (第 1 号: tweak / 第 2 号: portal 系フル / 第 3 号: 極小 + file://)
+- コア未変更 (gzip 5,169B)、ricdom-ui.css 5,661→5,686B。unit 526 / browser 103。パイロット 3 アプリで計 23 件
+
 ## 23. パイロット第 2 号の追報 5 (#14 実測フェーズの幅歪み) からの確定事項 (2026-09-05、2.0.0-alpha.5)
 
 - **バグ**: popup / dropdown の「開く → `visibility: hidden` で実測 render → 幅・高さを測って再配置」フローで、実測 render の本体を `left = rect.left` (トリガー左端、`openAt` は `x`) に置いていた。本体は `position: fixed` で幅未指定 (shrink-to-fit) なので利用可能幅が `innerWidth − rect.left` に制限され、右端付近のトリガーでは中身が折り返されて `offsetWidth` が過小に測られる。その幅で右端揃えすると本体が本来より狭く、右端に余白なしで張り付く (実測: rect.left 1213.33 / 実測 224 / 本来 417 / 最終 right 1361.33)
