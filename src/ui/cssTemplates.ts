@@ -297,6 +297,25 @@ const TOOLTIP_CSS = `
 .ric-tooltip__popup--right  { transform: translateY(-50%); transform-origin: left center; animation: ric-tip-v ${da}; }
 .ric-tooltip__popup--left   { transform: translateY(-50%); transform-origin: right center; animation: ric-tip-v ${da}; }`;
 
+// portal センチネル (`<div data-ricdom-role="portal">`) は createApp が target 直下に
+// 常に自動生成する (src/app.ts、コアの設計 §3.5、UI 層からは変更しない)。popup/dropdown/
+// tooltip/toast/dialog のような portal 系部品を一切使わない consumer では、この div は
+// 常に空 (幅 0・高さ 0) のまま残る。target 自体が無関係の理由で `display:flex; gap:...`
+// を持っていると、この空 div も flex item として数えられ、gap 1 個分の余白がレイアウトに
+// 混入する実機バグ (パイロット第 3 号 = 展示ビューアからの報告 #1、2.0.0-alpha.6)。
+// `:empty` (子ノードが 1 つも無い) で display:none にすることで、portal が実際に何かを
+// 描画するまでは flex/grid の計算から完全に除外される。中に子要素が入る (dialog/popup/
+// toast が開く) と `:empty` が外れて通常どおり表示される。
+// `display: contents` は採用しない — 展示ビューア (Electron) の SPEC §7 脚注どおり
+// portal の box 自体に `-webkit-app-region: no-drag` を当てる consumer がおり、
+// contents 化すると要素の box が消えて region 指定ごと無効になる。また contents は
+// 一部ブラウザで子孫の a11y ツリー計算に既知の癖がある (フォーカス順序等) — 空の間しか
+// 効かない :empty の方がシンプルで副作用が無い。
+const PORTAL_CSS = `
+[data-ricdom-role="portal"]:empty {
+  display: none;
+}`;
+
 // ── 状態を持たない部品とレイアウト (設計書 §4/§13) ─────────────
 
 // applyTheme した要素そのものに背景色・文字色を塗る (#11、v1 の create_ui_page が
@@ -1194,6 +1213,7 @@ export const buildStylesheet = (): string =>
     TOOLTIP_CSS,
     THEME_PAINT_CSS,
     SCROLLBAR_CSS,
+    PORTAL_CSS,
     TEXTAREA_CSS,
     CHECKBOX_CSS,
     SELECT_CSS,
