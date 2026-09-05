@@ -477,6 +477,23 @@ target):
 [data-ricdom-role="portal"] { -webkit-app-region: no-drag; }
 ```
 
+### FACT: the portal element always exists, and can add to flex/grid gaps while empty (2.0.0-alpha.6)
+
+The auto-generated portal element (`[data-ricdom-role="portal"]`) is appended to `target`
+unconditionally, whether or not your app ever registers a part with `renderPortal()`. For
+an app that never uses a portal-backed component (dialog/popup/toast/tooltip/dropdown),
+this div sits there empty for the app's entire lifetime. If `target` happens to be a flex
+or grid container with a `gap`, an empty block-level child still counts as a layout
+participant — it contributes one extra `gap` to the total, even though it renders nothing
+visible.
+
+If you load `ricdom-ui.css` (directly or via `injectStyles`), this is already handled: the
+stylesheet includes `[data-ricdom-role="portal"]:empty { display: none; }`, so the portal
+element is removed from flow entirely while empty and rejoins normally the moment a part
+renders something into it. If you use ricdom's core only (no `ricdom-ui.css`), add the same
+one-line rule to your own CSS, or sidestep the auto-generated portal altogether with
+`portalTo`.
+
 ---
 
 ## 8. Themes
@@ -537,26 +554,34 @@ styling of those controls.
   `el` (density/font-size variables are excluded) — round-trips with `applyTheme`, e.g.
   for persisting a user's theme choice to `localStorage`.
 
-### FACT: `applyTheme` paints `background`/`color` on the element (2.0.0-alpha.3)
+### FACT: `applyTheme` paints `background`/`color`/`font-size` on the element (2.0.0-alpha.3, font-size added in alpha.6)
 
 `ricdom-ui.css` has a rule scoped to the `[data-ricdom-theme]` attribute itself (not its
-descendants): `background: var(--ric-color-bg); color: var(--ric-color-fg);`. Without it,
-`applyTheme` would only ever set CSS custom properties — the element it's called on stays
-visually transparent/colorless, and only its descendants (which inherit the variables
+descendants): `background: var(--ric-color-bg); color: var(--ric-color-fg); font-size:
+var(--ric-font-size, 14px);`. Without it, `applyTheme` would only ever set CSS custom
+properties — the element it's called on stays visually transparent/colorless/at the
+browser's default font size, and only its descendants (which inherit the variables
 normally) end up looking themed, which is not what "apply a theme to this element" implies.
-This mirrors v1's `create_ui_page`, which painted `.ric-page` the same way.
+This mirrors v1's `create_ui_page`, which painted `.ric-page` the same way (including
+`font-size`).
 
 - If a themed element has descendants that are themselves `applyTheme`d (a nested "island"
-  with its own theme), the nested element paints its own `background`/`color` over its
-  ancestor's — this is intentional, matching v1.
+  with its own theme), the nested element paints its own `background`/`color`/`font-size`
+  over its ancestor's — this is intentional, matching v1.
 - The selector is a single attribute selector (`[data-ricdom-theme]`, no descendant
-  combinator, no class), so its specificity is low — override `background`/`color` from
-  your own stylesheet (or inline) to opt out for a particular element without needing any
-  extra specificity tricks.
+  combinator, no class), so its specificity is low — override `background`/`color`/
+  `font-size` from your own stylesheet (or inline) to opt out for a particular element
+  without needing any extra specificity tricks.
 - The attribute value itself is always the empty string (`applyTheme` always calls
   `el.setAttribute('data-ricdom-theme', '')`, regardless of whether `theme` was a bundled
   name or your own `ThemeVars` object) — `[data-ricdom-theme]` matches on the attribute's
   *presence*, not a particular value, so this holds for both cases.
+- **Changed in 2.0.0-alpha.6**: before this release, `font-size` was not painted — only
+  `background`/`color` were. If you relied on the themed element (or its direct text)
+  staying at the browser's default font size (16px) regardless of the `fontSize` option
+  (default `'md'` → 14px), this is a visible change. Override with
+  `[data-ricdom-theme] { font-size: ...; }` in your own CSS, or set `font-size` directly on
+  your own element, to opt out.
 
 ### `[data-ricdom-theme]` and page-wide scrollbar styling
 

@@ -228,8 +228,9 @@ Built-in themes: `light`, `dark`, `teal`, `cyber`, `aqua`. Densities: `comfortab
 object as `theme` for a fully custom palette, or `createTheme('teal', { ... })` to start
 from a bundled theme and override just a few variables.
 
-`applyTheme` also paints `background`/`color` on the element itself (2.0.0-alpha.3~) — with
-v1's `create_ui_page` gone, this is what makes the element you called it on actually look
+`applyTheme` also paints `background`/`color`/`font-size` on the element itself
+(background/color since 2.0.0-alpha.3, font-size added in alpha.6) — with v1's
+`create_ui_page` gone, this is what makes the element you called it on actually look
 themed, not just its descendants (which pick up the `--ric-*` variables through normal CSS
 inheritance either way).
 

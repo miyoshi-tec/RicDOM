@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.6] — not yet published
+
+Two bug reports from the third pilot migration (Unizon's exhibition viewer, a kiosk/embed
+app opened directly via `file://`, confirmed against the code by the maintainer) — a
+minimal integration (a single playback panel) that nonetheless surfaced two long-standing
+gaps in how the UI CSS layer treats the always-present portal element and `applyTheme`'s
+element-painting parity with v1.
+
+### Fixed
+
+- **the auto-generated portal element participates in `target`'s flex/grid layout while
+  empty (#1)**: `createApp(target, ...)` always appends a `<div data-ricdom-role="portal">`
+  as the last child of `target` when `portalTo` is not given (`src/app.ts`, core, unchanged
+  by this release) — apps that never register a portal-backed part (dialog/popup/toast/
+  tooltip/dropdown) carry this empty div for their entire lifetime. If `target` is a flex or
+  grid container with a `gap`, the empty portal still counts as a layout participant and
+  adds one extra `gap` to the total even though it renders nothing. Reproduction: a `target`
+  with `display: flex; gap: 16px` and a single 50px-wide child measured 66px wide (50 + the
+  16px gap) instead of 50px. Fixed with one CSS rule in `src/ui/cssTemplates.ts`
+  (`[data-ricdom-role="portal"]:empty { display: none; }`) so the element is removed from
+  flow while it has no content and rejoins automatically the instant a part renders
+  something into it (dialog opens, etc.). `display: contents` was considered and rejected:
+  an Electron consumer relies on `-webkit-app-region: no-drag` targeting the portal box
+  itself (SPEC §7), which `display: contents` would remove by dropping the box altogether,
+  and `display: contents` has known accessibility-tree quirks of its own. This fix only
+  helps consumers who load `ricdom-ui.css`; SPEC §7 documents the one-line workaround for
+  core-only consumers.
+- **`applyTheme`'s `fontSize` option had no visible effect on the element itself (#2)**:
+  `applyTheme(el, { fontSize })` only ever set the `--ric-font-size` CSS variable — almost
+  nothing in `ricdom-ui.css` reads that variable directly (`.ric-panel`/`.ric-md-pre` are the
+  exceptions), so the themed element's own font size (and any of its direct text) stayed at
+  the browser default (16px) regardless of the `fontSize` option. v1's `.ric-page` painted
+  `font-size` alongside `background`/`color`, matching the `background`/`color` parity fix
+  from `2.0.0-alpha.3` (#11) that this release extends. Fixed by adding
+  `font-size: var(--ric-font-size, 14px);` to `THEME_PAINT_CSS`'s `[data-ricdom-theme]` rule
+  in `src/ui/cssTemplates.ts`.
+
+### Changed
+
+- **`applyTheme`d elements now have a visible `font-size` painted on them** (see #2 above).
+  This can change the appearance of existing `2.0.0-alpha.x` consumers: text sitting directly
+  under an `applyTheme`d element (not itself wrapped in a `ricdom/ui` component with its own
+  `font-size`) may go from the browser default (usually 16px) to the theme's `fontSize`
+  (default `'md'` → 14px). Opt out per element with `[data-ricdom-theme] { font-size: ...; }`
+  in your own CSS (loaded after `ricdom-ui.css`), or set `font-size` directly on your own
+  element — this mirrors the existing opt-out path for the `background`/`color` painting from
+  `2.0.0-alpha.3`.
+
+### Tests
+
+- **`tests/browser/portalEmptyFlex.test.ts`** (new): a flex+gap `target` with no
+  portal-backed parts registered — asserts `target`'s measured width equals its single
+  child's width (no extra gap) and the portal's computed `display` is `none`; opening then
+  closing a `createDialog` toggles the portal's computed `display` away from and back to
+  `none`; a `portalTo`-supplied external element still gets no portal appended to `target`
+  (existing behavior, unchanged). Confirmed red against the pre-fix CSS (`git checkout --
+  src/ui/cssTemplates.ts`, rebuilt): the flex+gap case measured 66px instead of 50px, and the
+  dialog case's portal computed `display: block` instead of `none` before the dialog was even
+  opened.
+- **`tests/browser/uiTheme.test.ts`**: added a `font-size` parity block alongside the existing
+  `#11` background/color block — `fontSize: 'sm'/'md'/'lg'` resolving to computed
+  `12px`/`14px`/`16px`, the `'md'` default when `fontSize` is omitted, a `ThemeVars`
+  `--ric-font-size` override, and a child `uiButton` (`font-size: 1em`) inheriting the painted
+  value. Confirmed red against the pre-fix CSS: all four assertions measured the browser
+  default `16px` regardless of the requested `fontSize`.
+
+### Docs
+
+- SPEC.md §7 (Portals): new FACT documenting that the portal element always exists and can
+  add to flex/grid gaps while empty, and how `ricdom-ui.css` (or a one-line workaround for
+  core-only consumers) prevents it.
+- SPEC.md §8 (Themes): the `applyTheme` element-painting FACT (from `2.0.0-alpha.3`) now
+  covers `font-size` alongside `background`/`color`, with a note on the `2.0.0-alpha.6`
+  visual-appearance change.
+- TUTORIAL.md / V1_VS_V2.ja.md: the `applyTheme`/`create_ui_page` parity notes now mention
+  `font-size` alongside `background`/`color`.
+
 ## [2.0.0-alpha.5] — not yet published
 
 A single bug report from a pilot migration, confirmed against the code by the maintainer.
