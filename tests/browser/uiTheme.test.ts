@@ -4,8 +4,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyTheme } from '../../src/ui/theme.js';
+import { createApp } from '../../src/app.js';
+import { uiButton } from '../../src/ui/button.js';
 import { injectStyles } from '../../src/ui/injectStyles.js';
-import { setupApp } from '../_helpers/dom.js';
+import { flush, setupApp } from '../_helpers/dom.js';
 
 // #11 の検証には ricdom-ui.css ( `[data-ricdom-theme] { background; color; }` ) が
 // 実際に読み込まれている必要がある — CSS 変数の適用だけを見る既存のテスト (applyTheme が
@@ -104,5 +106,48 @@ describe('実ブラウザ: applyTheme した要素に background/color が塗ら
 
     expect(getComputedStyle(app).backgroundColor).toBe(hexToRgb('#f9fafb'));
     expect(getComputedStyle(nested).backgroundColor).toBe(hexToRgb('#111318'));
+  });
+});
+
+// #2 (パイロット第 3 号 = 展示ビューアからの報告、2.0.0-alpha.6): applyTheme(el, { fontSize })
+// は `--ric-font-size` 変数をセットするだけで、要素自身の font-size は塗っていなかった
+// (変数を消費するのは .ric-panel/.ric-md-pre くらいで、それ以外の直下テキストはブラウザ
+// 既定の 16px のまま)。v1 の `.ric-page` は font-size も塗っていた (md=14px) ため、
+// bg/fg パリティ (#11) と同じ理由で THEME_PAINT_CSS に font-size を追加した。
+// 修正前は el 自身の computed font-size が (fontSize オプションの値に関わらず) 常に
+// ブラウザ既定の 16px になっていた。
+describe('実ブラウザ: applyTheme した要素に font-size が塗られる (#2)', () => {
+  it('fontSize: "sm"/"md"/"lg" で computed font-size が 12px/14px/16px になる', () => {
+    const app = setupApp();
+    applyTheme(app, { fontSize: 'sm' });
+    expect(getComputedStyle(app).fontSize).toBe('12px');
+
+    applyTheme(app, { fontSize: 'md' });
+    expect(getComputedStyle(app).fontSize).toBe('14px');
+
+    applyTheme(app, { fontSize: 'lg' });
+    expect(getComputedStyle(app).fontSize).toBe('16px');
+  });
+
+  it('fontSize 省略時は既定の md (14px) になる', () => {
+    const app = setupApp();
+    applyTheme(app, { theme: 'light' });
+    expect(getComputedStyle(app).fontSize).toBe('14px');
+  });
+
+  it('fontSize: ThemeVars (自前 --ric-font-size 直指定) でもその値が塗られる', () => {
+    const app = setupApp();
+    applyTheme(app, { fontSize: { '--ric-font-size': '20px' } });
+    expect(getComputedStyle(app).fontSize).toBe('20px');
+  });
+
+  it('直下の uiButton (font-size: 1em) が applyTheme の 14px を継承する', async () => {
+    const app = setupApp();
+    applyTheme(app, { fontSize: 'md' });
+    createApp(app, {}, () => uiButton({ children: ['保存'] }));
+    await flush();
+
+    const button = app.querySelector('.ric-button') as HTMLElement;
+    expect(getComputedStyle(button).fontSize).toBe('14px');
   });
 });

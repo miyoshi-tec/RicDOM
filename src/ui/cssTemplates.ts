@@ -329,10 +329,20 @@ const PORTAL_CSS = `
 // 塗りたくない consumer は自分の CSS で上書きできる (SPEC §8 に FACT として明記)。
 // `[data-ricdom-theme]` は属性の「有無」で一致する — ThemeVars 指定時に applyTheme が
 // 付与する空文字値 (`data-ricdom-theme=""`) にもマッチする。
+//
+// font-size (パイロット第 3 号からの報告 #2、2.0.0-alpha.6): applyTheme は
+// `--ric-font-size` 変数をセットするだけで、要素自身の font-size は塗っていなかった
+// (この変数を実際に消費するのは .ric-panel/.ric-md-pre 程度で、それ以外の直下テキストは
+// ブラウザ既定の 16px のまま)。v1 の `.ric-page` は font-size も塗っていた
+// (md=14px) ため、bg/fg パリティ (#11) と同じ理由でここに揃える。
+// **既存 consumer への影響**: この要素直下のテキストの見た目が変わりうる (既定 16px →
+// テーマの fontSize、既定 md=14px)。上書きしたい場合は `[data-ricdom-theme] { font-size:
+// ... }` を自分の CSS で後勝ちさせるか、自分の要素に直接指定する (SPEC §8 に FACT 追記)。
 const THEME_PAINT_CSS = `
 [data-ricdom-theme] {
   background: ${bg};
   color: ${fg};
+  font-size: ${fs};
 }`;
 
 // ページ全体のスクロールバー既定スタイル (v1 の `.ric-page, .ric-page *` 相当)。
