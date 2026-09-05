@@ -8,11 +8,34 @@
 //     パネルは `role="region"` + `aria-labelledby`。Enter/Space は `<button>` タグの
 //     ネイティブ挙動でそのまま満たされる (v1 も元々 `<button>` を使っていたため無料)。
 //   - `title` に文字列だけでなく VDOM ノード (アイコン混在等) を渡せる契約は v1 から継承。
+//   - **controlled / uncontrolled 両対応** (2.0.0-alpha.7、`createTabs` と同じ規約):
+//     `open` props を渡せば controlled (外部の state が唯一の真実、内部 `openMap` は
+//     更新しない)、省略すれば uncontrolled (従来どおり内部状態で管理)。パイロット第 4 号
+//     (章動減速機 設計ツール) から「ボタン押下で節を外部から閉じたい」「共有 URL から
+//     開閉状態を復元したい」の要望が出て追加した。
+//   - **`setOpen()` のような命令的 API は持たない**: 外部制御の canon は controlled 1 つに
+//     揃える (§ポリシー「canon は 1 つ」)。command 的な `setOpen(id, bool)` を別に生やすと
+//     「controlled props で制御する」「命令的メソッドで制御する」の 2 系統が併存し、
+//     どちらが正なのか consumer が毎回悩む polysemic API になる。`createTabs` も同じ理由で
+//     `active` props のみ (専用の `select()` メソッドを持たない) — 一貫性を優先する。
+//
+// controlled モードの詳細 (tabs.ts と同じ規則):
+//   - `open` が渡されると controlled。表示は常に `open` props に従い、ヘッダクリック
+//     (および Enter/Space = button のネイティブ click) では内部状態を一切更新せず、
+//     `onToggle?.(id, nextOpen, nextMap)` を呼ぶだけ。`onToggle` が未指定なら何も起きない
+//     (tabs の `active` のみ指定・`onChange` 省略時と同じ「見た目が変わらないだけ」の扱い)。
+//   - `nextMap` は「もし uncontrolled だったらこうなっていたはずの」完全な次状態:
+//     `multi: false` (排他) なら押した節だけ true・他の全節が false の map、
+//     `multi: true` (既定) なら現在の `open` に押した節の反転値をマージした map。
+//     consumer は `onToggle: (id, next, map) => { s.acc = map; }` と書くだけで良い
+//     (id / next 単体も渡すのは、map だけでは「どれが変わったか」を都度 diff するのが
+//     面倒な consumer 向けの便宜。3 引数とも同じ情報から導けるが、生成済みの形で渡す)。
+//   - `isOpen(id)` は両モードで正しい値を返す (controlled では直近に渡された `open` を参照)。
 //
 // アニメーション: `grid-template-rows: 0fr → 1fr` のトリックで auto 高さに対して
 // アニメーションする (scrollHeight 計測不要、v1 継承)。
 //
-// 使い方:
+// 使い方 (uncontrolled、従来どおり):
 //   const acc = app.use(createAccordion({ defaultOpen: { a: true } }));
 //   render 内で毎回呼ぶ:
 //   acc({
@@ -22,6 +45,9 @@
 //     ],
 //     multi: true, // true (既定) = 複数パネル同時展開可 / false = 常に 1 パネルのみ (排他)
 //   })
+//
+// 使い方 (controlled):
+//   acc({ items, open: s.acc, onToggle: (id, next, map) => { s.acc = map; } })
 
 import type { RicNode } from '../types.js';
 import { type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
@@ -47,6 +73,14 @@ export interface AccordionProps {
   items: AccordionItem[];
   /** true (既定) = 複数パネル同時展開可 / false = 常に 1 パネルのみ展開 (排他) */
   multi?: boolean;
+  /** 指定すると controlled モード ({ [id]: boolean })。省略すれば uncontrolled (内部状態管理)。 */
+  open?: Record<string, boolean>;
+  /**
+   * controlled モードでヘッダクリック (Enter/Space 含む) のたびに呼ばれる。
+   * `nextMap` は「uncontrolled ならこうなっていた」完全な次状態 —
+   * `s.acc = nextMap` を代入するだけで良い形で渡す。uncontrolled モードでは呼ばれない。
+   */
+  onToggle?: (id: string, nextOpen: boolean, nextMap: Record<string, boolean>) => void;
 }
 
 export interface AccordionInstance extends Component<AccordionProps> {
@@ -67,6 +101,10 @@ export const createAccordion = (options: CreateAccordionOptions = {}): Accordion
   const guard: AttachGuard = createAttachGuard('createAccordion');
 
   const openMap: Record<string, boolean> = { ...defaultOpen };
+  // controlled モード時の直近の `open` props (isOpen() が両モードで正しい値を返すための
+  // 参照。tabs.ts の `lastActive` と同じ考え方 — render のたびに更新し、uncontrolled に
+  // 戻ったら null に戻す)。
+  let lastControlledOpen: Record<string, boolean> | null = null;
 
   const headerId = (id: string): string => `ricdom-accordion-${fid}-${encodeURIComponent(id)}-header`;
   const panelId = (id: string): string => `ricdom-accordion-${fid}-${encodeURIComponent(id)}-panel`;
@@ -75,14 +113,16 @@ export const createAccordion = (options: CreateAccordionOptions = {}): Accordion
     const host = guard.ensure();
     if (!host) return null;
 
-    const { items = [], multi = true } = props;
+    const { items = [], multi = true, open, onToggle } = props;
+    const controlled = open !== undefined;
+    lastControlledOpen = controlled ? open : null;
 
     return {
       tag: 'div',
       class: 'ric-accordion',
       'data-ricdom-role': UI_ROLE.accordion,
       children: items.map(({ id, title, children: itemChildren }) => {
-        const isItemOpen = !!openMap[id];
+        const isItemOpen = controlled ? !!open[id] : !!openMap[id];
         return {
           tag: 'div',
           class: 'ric-accordion__item',
@@ -96,6 +136,16 @@ export const createAccordion = (options: CreateAccordionOptions = {}): Accordion
               'aria-expanded': isItemOpen ? 'true' : 'false',
               'aria-controls': panelId(id),
               onclick: () => {
+                if (controlled) {
+                  // controlled: 内部状態には一切触れず、次状態を計算して onToggle に渡すだけ。
+                  // onToggle 未指定なら何も起きない (tabs の active-only 指定時と同じ扱い)。
+                  const nextOpen = !isItemOpen;
+                  const nextMap: Record<string, boolean> = multi
+                    ? { ...open, [id]: nextOpen }
+                    : Object.fromEntries(items.map((it) => [it.id, it.id === id && nextOpen]));
+                  onToggle?.(id, nextOpen, nextMap);
+                  return;
+                }
                 if (!multi) {
                   // 排他モード: 他をすべて閉じる
                   for (const k of Object.keys(openMap)) openMap[k] = false;
@@ -136,7 +186,7 @@ export const createAccordion = (options: CreateAccordionOptions = {}): Accordion
 
   inst.attach = guard.attach;
   inst.dispose = (): void => guard.dispose();
-  inst.isOpen = (id: string): boolean => !!openMap[id];
+  inst.isOpen = (id: string): boolean => (lastControlledOpen ? !!lastControlledOpen[id] : !!openMap[id]);
 
   return inst;
 };

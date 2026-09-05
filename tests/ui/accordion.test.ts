@@ -158,6 +158,99 @@ describe('createAccordion: defaultOpen', () => {
   });
 });
 
+describe('createAccordion: controlled (2.0.0-alpha.7)', () => {
+  it('open props が表示を決め、内部状態 (openMap) は変わらない', async () => {
+    const app = setupApp();
+    let acc: ReturnType<typeof createAccordion>;
+    const state = { acc: { a: true, b: false } };
+    const handle = createApp('#app', state, (s) => (acc ? acc({ items: ITEMS, open: s.acc, onToggle: () => {} }) : null));
+    acc = handle.use(createAccordion());
+    await flush();
+
+    const headers = () => Array.from(app.querySelectorAll('.ric-accordion__header')) as HTMLElement[];
+    expect(headers()[0]!.getAttribute('aria-expanded')).toBe('true');
+    expect(headers()[1]!.getAttribute('aria-expanded')).toBe('false');
+    expect(acc!.isOpen('a')).toBe(true);
+    expect(acc!.isOpen('b')).toBe(false);
+
+    // ヘッダをクリックしても、親が open を更新しない限り表示は変わらない (controlled)
+    headers()[1]!.click();
+    await flush();
+    expect(headers()[1]!.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('ヘッダクリックで onToggle(id, nextOpen, nextMap) が来て、multi:true では現在の open にマージした map になる', async () => {
+    const app = setupApp();
+    const calls: [string, boolean, Record<string, boolean>][] = [];
+    let acc: ReturnType<typeof createAccordion>;
+    const state: { acc: Record<string, boolean> } = { acc: { a: true, b: false } };
+    const handle = createApp('#app', state, (s) =>
+      acc
+        ? acc({
+            items: ITEMS,
+            open: s.acc,
+            onToggle: (id, next, map) => calls.push([id, next, map]),
+          })
+        : null,
+    );
+    acc = handle.use(createAccordion());
+    await flush();
+
+    const headers = () => Array.from(app.querySelectorAll('.ric-accordion__header')) as HTMLElement[];
+    headers()[1]!.click();
+    await flush();
+
+    expect(calls.length).toBe(1);
+    expect(calls[0]![0]).toBe('b');
+    expect(calls[0]![1]).toBe(true);
+    expect(calls[0]![2]).toEqual({ a: true, b: true }); // 現在の open + b の反転値をマージ、a はそのまま
+
+    // 親が代入すれば表示に反映される (state ではなく、reactive proxy である handle に代入する)
+    handle.acc = calls[0]![2];
+    await flush();
+    expect(headers()[1]!.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('multi:false の nextMap は押した節だけ true、他の全節が false になる', async () => {
+    const app = setupApp();
+    const calls: Record<string, boolean>[] = [];
+    let acc: ReturnType<typeof createAccordion>;
+    const state = { acc: { a: true, b: false } };
+    const handle = createApp('#app', state, (s) =>
+      acc
+        ? acc({
+            items: ITEMS,
+            multi: false,
+            open: s.acc,
+            onToggle: (_id, _next, map) => calls.push(map),
+          })
+        : null,
+    );
+    acc = handle.use(createAccordion());
+    await flush();
+
+    const headers = () => Array.from(app.querySelectorAll('.ric-accordion__header')) as HTMLElement[];
+    headers()[1]!.click(); // b を開く → a は排他で閉じるはず
+    await flush();
+
+    expect(calls[0]).toEqual({ a: false, b: true });
+  });
+
+  it('onToggle 未指定なら何も起きない (tabs の active-only 指定時と同じ扱い)', async () => {
+    const app = setupApp();
+    let acc: ReturnType<typeof createAccordion>;
+    const state = { acc: { a: false, b: false } };
+    const handle = createApp('#app', state, (s) => (acc ? acc({ items: ITEMS, open: s.acc }) : null));
+    acc = handle.use(createAccordion());
+    await flush();
+
+    const header = () => app.querySelectorAll('.ric-accordion__header')[0] as HTMLElement;
+    expect(() => header().click()).not.toThrow();
+    await flush();
+    expect(header().getAttribute('aria-expanded')).toBe('false'); // 何も変わらない
+  });
+});
+
 describe('createAccordion: dispose', () => {
   it('unmount 後は再度呼んでも描画されない', async () => {
     const app = setupApp();
