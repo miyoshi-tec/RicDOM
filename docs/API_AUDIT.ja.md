@@ -236,3 +236,25 @@ export interface Host {
 4. `docs: 嘘コメント・制作過程語を除去し公開関数に JSDoc を補完` — §9-6〜9
 5. `chore: package.json に homepage/bugs/engines を追加` — §9-10
 6. `ci: actions/checkout・setup-node を v5 に更新` — §9-11
+
+---
+
+## 13. 監査後の公開 API 変更 (追跡)
+
+本監査 (2026-09-02) 以降にリリースされた公開 API の変更を追跡する。挙動修正のみ (公開シグネチャ
+不変) のリリースはここには載せない — SPEC.md/CHANGELOG.md を参照。
+
+### 2.0.0-alpha.7: `AccordionProps.open` / `AccordionProps.onToggle` 追加
+
+パイロット第 4 号の要望 (「ボタン押下で節を外部から閉じたい」「共有 URL から開閉状態を復元したい」)
+を受け、`createAccordion` に `createTabs` と同じ controlled/uncontrolled 契約を追加した。
+
+| 種別 | 名前 | 規約 | 判定 |
+|---|---|---|---|
+| Props フィールド (追加) | `AccordionProps.open?: Record<string, boolean>` | 既存の `TabsProps.active` と同じ「controlled スイッチ」パターン | OK |
+| Props フィールド (追加) | `AccordionProps.onToggle?: (id, nextOpen, nextMap) => void` | 既存の `TabsProps.onChange` と同じ「選択が起きた通知」パターン (引数の形は accordion 独自 — nextMap を含む) | OK |
+
+命名規約からの逸脱なし (既存の `Props` 命名 = 追加フィールドであり新しい型ではない)。破壊的変更は
+ゼロ (両フィールドとも省略可能、省略時は既存の uncontrolled 挙動のまま)。`setOpen()` のような
+命令的メソッドは意図的に追加していない (「canon は 1 つ」ポリシー、理由は `src/ui/accordion.ts`
+のファイルヘッダおよび SPEC.md §10.3.3a に記載)。

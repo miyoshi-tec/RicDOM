@@ -307,6 +307,36 @@ configured *inside* the `trigger` object (`trigger: { icon, ghost, size }`), whi
 `createDropdown`'s equivalent look is a set of **top-level props** (`label`/`icon`/`ghost`)
 passed alongside `children` — the two components don't share a `trigger` shape.
 
+`createAccordion` follows the same controlled/uncontrolled split as `createTabs`: leave
+`open` out and it manages itself, or pass `open` to drive it from your own state — for
+example, a "Close all" button that no header click could express on its own:
+
+```js
+import { createApp } from 'ricdom';
+import { createAccordion, uiButton, uiCol } from 'ricdom/ui';
+
+let acc;
+const app = createApp(
+  '#app',
+  { acc: { a: true, b: false } },
+  (s) =>
+    uiCol({
+      children: [
+        uiButton({ children: ['Close all'], onclick: () => { s.acc = { a: false, b: false }; } }),
+        acc({
+          items: [
+            { id: 'a', title: 'Section A', children: ['...'] },
+            { id: 'b', title: 'Section B', children: ['...'] },
+          ],
+          open: s.acc,
+          onToggle: (id, next, nextMap) => { s.acc = nextMap; },
+        }),
+      ],
+    }),
+  { setup: (a) => { acc = a.use(createAccordion()); } },
+);
+```
+
 ---
 
 ## 8. The tweak panel

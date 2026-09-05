@@ -554,6 +554,20 @@ styling of those controls.
   `el` (density/font-size variables are excluded) — round-trips with `applyTheme`, e.g.
   for persisting a user's theme choice to `localStorage`.
 
+### FACT: `applyTheme` warns on an invalid `theme`/`density`/`fontSize` name (2.0.0-alpha.7)
+
+If `theme`, `density`, or `fontSize` is given as a string that isn't one of the bundled
+names (`light`/`dark`/`teal`/`cyber`/`aqua`; `comfortable`/`compact`/`tight`; `sm`/`md`/`lg`
+respectively), `applyTheme` logs one `console.warn` per call naming the invalid value, the
+valid names, and which default it fell back to — before this release, a typo (e.g.
+`density: 'md'`, which isn't a density name) silently fell back to the default with no
+indication anything was wrong. **The fallback behavior itself is unchanged** — this only
+adds a warning; a typo'd `applyTheme` call still renders with the same default it always
+did. Passing a `ThemeVars` object (your own CSS-variable map) or omitting the option
+entirely never warns, in either case, since neither represents a mistyped name. Like
+`createFocusWhen`'s "ref not found" warning and `uiInlineMenu`'s "parent has no position"
+warning, this is dev-build only (`process.env.NODE_ENV !== 'production'`).
+
 ### FACT: `applyTheme` paints `background`/`color`/`font-size` on the element (2.0.0-alpha.3, font-size added in alpha.6)
 
 `ricdom-ui.css` has a rule scoped to the `[data-ricdom-theme]` attribute itself (not its
@@ -833,7 +847,35 @@ treatment as the rest of this table.
 | `createSplitter(options)` | Two-pane resizable layout. The divider is `role="separator"` + `aria-orientation` + `aria-valuenow`/`aria-valuemin`/`aria-valuemax` (the last omitted entirely when `options.max` is `null`, i.e. no logical upper bound) + `tabIndex: 0`; resizes via mouse drag or arrow keys (10px per keypress, in the direction that grows the side panel). `onResizeEnd(size)` fires once per drag (on `mouseup`) or once per keypress (since keyboard has no separate "end" event). The optional collapse toggle button gets `aria-label: 'Expand' \| 'Collapse'`. `side`/`main` (render props) hold the panel content directly (no `{ ctx }` wrapper, unlike v1); `collapsed`/`onCollapseChange` (props) make it controlled |
 | `createScrollPane(options)` | A scrollable container that auto-follows new content at the `options.follow: 'bottom' \| 'top' \| 'none'` edge (within `options.threshold` px) unless the user has scrolled away from it — no ARIA role of its own (it's a plain `overflow: auto` region, not a live-region announcer). `pane.scrollToBottom()`/`scrollToTop()` force a scroll regardless of the current follow state |
 | `createCollapseBox(options)` | Headless animated show/hide container (`options.direction: 'v' \| 'h' \| 'both'`) with **no trigger of its own** — unlike `createAccordion`, it has no button to hang `aria-expanded` on, so *you* put `aria-expanded={visible}` + `aria-controls={box.idFor(key)}` on your own trigger to satisfy the APG disclosure pattern (`idFor(key)`, key optional, gives the stable `id` the box renders with). Supports multiple concurrent instances distinguished by a `key` prop (sparse list animation). Completion is detected via `transitionend` (not `animationend` — height/width targets are per-instance dynamic values, not expressible as fixed `@keyframes`) with the same 700ms fallback as the rest of §10.3 |
-| `createAccordion(options)` | Each item's header is a real `<button aria-expanded aria-controls>` (so `Enter`/`Space` activation is native, no extra keydown handling needed); its panel is `role="region"` + `aria-labelledby`, and gets the `hidden` attribute while closed (removing it from the accessibility tree — the CSS `grid-template-rows` close animation still runs visually, since an author `display` rule outranks the `[hidden] { display: none }` user-agent default). `options.defaultOpen: Record<id, boolean>` seeds initial state; `multi: false` on props makes it single-open (exclusive, closes any other open panel) instead of the default multi-open |
+| `createAccordion(options)` | Each item's header is a real `<button aria-expanded aria-controls>` (so `Enter`/`Space` activation is native, no extra keydown handling needed); its panel is `role="region"` + `aria-labelledby`, and gets the `hidden` attribute while closed (removing it from the accessibility tree — the CSS `grid-template-rows` close animation still runs visually, since an author `display` rule outranks the `[hidden] { display: none }` user-agent default). `options.defaultOpen: Record<id, boolean>` seeds initial state (uncontrolled only); `multi: false` on props makes it single-open (exclusive, closes any other open panel) instead of the default multi-open. Controlled (`open` prop given) or uncontrolled (internal state) — see §10.3.3a |
+
+### 10.3.3a FACT: `createAccordion` controlled / uncontrolled (2.0.0-alpha.7)
+
+Same two-mode contract as `createTabs` (§10.3.3's row above) — one `AccordionProps.open`
+switch, no separate imperative method:
+
+- **Uncontrolled** (`open` omitted): the component manages its own open/closed state
+  internally, seeded from `options.defaultOpen`. This is unchanged from earlier releases.
+- **Controlled** (`open: Record<id, boolean>` given): the displayed open/closed state always
+  follows `open` — clicking a header (or activating it via `Enter`/`Space`, which is the
+  same native `click`) never mutates anything internally. Instead it calls
+  `onToggle?.(id, nextOpen, nextMap)`:
+  - `nextOpen` is the item's next open state (the opposite of its current one).
+  - `nextMap` is the complete next `{ [id]: boolean }` map — "what the internal state would
+    have become had this been uncontrolled" — so `onToggle: (id, next, map) => { s.x = map;
+    }` is a complete, correct handler on its own (id/next are provided as a convenience for
+    callers that only care about the one item that changed). With `multi: false` (exclusive),
+    `nextMap` closes every other item's entry to `false` regardless of what was in the
+    incoming `open` object, keyed by every id present in the current `items` prop.
+  - If `onToggle` is omitted, nothing happens on click — the same treatment `createTabs`
+    gives an `active`-only call with no `onChange`.
+- `isOpen(id)` returns the correct value in both modes (reading the most recently passed
+  `open` prop in controlled mode).
+- There is **no `setOpen()`** or other imperative open/close method — the controlled `open`
+  prop is the one supported way to drive this component's state from the outside, matching
+  `createTabs`'s `active` prop (no separate `select()` method either). Keeping exactly one
+  external-control mechanism avoids two parallel, occasionally-inconsistent ways to ask "is
+  this panel open" from outside the component.
 
 ### 10.4 Stateless — text
 

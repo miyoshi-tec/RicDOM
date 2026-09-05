@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.7] — not yet published
+
+Two reports from the fourth pilot migration (a bevel-gear reducer design tool, a classic
+`<script>`-tag app migrated through a single adapter file, no portal-based components used)
+— both confirmed against the code by the maintainer before implementation.
+
+### Added
+
+- **`createAccordion` controlled mode**: `AccordionProps` gains `open?: Record<string,
+  boolean>` and `onToggle?: (id, nextOpen, nextMap) => void`, matching `createTabs`'s
+  existing controlled/uncontrolled split. Passing `open` makes the accordion controlled —
+  the displayed state always follows `open`, header clicks never touch internal state, and
+  `onToggle` receives the complete next `{ [id]: boolean }` map (`multi: false` produces a
+  map with every other item closed) so a caller can implement it as `onToggle: (id, next,
+  map) => { s.x = map; }`. Omitting `open` keeps the existing uncontrolled behavior
+  unchanged. There is deliberately **no `setOpen()`** or other imperative method — see
+  `src/ui/accordion.ts`'s file header and SPEC.md §10.3.3a for why (one external-control
+  mechanism, matching `createTabs`'s `active` prop). `isOpen(id)` returns the correct value
+  in both modes.
+- **`applyTheme` warns on an invalid `theme`/`density`/`fontSize` string** (e.g. `density:
+  'md'`, which isn't a density name): one `console.warn` per `applyTheme` call naming the
+  invalid value and which default it fell back to. The fallback behavior itself is
+  unchanged (dev-build only, same convention as `createFocusWhen`/`uiInlineMenu`'s existing
+  warnings) — see SPEC.md §8's new FACT.
+
+### Docs
+
+- **`docs/V1_VS_V2.ja.md`**: filled in four migration-guide gaps reported as "the table's
+  literal advice breaks on first use": (1) `s.x = create_ui_x()` → `app.use(createX())`
+  needs the `setup` option, since `createApp` renders synchronously on construction —
+  worked example added; (2) `applyTheme` only paints `background`/`color`/`font-size`, not
+  v1 `.ric-page`'s `padding`/`overflow`/`box-sizing` — compensating CSS snippet added; (3)
+  the scrollbar defaults are actually identical between v2 and v1 since v0.4.2 (only the CSS
+  *scope* changed, `.ric-page` → `[data-ricdom-theme]` — corrected a stale assumption that
+  the default value itself had also changed, which was true only for pre-0.4.2 v1); (4) the
+  naive `ctx`→`children` regex misses ES2015 shorthand (`{ style, ctx }`) and post-hoc
+  assignment (`node.ctx = [...]`) forms, and a caution against running the conversion
+  repo-wide when a non-ricdom `ctx`-named variable (e.g. a canvas 2D context) coexists.
+  Also recorded the "fold v1 usage into one adapter file before migrating" approach the
+  third and fourth pilots both used to keep the mechanical conversion scoped to that one
+  file.
+
+### Tests
+
+- **`tests/ui/accordion.test.ts`** (+4): controlled `open` drives display and leaves
+  internal state untouched; `onToggle` receives `(id, nextOpen, nextMap)` with `nextMap`
+  merged from the current `open` for `multi: true`; `nextMap` closes every other item for
+  `multi: false`; a controlled accordion with no `onToggle` does nothing on click.
+- **`tests/browser/uiAccordion.test.ts`** (new, 1 test): a real click plus an external
+  `open` reassignment both correctly flip `aria-expanded`/`hidden` in a real browser.
+- **`tests/ui/theme.test.ts`** (+6): invalid `theme`/`density`/`fontSize` each warn once and
+  fall back to the documented default; warns on every call (not memoized to once-ever);
+  valid string names and `ThemeVars` objects never warn; omitting an option never warns.
+
 ## [2.0.0-alpha.6] — not yet published
 
 Two bug reports from the third pilot migration (Unizon's exhibition viewer, a kiosk/embed
