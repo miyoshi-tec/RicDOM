@@ -663,7 +663,14 @@ adds a warning; a typo'd `applyTheme` call still renders with the same default i
 did. Passing a `ThemeVars` object (your own CSS-variable map) or omitting the option
 entirely never warns, in either case, since neither represents a mistyped name. Like
 `createFocusWhen`'s "ref not found" warning and `uiInlineMenu`'s "parent has no position"
-warning, this is dev-build only (`process.env.NODE_ENV !== 'production'`).
+warning, this is dev-build only. "Dev build" for `ricdom/ui` follows the same
+per-distribution-format rule as the core (§3, "Dev-mode warning for untracked deep
+assignment"): `dist/ricdom-ui.iife.min.js` has `__RICDOM_DEV__` inlined to `false` and
+all three warnings are removed by dead-code elimination (2.0.0-alpha.10 — before that, the
+`ui` production IIFE shipped them live in a plain browser with no `process` global, for the
+same reason as the core bug), `dist/ricdom-ui.iife.js` always warns, ESM/CJS defer to the
+consumer's bundler's `process.env.NODE_ENV`, and a no-bundler ESM import falls back to dev
+mode.
 
 ### FACT: `applyTheme` paints `background`/`color`/`font-size` on the element (2.0.0-alpha.3, font-size added in alpha.6)
 
@@ -947,7 +954,8 @@ fw(refName: string, condition: boolean): null
   this same render), it calls `app.refs.get(refName)?.focus()`. `condition` staying `true`
   across renders does not refocus; a false→false or true→false transition does nothing.
 - If `refName` doesn't resolve to a focusable element by the time the render commits, it
-  logs one `console.warn` (dev builds only) and otherwise does nothing — it never throws.
+  logs one `console.warn` (dev builds only — see §8's `applyTheme` warning FACT for which
+  `ricdom/ui` build counts as "dev") and otherwise does nothing — it never throws.
 - Always returns `null` — it exists for its side effect, not to contribute to the render
   tree.
 

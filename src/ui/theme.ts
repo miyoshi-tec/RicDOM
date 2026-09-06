@@ -18,7 +18,7 @@
 //     実行時依存ゼロなので、コアの `isDevMode` を import せず `internal/pureHelpers.ts` に
 //     複製されたものを使う)。
 
-import { isDevMode } from './internal/pureHelpers.js';
+import { bakedDevMode, isDevMode } from './internal/pureHelpers.js';
 
 export type ThemeName = 'light' | 'dark' | 'teal' | 'cyber' | 'aqua';
 export type DensityName = 'comfortable' | 'compact' | 'tight';
@@ -158,7 +158,11 @@ const FONT_SIZE_NAMES: readonly FontSizeName[] = ['sm', 'md', 'lg'];
 const warnIfInvalidName = <T extends string>(kind: string, value: T | ThemeVars | undefined, validNames: readonly T[], fallbackLabel: string): void => {
   if (value === undefined || typeof value === 'object') return;
   if ((validNames as readonly string[]).includes(value)) return;
-  if (!isDevMode()) return;
+  // `!isDevMode()` ではなく `!(bakedDevMode ?? isDevMode())` (定数を `??` の左) にする理由は
+  // internal/pureHelpers.ts の bakedDevMode 定義直前のコメント参照。production IIFE では
+  // `!(false ?? …)` → `true` に畳み込まれて無条件 return になり、続く console.warn が
+  // 到達不能コードとして dead-code elimination される。
+  if (!(bakedDevMode ?? isDevMode())) return;
   console.warn(`RicDOM UI: applyTheme の ${kind} "${value}" は無効です (有効: ${validNames.join(' / ')})。既定値 ${fallbackLabel} を使います。`);
 };
 

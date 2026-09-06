@@ -27,7 +27,7 @@
 // (dialog を開いた最初の render で fw() を呼んでも、portal 内の ref を正しく拾える)。
 
 import { type AttachGuard, createAttachGuard, type Host } from './internal/component.js';
-import { isDevMode } from './internal/pureHelpers.js';
+import { bakedDevMode, isDevMode } from './internal/pureHelpers.js';
 
 export interface FocusWhenInstance {
   /**
@@ -58,7 +58,10 @@ export const createFocusWhen = (): FocusWhenInstance => {
       (el as HTMLElement).focus();
       return;
     }
-    if (isDevMode()) {
+    // `isDevMode()` を直接条件に置かず `bakedDevMode ?? isDevMode()` (定数を左) にする
+    // 理由は internal/pureHelpers.ts の bakedDevMode 定義直前のコメント参照
+    // (production IIFE でこの warn ごと dead-code elimination させるため)。
+    if (bakedDevMode ?? isDevMode()) {
       console.warn(`RicDOM UI: createFocusWhen: ref "${refName}" が見つかりません (フォーカスできる要素が render 結果に無い、または ref 名の綴りが違う可能性があります)。`);
     }
   };

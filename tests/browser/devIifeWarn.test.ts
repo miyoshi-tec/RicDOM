@@ -86,3 +86,50 @@ describe('実ブラウザ (process 未定義): dev IIFE (.iife.js) は深い代�
     warnSpy.mockRestore();
   });
 });
+
+// ricdom/ui 側の複製 (src/ui/internal/pureHelpers.ts の isDevMode/bakedDevMode) も
+// コアと同じ穴を抱えていたため、同じ規則で修正した (2.0.0-alpha.10)。focusWhen/
+// inlineMenu/theme の 3 箇所のうち、`applyTheme` (無効な theme/density/fontSize 名で
+// warn、src/ui/theme.ts の warnIfInvalidName) が最も単純に呼べるので代表としてテストする。
+interface RicdomUiGlobal {
+  applyTheme: (el: Element, opts: { density?: string }) => void;
+}
+
+describe('実ブラウザ (process 未定義): ui dev IIFE (ricdom-ui.iife.js) は無効な density 名で warn する / production (ricdom-ui.iife.min.js) は warn しない', () => {
+  it('dist/ricdom-ui.iife.js (dev、__RICDOM_DEV__=true 焼き込み) は無効な density 名 (\'md\') で console.warn する', async () => {
+    const code = await commands.readFile('dist/ricdom-ui.iife.js');
+    loadScript(code);
+
+    const ricdomUI = (window as unknown as { ricdomUI?: RicdomUiGlobal }).ricdomUI;
+    expect(ricdomUI).toBeTruthy();
+
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // 'md' は density としては無効 (density の有効値は comfortable/compact/tight。
+    // 'md' は fontSize の有効値であり、density と混同しやすい値としてあえて選んだ)。
+    ricdomUI!.applyTheme(el, { density: 'md' });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy.mock.calls.some((call) => String(call[0]).includes('applyTheme の density'))).toBe(true);
+    warnSpy.mockRestore();
+    el.remove();
+  });
+
+  it('dist/ricdom-ui.iife.min.js (production、__RICDOM_DEV__=false 焼き込み) は process が無くても同じ無効な density 名で console.warn しない', async () => {
+    const code = await commands.readFile('dist/ricdom-ui.iife.min.js');
+    loadScript(code);
+
+    const ricdomUI = (window as unknown as { ricdomUI?: RicdomUiGlobal }).ricdomUI;
+    expect(ricdomUI).toBeTruthy();
+
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    ricdomUI!.applyTheme(el, { density: 'md' });
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+    el.remove();
+  });
+});

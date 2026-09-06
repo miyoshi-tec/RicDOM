@@ -7,6 +7,53 @@
 
 import type { ClassValue } from '../../types.js';
 
+// dev/prod 切り替え (src/reactivity.ts の isDevMode / bakedDevMode と同じ判定規則)。
+// ricdom/ui はコアに実行時依存が無い (設計書 §13) ので、コア側を import せずここに複製する
+// (判定規則を変えるときは両方を揃えること)。
+//
+// 2.0.0-alpha.10 で判明した穴 (コア側と同根、統括確認済み): 旧実装は
+// `typeof process === 'undefined' || ... || process.env.NODE_ENV !== 'production'` の
+// OR 連鎖だけで、tsup の define は末尾の `process.env.NODE_ENV` トークンしか置換しない
+// ため、`process` グローバルが無いブラウザ (`<script src>` 直読み = 主要な配布形態) では
+// 前 2 節が常に true になり、production の `.iife.min.js` でも isDevMode() が true を
+// 返し続けていた。focusWhen (ref 未発見) / inlineMenu (親が unpositioned) / theme
+// (無効な theme 名) の dev 専用 warn がコード・文字列ごと出荷 min に残っていた
+// (\uXXXX エスケープを考慮した grep で確認)。コアの修正時点では ui 側は「別の穴」と
+// して tsup.config.ts の define だけ先に足してあり、この判定側が `__RICDOM_DEV__` を
+// 見ていなかったため、その define は効いていなかった。
+//
+// 対策もコアと同じ: ビルド時定数 `__RICDOM_DEV__` (declare は src/env.d.ts、tsup.config.ts
+// の ui IIFE 2 本が true/false を焼き込む) をトップレベル定数 `bakedDevMode` として一度だけ
+// 確定させ、呼び出し側 (focusWhen.ts / inlineMenu.ts / theme.ts) は `isDevMode()` を
+// 直接呼ばず、必ず定数を **左** に置いた `bakedDevMode ?? isDevMode()` の形で参照する。
+// esbuild は関数呼び出しをまたいだ定数伝播を行わない (isDevMode() の中身をどれだけ
+// 定数化しても、呼び出し式が条件に残る限り warn コードは物理的に残る) が、`??`/`&&` の
+// 左辺が静的に確定していれば右辺ごと畳み込む (`false ?? f()` → `false`) ので、
+// `.iife.min.js` では warn コードが dead-code elimination で完全に消え、`.iife.js`
+// (`true`) では無条件に残る。ESM/CJS や bundler 無しの実行では `__RICDOM_DEV__` が
+// 未定義 → `bakedDevMode` は `undefined` → 従来どおり `process.env.NODE_ENV` を都度読む
+// (テストで dev/prod を切り替えられる動的挙動を維持)。`process` 自体が無い環境では
+// 「判定不能なら dev 扱い」(silent failure を増やさない方針) もコアと同じ。
+//
+// **このファイルの先頭 (import 直後、UI_ROLE より前) に置くこと**: 実装時に esbuild 直叩きの
+// 二分探索で判明した追加条件 (esbuild 0.27.7) — トップレベル const の定数インライン化
+// (呼び出し側の `bakedDevMode` を `false` に置換する処理) は、同じファイル内でそれより
+// **前** にあるトップレベル宣言の初期化子にオブジェクトリテラル・`new`・関数呼び出しが
+// 1 つでもあると行われない (数値・配列リテラル・アロー関数は妨げない)。当初 UI_ROLE
+// (オブジェクトリテラル) の後ろに置いたところ、`bakedDevMode = !1` 自体は畳まれるのに
+// 呼び出し側には変数参照のまま残り、warn コードが min に残った。コア (reactivity.ts) で
+// 同じ書き方が効いていたのは、たまたま前方にそうした宣言が無かったため。
+export const bakedDevMode: boolean | undefined = typeof __RICDOM_DEV__ === 'boolean' ? __RICDOM_DEV__ : undefined;
+
+export const isDevMode = (): boolean => {
+  if (bakedDevMode !== undefined) return bakedDevMode;
+  try {
+    return typeof process === 'undefined' || typeof process.env === 'undefined' || process.env.NODE_ENV !== 'production';
+  } catch {
+    return true;
+  }
+};
+
 /** 基底 class (例: 'ric-input') に呼び出し側の class (string/配列/真偽値マップ) を連結する。 */
 export const mergeClass = (base: string, extra: ClassValue | undefined): string => {
   if (!extra) return base;
@@ -111,15 +158,3 @@ export const UI_ROLE = {
 } as const;
 
 export type UiRole = (typeof UI_ROLE)[keyof typeof UI_ROLE];
-
-// dev/prod 切り替え (src/reactivity.ts の isDevMode と同じ考え方: モジュール読み込み時に
-// キャッシュせず都度読む。IIFE 配布版は tsup の define で 'production' を焼き込むため
-// dead-code elimination で消える)。ricdom/ui はコアに実行時依存が無い (設計書 §13) ので、
-// コア側の isDevMode を import せずここに複製する。
-export const isDevMode = (): boolean => {
-  try {
-    return typeof process === 'undefined' || typeof process.env === 'undefined' || process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};

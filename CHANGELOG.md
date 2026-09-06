@@ -106,6 +106,35 @@ implementation.
   real condition (no `process` global at all) directly. Core gzip: **5,182B → 4,774B**
   (net **−408B**, comfortably under the 5,200B ceiling — the removed dead code was larger
   than the constant-check overhead added).
+- **`dist/ricdom-ui.iife.min.js` (production `ui`) no longer ships its three dev-only
+  warnings live in a plain browser with no `process` global** — the same root cause as the
+  core fix above. `src/ui/internal/pureHelpers.ts` has its own copy of `isDevMode()` (kept
+  separate on purpose: `ricdom/ui` has zero runtime dependency on the core), and it had the
+  identical `typeof process` guard hole; the `__RICDOM_DEV__` `define` already added to the
+  `ui` IIFE entries by the core fix had no effect because this copy never read it. Fixed the
+  same way: a `bakedDevMode` top-level constant in `pureHelpers.ts`, and the three call
+  sites (`createFocusWhen`'s "ref not found", `uiInlineMenu`'s "parent has no position",
+  `applyTheme`'s "invalid theme/density/fontSize name") now reference it as the **left**
+  operand (`bakedDevMode ?? isDevMode()`, or `!(bakedDevMode ?? isDevMode())` for the
+  early-return form) instead of calling `isDevMode()` directly. Two more esbuild
+  constraints surfaced while doing this, both confirmed by bisecting with direct esbuild
+  builds (0.27.7) and documented in the source comments: (1) esbuild only inlines a
+  top-level `const` into other modules when **no earlier top-level declaration in the same
+  file** has an object-literal, `new`, or call-expression initializer (numbers, arrays, and
+  arrow functions don't interfere) — `bakedDevMode` originally sat after the `UI_ROLE`
+  object literal and stayed a live variable at every call site, so it now comes first in
+  `pureHelpers.ts`; (2) esbuild's tree shaking decides which declarations to keep from
+  parse-time reference counts, before the constant is substituted, so guarding the *call*
+  to a separate helper (`if (baked ?? …) scheduleParentPositionCheck()`) removed the call
+  but left the helper — and its warning string — in the bundle. `uiInlineMenu` therefore
+  puts the check as an early return *inside* `scheduleParentPositionCheck`, which lets
+  esbuild fold the whole body (rAF + `getComputedStyle` scan) down to an empty function.
+  Verified by escape-aware grep (esbuild emits `\uXXXX` for non-ASCII) that all three
+  warning strings are absent from `dist/ricdom-ui.iife.min.js` and present in
+  `dist/ricdom-ui.iife.js`. `ui` gzip: **24,970B → 24,472B** (net **−498B**).
+  `tests/browser/devIifeWarn.test.ts` gained the `ui` counterpart of the core assertions
+  (`applyTheme` with an invalid `density` warns from `.iife.js`, stays silent from
+  `.iife.min.js`, in a real browser with no `process` global).
 
 ### Docs
 
@@ -126,6 +155,10 @@ implementation.
   actual per-distribution-format behavior (`.iife.min.js` DCE'd via `__RICDOM_DEV__`,
   `.iife.js` always warns, ESM/CJS defer to the consumer's bundler, a no-bundler ESM import
   falls back to dev mode) — see the `isDevMode()` fix above.
+- `docs/SPEC.md` §8 (`applyTheme` invalid-name warning FACT) and §10.3.2
+  (`createFocusWhen`): replaced the bare `process.env.NODE_ENV !== 'production'` wording
+  with the same per-distribution-format rule for `ricdom/ui` (`ricdom-ui.iife.min.js` DCE'd
+  via `__RICDOM_DEV__`, `ricdom-ui.iife.js` always warns) — see the `ui` fix above.
 
 ## [2.0.0-alpha.9] — not yet published
 
