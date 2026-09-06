@@ -176,6 +176,18 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 26. パイロット移行第 5〜7 号 (RaccoonMemo / Rancha / Brownies Desktop、Electron 3 アプリ同時) からの確定事項 (2026-09-06、2.0.0-alpha.8)
+
+- **移行実績**: v1 v0.4.5 → v2 alpha.7、3 アプリとも「移行できた」。unit + e2e (スナップショット含む) が v1 と同数で全緑 (Brownies 361+27 / Rancha 392+116 / Raccoon 223+39)。推奨手順 0 (v1 依存を 1 ファイルに寄せる) は打診より前に自発的に完了しており、v2 化は「アダプタ 1 本 + 機械変換 1 種類」。**アダプタ先行の有効性を第 3〜7 号の 5 アプリで確認**
+- **既定塗りの詳細度は 0 でなければならない**: `[data-ricdom-theme]` (0,1,0) は consumer の要素セレクタ `body { background }` (0,0,1) より高く、Brownies のアプリテーマを黙って上書きしていた (theme e2e が `rgb(51,51,51)` vs `rgb(30,30,30)` で検出)。§21 で「属性セレクタ 1 つなので詳細度は低く上書きできる」と書いたのは**統括の事実誤認**。`THEME_PAINT_CSS` と `SCROLLBAR_CSS` のセレクタを `:where([data-ricdom-theme])` で包んで詳細度 0 に。**原則: ライブラリの「既定」は consumer のどんな規則にも負けることをコードで保証する** (`:where`)。`portal:empty` は既定塗りではないので対象外
+- **二段階配線 (v1 の handle 生成 → 配線 → render 後付け)**: 「render 未指定なら初回描画をスキップする lenient モード」の提案は**見送り** — canon は既存の 2 つ: `options.setup`、または `createApp(target, state, () => null)` で作ってから `app.render = fn` を代入 (許可された再代入、同期描画。v1 の `shared_proxy.render` 踏襲、SPEC に一言しか無かった穴)。コアに 2 つ目の起動モードを足さない。再検討の条件: 上の 2 つでほどけない循環参照の実例
+- **編集中ガード (コア規則) の帰結を FACT 化**: フォーカスを保ったままのプログラム的挿入 (貼り付けで Markdown 差し込み、DnD) は要素に対して行い (`setRangeText` / `value` + selection)、同じ値を state に写す。フォーカス中は DOM が正。ガードにより次の render は上書きしない。規則は変えない
+- **`data-ricdom-role` の棚卸し**: `dialog-title` (報告) に加え `popup-trigger` / `tooltip-trigger` / `toast-msg` / `tweak-title`、dialog の自前トリガーに `button`。tweak の行ラベル等の反復装飾 span は付けない (行に `data-ricdom-tweak-key` / folder role の固有フックが既にある)。方針: **consumer が CSS / E2E で掴みたくなる構造要素にはすべて role、装飾 span には付けない**
+- **`uiButton` の `variant: 'link'` 復活** (§20 の原則。v1 の正式 variant、テキスト風ボタン)。alpha.7 以前で `ghost` + 自前 class に逃げた consumer は撤去可
+- docs: `children` 省略 = 空要素の grep 指針 (`ref` だけの要素、innerHTML 注入 host → `island: true`)、`tag` 必須 (v1 暗黙 div の機械変換パス) を V1_VS_V2 / TUTORIAL に
+- **良かった点 (据え置き)**: page の 3 分解で Brownies の css_for 島ハックが消滅 / `use()` 忘れの即時 error / descriptor と dialog クラスの 1:1 互換で見た目回帰ゼロ / `.d.ts` が prop 名ミスを事前に止めた / `createFocusWhen` の ref 名設計
+- コア未変更 (gzip 5,169B)、ui 24,509B、css 6,230B。unit 538 / browser 107。**パイロット 7 アプリで計 35 件** (第 5〜7 号 = 実装 3 + docs 4)。次のパイロット指名は規模順 Raccoon → Rancha → Brownies で受けられる旨の申し出あり
+
 ## 25. パイロット移行第 4 号 (章動減速機 設計ツール v8、classic script) からの確定事項 (2026-09-05、2.0.0-alpha.7)
 
 - **移行実績**: v1 v0.3.37 → v2 alpha.5、**部分的** (1 機能のみ不可 = accordion を外から閉じる)。ricdom は右ペイン 1 木 (アコーディオン 5 節 + 表 2 + 散布図 SVG、部品呼び出し 251 箇所、9 部品のみ、portal 系不使用)。**アダプタ 1 ファイルが先にあった**ため機械変換は `ctx`→`children` 1 種類 295 箇所、呼び出し側は 1 文字も変えず。差分全行を逆変換して突合 (不一致 0)。テスト 1,654 件・全スイート 277 秒
