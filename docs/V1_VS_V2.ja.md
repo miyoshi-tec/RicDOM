@@ -40,7 +40,7 @@
 
 | 観点 | v1 | v2 |
 |---|---|---|
-| 状態を持つ部品の契約 | `s.x = create_ui_x()` で `__notify` を**暗黙注入** (state トップレベル必須、誤ると silent failure) | **`const x = app.use(createX())`** で明示登録。未登録で呼ぶと console.error + NOOP、`dispose()` あり。**注意: `createApp` は同期で初回描画するため、`use()` は `render` 関数の外 (`setup` オプション) で行う** — 詳細は下記「`setup` オプション」節 |
+| 状態を持つ部品の契約 | `s.x = create_ui_x()` で `__notify` を**暗黙注入** (state トップレベル必須、誤ると silent failure) | **`const x = app.use(createX())`** で明示登録。未登録で呼ぶと console.error + NOOP、`dispose()` あり。**注意: `createApp` は同期で初回描画するため、`use()` は `render` 関数の外で行う** — canon は 2 通り: `setup` オプション (下記「`setup` オプション」節)、または `() => null` で作ってから `app.render` を後付けする (下記「二段階配線のもう 1 つの解」節、v1 の handle→配線→render 後付けの順序をそのまま再現したい場合向け) |
 | 状態を持たない部品 | `ui_button(...)` 等 | `uiButton(...)` 等 (純粋関数、`use()` 不要) |
 | portal (popup/dialog/toast/tooltip) | `create_ui_page` の render が drain (**page 必須**、css_for 島では不可) | **app 単位の portal ホスト** (page 部品なし)、`portalTo` で任意要素 |
 | CSS 配布 | per-instance で使用クラスを収集注入 (通らない mount は**無装飾**)、`css_for` 3 点セット | **1 枚の `ricdom-ui.css`** (`<link>` or `injectStyles()`)、無装飾 silent failure は構造的に消滅 |
@@ -67,11 +67,11 @@
 | portal 系 (popup/dialog/toast/tooltip) の props | 手動 (API 変更) |
 | アイコン descriptor | そのまま |
 
-## 移行の落とし穴 (第 3 号・第 4 号のフィードバックより — 表のとおりに書くと必ず 1 回踏む)
+## 移行の落とし穴 (第 3〜7 号のフィードバックより — 表のとおりに書くと必ず 1 回踏む)
 
 移行ガイドの対応表は「何が変わったか」を短く伝えるものだが、実際に手を動かすと表の 1 行だけでは
-気づけない具体的な落とし穴がある。ここでは実際のパイロット移行 (第 3 号・第 4 号) が踏んだものを、
-再現手順ごと記録する。
+気づけない具体的な落とし穴がある。ここでは実際のパイロット移行 (第 3〜4 号、および Electron 3 アプリ
+同時移行だった第 5〜7 号 = RaccoonMemo/Rancha/Brownies Desktop) が踏んだものを、再現手順ごと記録する。
 
 ### `setup` オプション: `app.use()` を呼ぶタイミング
 
@@ -118,6 +118,34 @@ v1 では `s.acc = create_ui_accordion()` のように **state のどのキー�
 （render 内で使う呼び出し自体は `s.acc({ items, ctx })` → `acc({ items, children })` のような
 ノード変換のみで、部品オブジェクトそのものの呼び出し方は変わらない。)
 
+### 二段階配線のもう 1 つの解: `app.render` の後付け (第 5〜7 号・RaccoonMemo/Rancha 同型の報告より)
+
+上の「`setup` オプション」節は「`use()` を先に済ませる」解だが、v1 の「まず handle を作り、
+panel を配線してから render を後付けする」という順序そのものを再現したいケースもある
+(例: panel オブジェクトの構築自体が複雑で、render 関数の外に出しておきたい)。v2 では
+これも canon の書き方として許可されている ([SPEC.md §5](SPEC.md) の `App<S>.render` FACT
+に一言だけ書かれている契約): **`createApp` の第 3 引数に `() => null` (何も描画しない
+render) を渡してインスタンスを作ってから、`app.render` に本物の render 関数を代入する**。
+代入は同期的にすぐ再描画をトリガーする — 「初回描画をスキップする」ような lenient モードは
+存在しない (`() => null` も「今はまだ何も描画しない、ただの render 関数」として扱われる)。
+
+```js
+// v1: handle 生成 → panel 配線 → render 後付け
+// const app = create_RicDOM('#app', { params: {...} });
+// const panel = create_ui_tweak_panel();
+// app.render = (s) => panel({ title: '設定', data: s.params });
+
+// v2: 同じ順序をそのまま再現できる (setup オプションを使わない代替パターン)
+const app = createApp('#app', { params: { size: 10 } }, () => null); // 初回は空描画
+const panel = app.use(createTweakPanel()); // handle が要る組み立てをここで行う
+app.render = (s) => panel({ title: '設定', data: s.params }); // 循環参照をここでほどく
+```
+
+`use()` を先に済ませられる (循環参照が生じない) なら「`setup` オプション」節のパターンの方が
+コード量が少ないので、そちらを既定に推奨する。この節のパターンは「v1 の順序をそのまま踏襲
+したい」「render の組み立てが `createApp` 呼び出し時点でまだ用意できない」ような場合の
+代替として使う (canon はこの 2 つのみ)。
+
 ### page 行の補足: `applyTheme` が塗るのは bg/fg/font-size のみ
 
 `applyTheme` した要素に塗られるのは `background` / `color` / `font-size` の 3 つだけ。v1 の
@@ -154,6 +182,16 @@ v1 では `s.acc = create_ui_accordion()` のように **state のどのキー�
 `ctx` という名前のプロパティ (例: canvas 2D の `CanvasRenderingContext2D` を指す変数名としての
 `ctx`) を持つケースがあり得る。この場合、**リポジトリ全体に変換をかけてはいけない** — 変換対象の
 ファイルを (v1 の `ricdom` API を呼んでいるファイルだけに) 明示的に列挙してから機械変換をかける。
+
+### `tag` 必須化 (RaccoonMemo からの報告)
+
+もう 1 つ機械変換で見落としやすいのが `tag` の省略。v1 は `tag` を省略すると暗黙に `div` として
+扱っていたが、v2 では **`tag` が型上必須** (実行時に欠落していれば `console.error` + 不可視) なので、
+`{ children: [...] }` だけの (＝ `tag` を書いていない) 要素は v2 では動かない。`ctx`→`children` の
+機械変換だけをかけて「`tag` が無いオブジェクトが残っていないか」を見ないまま済ませると、
+TypeScript を使っていれば型エラーで気づけるが、JS のまま (`allowJs`) 移行している場合は
+実行時まで気づけない。変換対象ファイルに対して `tag` を持たないオブジェクトリテラルを別途 grep
+し、`tag: 'div'` を補う一括変換をもう 1 パス走らせておく。
 
 ### 進め方の推奨: まず v1 依存を 1 ファイル (アダプタ) に寄せる
 

@@ -204,6 +204,22 @@ const app = createApp(
 (Without `setup`, you'd have to make `render` return a placeholder until `use()` has run,
 then trigger another render — `setup` exists so you don't have to.)
 
+There's a second sanctioned way to untangle the same circular dependency (the part needs
+the app handle; the render function needs the part): pass a render function that renders
+nothing yet, and assign the real one to `app.render` once you have what you need. This is
+useful when building the render function itself is involved enough that you'd rather do it
+outside `createApp`'s call site:
+
+```js
+const app = createApp('#app', {}, () => null); // nothing to render yet
+const toast = app.use(createToast());
+app.render = () => { toast(); return uiButton({ children: ['Save'], onclick: () => toast.show('Saved!') }); };
+```
+
+Assigning to `app.render` re-renders synchronously right away, same as assigning to any
+other property on the handle — there's no lenient mode where a missing/placeholder render
+function skips the first paint.
+
 If you forget the `app.use(...)` step and call `createToast()()` directly, nothing
 crashes — `ricdom/ui` logs one `console.error` explaining the fix and renders nothing.
 There's no implicit wiring to get subtly wrong: either a part is registered with `use()`,
@@ -395,6 +411,29 @@ createApp('#app', { fps: 0 }, (s) => ({
 
 Grab the canvas element yourself via `app.refs.get('canvas')` and drive it however you
 like — ricdom's diffing will never fight you for control of anything inside an island.
+
+### Migrating from v1: the second trap — omitting `children` no longer means "leave this alone"
+
+If you're porting a v1 tree, this is the mirror image of chapter 3's trap and just as easy
+to miss. In v1, an element that omitted `ctx` (v1's `children`) was implicitly an island —
+ricdom never touched its descendants. In v2, omitting `children` just means **an empty
+element** (`island` must be requested explicitly, above). A v1 element that relied on the
+old implicit behavior renders correctly on the first paint (it happens to already be
+correct DOM) and then goes quietly wrong on the *next* render, when v2 diffs it against an
+empty `children` and clears out whatever was there.
+
+Before migrating, grep the v1 codebase for the two shapes most likely to be relying on this
+implicit behavior (pilot 5-7 = Rancha's report; this doesn't show up as an error, so it has
+to be found by inspection, not by running the app):
+
+1. **Elements that carry only a `ref`, no `ctx`/`children`** — almost always a hand-off
+   point, e.g. `{ tag: 'canvas', ref: 'chart' }` for a chart library that draws into it
+   later. Add `island: true`.
+2. **Any host element that some other piece of code writes into directly** — `el.innerHTML
+   = ...` from a rich-text editor, a third-party widget's own `.mount(el)`, a canvas
+   animation loop — reached via `app.refs.get(name)` or a raw `document.querySelector`.
+   Add `island: true` to that element in the tree, not just to the code that touches it
+   afterwards.
 
 ---
 

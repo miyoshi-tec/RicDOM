@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.8] — not yet published
+
+Seven cross-cutting reports from pilots 5-7 (RaccoonMemo, Rancha, Brownies Desktop — three
+Electron apps that migrated at the same time), triaged and verified against the code by the
+maintainer before implementation.
+
+### Changed
+
+- **`ricdom-ui.css`'s default theme paint and scrollbar rules now have zero specificity**
+  (Brownies Desktop #1): `THEME_PAINT_CSS` (`[data-ricdom-theme] { background; color;
+  font-size }`) and `SCROLLBAR_CSS` (`[data-ricdom-theme]`/`[data-ricdom-theme] *` and their
+  `::-webkit-scrollbar*` rules) were attribute selectors, specificity (0,1,0) — higher than
+  a plain element selector like `body { background: ... }` (0,0,1), so a consumer's ordinary
+  rule silently lost to this "default" paint despite alpha.3's docs claiming otherwise
+  (`applyTheme` an element, then style `body` by tag name and get the theme's color back,
+  not yours). Both are now wrapped in `:where(...)` so their specificity is zero — any rule
+  of yours, including a bare element selector, wins. `[data-ricdom-role="portal"]:empty {
+  display:none }` is unaffected (not a "default" paint). See SPEC.md §8.
+
+### Added
+
+- **`data-ricdom-role="dialog-title"`** on `createDialog`'s `.ric-dialog__title` span
+  (Brownies Desktop #2), plus a role audit across dialog/popup/dropdown/toast/tooltip/
+  tweakPanel for other `ric-*`-classed elements that had no role: `popup-trigger` (popup's
+  trigger button — `createDropdown` had `dropdown-trigger`, popup's equivalent didn't),
+  `tooltip-trigger` (tooltip's hover/focus wrapper, distinct from the floating `tooltip`
+  popup), `toast-msg` (a toast item's message text), `tweak-title` (the tweak panel's
+  optional title), and `button` on `createDialog`'s own trigger button (it builds a raw
+  `.ric-button` node instead of going through `uiButton()`, so it had silently been the one
+  `.ric-button`-styled element with no role). Repeated per-row decorative sub-parts inside
+  `createTweakPanel` (row/folder label spans, the JSON-fallback preview) were deliberately
+  left unroled — see SPEC.md §11 and `src/ui/tweakPanel.ts`'s `rowHookAttrs` comment for why.
+- **`uiButton`'s `variant: 'link'` restored from v1** (Rancha): strips background, border,
+  and the height constraint for a text-like button (breadcrumbs, inline links); ignores
+  `size` the same way it ignores density's height. Per DESIGN.ja.md §20 ("a v1 prop that
+  was official is restored by default"), not a new design.
+
+### Docs
+
+- **Two-stage wiring**: documented the second sanctioned way to untangle "the part needs
+  the app handle; render needs the part" (v1's handle→wire→render-later order) — pass `()
+  => null` to `createApp` and assign the real function to `app.render` afterward, which
+  renders synchronously right away (an existing but barely-documented contract). There is
+  no lenient mode where a missing render skips the first paint. Worked examples added to
+  `docs/V1_VS_V2.ja.md` and `docs/TUTORIAL.md`; SPEC.md §5 gained an explicit FACT.
+- **Editing guard + programmatic insertion** (RaccoonMemo): documented the consequence of
+  the "no `value` reapply while focused" core rule for paste/drag-and-drop text insertion —
+  do the insertion against the element (`setRangeText()`/`value` + selection), mirror the
+  same value into state, and it will not be clobbered on the next render. SPEC.md's editing
+  guard FACT gained this as a direct consequence, not a new recipe.
+- **`children` omission = empty element** (Rancha): added a second TUTORIAL migration trap
+  (mirroring chapter 3's) — grep the v1 codebase for `ref`-only elements and hosts that get
+  `innerHTML` written into them externally, and add `island: true` before migrating.
+- **`tag` required** (RaccoonMemo): `docs/V1_VS_V2.ja.md`'s mechanical-conversion section
+  gained a note that v1's implicit `tag: 'div'` has no v2 equivalent — grep for
+  `{ children: [...] }` literals with no `tag` and add it as a second conversion pass.
+- **`docs/API_AUDIT.ja.md`**: recorded the public API additions above (`variant: 'link'`,
+  the new `UI_ROLE` entries).
+
+### Tests
+
+- **`tests/browser/uiTheme.test.ts`**: replaced the outdated "override wins because
+  specificity is low" test (which actually only proved a class selector + `!important`
+  wins, true either way) with one that reproduces the bug directly — a bare `body {
+  background: ... }` element selector, no `!important`, now wins against the theme paint;
+  before this release it did not.
+- **`tests/ui/buttonInput.test.ts`** (+1): `variant: 'link'` produces `ric-button
+  ric-button--link`.
+- **`tests/browser/uiButtonVariant.test.ts`** (new, 2 tests): `variant: 'link'` computes to
+  a transparent background/border-color and smaller padding; a default-variant button in
+  the same tree keeps its background and is taller.
+
 ## [2.0.0-alpha.7] — not yet published
 
 Two reports from the fourth pilot migration (a bevel-gear reducer design tool, a classic

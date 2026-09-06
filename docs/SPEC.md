@@ -153,6 +153,20 @@ rule that applies everywhere). The exemption is scoped to `value` only — `chec
 destroy in-progress keystrokes. Once the element loses focus, the next render re-syncs
 `value` normally.
 
+**Consequence for programmatic insertion while focused (RaccoonMemo, one of pilots 5-7,
+2.0.0-alpha.8)**: because the guard makes the live DOM authoritative for `value` while an
+element is focused, a state-driven write to that element's `value` (e.g. pasting an image
+→ inserting Markdown, or a drag-and-drop handler that wants to splice text in) has no
+effect as long as focus stays there — the next render sees the guard and skips reapplying
+`value`, so nothing appears to happen. This isn't a bug to work around; it follows directly
+from the rule above. Do the insertion against the **element**, not the state — e.g.
+`el.setRangeText(text, start, end, 'end')` or `el.value = ...` plus restoring
+`el.selectionStart`/`el.selectionEnd` — and write the same resulting value into state at
+the same time, so state and DOM already agree. The guard will not clobber it on the next
+render (it's exempting `value` precisely because the DOM is already right), and once the
+element blurs, state and DOM must already match — there is no separate blur-time
+reconciliation step.
+
 ### 2.5 Islands
 
 `{ tag: 'div', island: true, children: [...] }` tells ricdom to build the element once and
@@ -370,6 +384,29 @@ special behavior or logs `console.error` and refuses):
 | `use(part)` | `<T extends UsePart>(part: T) => T` | See §6. Idempotent — registering the same part object twice is a no-op |
 | `unmount()` | `() => void` | Disposes all registered parts, stops the scheduler, clears refs. Nothing renders again after this |
 | `refs` | `ReadonlyMap<string, Element>` | Every element with a `ref: 'name'` in the last-rendered tree, keyed by that name; recomputed after each render, **including elements inside the portal** (§7) |
+
+### FACT: `app.render = fn` is a sanctioned two-stage wiring pattern (2.0.0-alpha.8)
+
+Passing `() => null` as `createApp`'s third argument and reassigning `app.render` right
+after is not a workaround — it's one of exactly two canon ways to break a circular
+dependency between "the handle" and "what it renders" (the other is `options.setup`, §5).
+This comes up whenever building the render function needs the `App` handle itself (e.g. a
+part built with `app.use(...)` that the render function then calls), which you don't have
+until `createApp` returns:
+
+```js
+const app = createApp(target, state, () => null); // initial render: nothing yet
+const panel = app.use(createTweakPanel());          // now you have the handle
+app.render = (s) => panel({ title: 'Params', data: s }); // sanctioned reassignment,
+                                                          // renders synchronously right away
+```
+
+There is no separate "lenient mode" where omitting `render` (or passing a nullish value)
+skips the initial synchronous render — `createApp`'s render argument is required and
+called immediately either way (§5, "a **synchronous first render**"); `() => null` is
+just an ordinary render function that happens to render nothing yet. Once `app.render` is
+reassigned, the next render reflects it, synchronously, same as any other reassignment (see
+table above).
 
 ### FACT: portal `ref`s are collected in the same render they first appear
 

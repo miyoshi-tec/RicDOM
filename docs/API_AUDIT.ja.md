@@ -258,3 +258,23 @@ export interface Host {
 ゼロ (両フィールドとも省略可能、省略時は既存の uncontrolled 挙動のまま)。`setOpen()` のような
 命令的メソッドは意図的に追加していない (「canon は 1 つ」ポリシー、理由は `src/ui/accordion.ts`
 のファイルヘッダおよび SPEC.md §10.3.3a に記載)。
+
+### 2.0.0-alpha.8: `UiButtonVariant` に `'link'` 追加、`UI_ROLE` に 5 件追加
+
+パイロット第 5〜7 号 (RaccoonMemo / Rancha / Brownies Desktop、3 アプリ同時移行) の横断報告を受けた
+変更。
+
+| 種別 | 名前 | 規約 | 判定 |
+|---|---|---|---|
+| 型 (union 拡張) | `UiButtonVariant`: `'default' \| 'primary' \| 'ghost'` → `+ 'link'` | 既存 union の値追加 (新しい型ではない) | OK |
+| 定数フィールド (追加) | `UI_ROLE.dialogTitle = 'dialog-title'` | 既存の `dialogHeader`/`dialogBody` 等と同じ `dialogXxx` 命名 | OK |
+| 定数フィールド (追加) | `UI_ROLE.popupTrigger = 'popup-trigger'` | 既存の `dropdownTrigger` と同じ `xxxTrigger` 命名 | OK |
+| 定数フィールド (追加) | `UI_ROLE.tooltipTrigger = 'tooltip-trigger'` | 同上 | OK |
+| 定数フィールド (追加) | `UI_ROLE.toastMsg = 'toast-msg'` | 既存の `toastItem`/`toastClose` と同じ `toastXxx` 命名 | OK |
+| 定数フィールド (追加) | `UI_ROLE.tweakTitle = 'tweak-title'` | 既存の `tweakPanel`/`tweakFolder` と同じ `tweakXxx` 命名 | OK |
+
+命名規約からの逸脱なし。破壊的変更はゼロ (`variant: 'link'` は既存 union への値追加、`UI_ROLE` の
+新規フィールドは既存フィールドの値・意味を変えない追加のみ)。`UiButtonVariant` は v1
+(`ric_ui/control/ui_button.js`) に存在した正式 variant の復活であり新設ではない (設計書 §20
+「v1 で正式 prop だったものは復活が原則」)。`UI_ROLE` の 5 件は `src/ui/dialog.ts`/`popup.ts`/
+`toast.ts`/`tooltip.ts`/`tweakPanel.ts` の役割棚卸しで見つかった非対称の解消 (詳細は SPEC.md §11)。
