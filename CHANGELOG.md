@@ -117,13 +117,14 @@ implementation.
   `applyTheme`'s "invalid theme/density/fontSize name") now reference it as the **left**
   operand (`bakedDevMode ?? isDevMode()`, or `!(bakedDevMode ?? isDevMode())` for the
   early-return form) instead of calling `isDevMode()` directly. Two more esbuild
-  constraints surfaced while doing this, both confirmed by bisecting with direct esbuild
-  builds (0.27.7) and documented in the source comments: (1) esbuild only inlines a
-  top-level `const` into other modules when **no earlier top-level declaration in the same
-  file** has an object-literal, `new`, or call-expression initializer (numbers, arrays, and
-  arrow functions don't interfere) — `bakedDevMode` originally sat after the `UI_ROLE`
-  object literal and stayed a live variable at every call site, so it now comes first in
-  `pureHelpers.ts`; (2) esbuild's tree shaking decides which declarations to keep from
+  observations were made while doing this and are documented in the source comments:
+  (1) in one bisection with direct esbuild builds (0.27.7), `bakedDevMode` placed *after*
+  the `UI_ROLE` object literal stayed a live variable at every call site and the warnings
+  survived, while placing it first in `pureHelpers.ts` let them fold — a second,
+  independent set of clean rebuilds could **not** reproduce the failure with the original
+  order, so the causal rule is unconfirmed; the constant is kept at the top of the file
+  because that ordering is harmless and is the configuration that was verified;
+  (2) esbuild's tree shaking decides which declarations to keep from
   parse-time reference counts, before the constant is substituted, so guarding the *call*
   to a separate helper (`if (baked ?? …) scheduleParentPositionCheck()`) removed the call
   but left the helper — and its warning string — in the bundle. `uiInlineMenu` therefore
