@@ -91,4 +91,21 @@ describe('実ブラウザ smoke: ricdom + ricdom/ui の IIFE 2 本 + CSS <link>'
     await new Promise((r) => setTimeout(r, 100));
     expect(document.querySelector('[role="status"]')).not.toBeNull();
   });
+
+  // iifeSmoke.test.ts と同じ理由 (パイロット第 9 号 = Potopeta、2.0.0-alpha.10):
+  // `ricdom-ui.iife.min.js` 側の globalThis.ricdomUI 代入も同じ footer 対策なので、
+  // ui 側でも同じ関数スコープ eval の耐性を確認する。
+  it('関数スコープで評価 (new Function) しても globalThis.ricdomUI が定義される (footer の global 代入、修正前は赤)', async () => {
+    const uiCode = await commands.readFile('dist/ricdom-ui.iife.min.js');
+    // iifeSmoke.test.ts と同じ理由: 先行テストの <script> タグ実行で既に立っている
+    // window.ricdomUI (var 由来、非 configurable) を undefined で上書きしてから
+    // 関数スコープ eval の効果だけを見る。
+    (window as unknown as { ricdomUI?: unknown }).ricdomUI = undefined;
+    const fn = new Function(uiCode);
+    fn();
+
+    const ricdomUI = (window as unknown as { ricdomUI?: RicdomUiGlobal }).ricdomUI;
+    expect(ricdomUI).toBeTruthy();
+    expect(typeof ricdomUI!.createDialog).toBe('function');
+  });
 });

@@ -47,6 +47,20 @@ export default defineConfig([
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
     },
+    // パイロット第 9 号 = Potopeta からの報告 (2.0.0-alpha.10): esbuild の IIFE 出力は
+    // `var ricdom=(()=>{...})();` というトップレベル bare var で、通常の <script> 実行
+    // (グローバルスコープ) では `var` がそのまま window のプロパティになるため問題ない。
+    // ところが Potopeta の自己完結 HTML バンドル (v1 の LZ 自己展開ツールで生成) は
+    // 復元コードを `(()=>{ eval(s) })()` という関数スコープの中で eval する形をとる。
+    // 関数スコープの中の `var` はその関数のローカル変数になるだけで window には付かない
+    // ため、eval 完了後に `window.ricdom` が存在しない (v1 の成果物は既にこの対策として
+    // 明示的な global 代入を持っていた — v1 との非対称に気づかず素の esbuild 出力の
+    // ままだったのが今回の穴)。footer で `globalThis.ricdom=ricdom;` を明示注入すること
+    // で、`ricdom` ローカル変数 (トップレベル var なので同じ関数スコープ内では参照できる)
+    // を確実に `globalThis` へ張り直す。`globalThis` が無い環境 (target es2020 は
+    // globalThis 未対応ブラウザを最初から切っているため対象外) は考慮しない。
+    // コア gzip 天井 (5,200B) への影響は実測して最終報告に記載する。
+    footer: { js: 'globalThis.ricdom=ricdom;' },
   },
   {
     // ricdom/ui サブパスの ESM/CJS + 型宣言。コアと同じく consumer 側の bundler が
@@ -73,6 +87,8 @@ export default defineConfig([
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
     },
+    // 上のコア IIFE と同じ理由・同じ対策 (2.0.0-alpha.10、パイロット第 9 号 = Potopeta)。
+    footer: { js: 'globalThis.ricdomUI=ricdomUI;' },
   },
   {
     // ricdom/icons サブパスの ESM/CJS + 型宣言 (設計書付録 B A17、Phase 3c)。
