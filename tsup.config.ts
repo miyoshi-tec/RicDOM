@@ -35,6 +35,14 @@ export default defineConfig([
     // CDN から素の状態で読み込まれる想定のため、ここだけ NODE_ENV='production' を
     // 焼き込み、深い代入警告 (§3.3) 等の dev 専用コードを esbuild の dead-code
     // elimination で丸ごと削り、最小サイズにする。
+    // 2.0.0-alpha.10 で判明した穴の修正: `process.env.NODE_ENV` の define だけでは
+    // isDevMode() (src/reactivity.ts) の `typeof process === 'undefined'` 等のガード節が
+    // 置換対象外のまま残り、`process` の無いブラウザでは production ビルドでも
+    // isDevMode() が true になってしまっていた (dev 専用コードが DCE されない)。
+    // `__RICDOM_DEV__` を `false` の リテラルとして define することで、
+    // `typeof __RICDOM_DEV__ === 'boolean'` ごと esbuild が定数畳み込みし、
+    // NODE_ENV 判定を含む分岐全体を dead-code elimination できるようにする
+    // (src/env.d.ts の型宣言、src/reactivity.ts のコメント参照)。
     entry: { ricdom: 'src/index.ts' },
     format: ['iife'],
     globalName: 'ricdom',
@@ -46,6 +54,7 @@ export default defineConfig([
     outExtension: () => ({ js: '.iife.min.js' }),
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
+      __RICDOM_DEV__: 'false',
     },
     // パイロット第 9 号 = Potopeta からの報告 (2.0.0-alpha.10): esbuild の IIFE 出力は
     // `var ricdom=(()=>{...})();` というトップレベル bare var で、通常の <script> 実行
@@ -74,6 +83,14 @@ export default defineConfig([
     // `typeof process === 'undefined' → dev 扱い` 分岐が自然に true になり、警告が有効に
     // なる。production 版 (`.iife.min.js`) はコア gzip 天井の対象のまま変更しない —
     // この dev 版は天井の対象外 (配布はしても CDN 常用を想定しない、ローカル開発用)。
+    // 2.0.0-alpha.10 で `__RICDOM_DEV__: 'true'` を明示 define する (統括決定)。
+    // NODE_ENV を注入しないだけでは「`process` が実在し NODE_ENV が 'production' 以外」
+    // という consumer 環境 (Electron レンダラー等) との判別しかできておらず、
+    // `__RICDOM_DEV__` 導入後の isDevMode() (src/reactivity.ts) は
+    // `typeof __RICDOM_DEV__ === 'boolean'` を最優先で見るため、ここで明示しないと
+    // 未定義 → 結局 `process` の有無で分岐するフォールバックに落ちてしまい、
+    // production 版 (`.iife.min.js`, `__RICDOM_DEV__: 'false'`) との対比が
+    // 「NODE_ENV の baked/非-baked」ではなく「define の有無」でしか効かなくなる。
     entry: { ricdom: 'src/index.ts' },
     format: ['iife'],
     globalName: 'ricdom',
@@ -83,6 +100,9 @@ export default defineConfig([
     clean: false,
     target: 'es2020',
     outExtension: () => ({ js: '.iife.js' }),
+    define: {
+      __RICDOM_DEV__: 'true',
+    },
     // production 版と同じ理由 (B) で、関数スコープ eval 耐性のため footer は dev 版にも付ける。
     footer: { js: 'globalThis.ricdom=ricdom;' },
   },
@@ -99,6 +119,10 @@ export default defineConfig([
   },
   {
     // ricdomUI IIFE。`<script src>` 2 本 (ricdom → ricdom-ui) で部品が動くことの根拠。
+    // `__RICDOM_DEV__` はコア (src/reactivity.ts) の判定にしか使われていない
+    // (src/ui/internal/pureHelpers.ts の独自 isDevMode は現状 NODE_ENV のみを見る、
+    // 別の穴 — 今回のタスク範囲外) が、コアと命名・構成を揃えるため define 自体は
+    // ここにも足しておく (2.0.0-alpha.10、統括決定)。
     entry: { 'ricdom-ui': 'src/ui/index.ts' },
     format: ['iife'],
     globalName: 'ricdomUI',
@@ -110,6 +134,7 @@ export default defineConfig([
     outExtension: () => ({ js: '.iife.min.js' }),
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
+      __RICDOM_DEV__: 'false',
     },
     // 上のコア IIFE と同じ理由・同じ対策 (2.0.0-alpha.10、パイロット第 9 号 = Potopeta)。
     footer: { js: 'globalThis.ricdomUI=ricdomUI;' },
@@ -128,6 +153,9 @@ export default defineConfig([
     clean: false,
     target: 'es2020',
     outExtension: () => ({ js: '.iife.js' }),
+    define: {
+      __RICDOM_DEV__: 'true',
+    },
     footer: { js: 'globalThis.ricdomUI=ricdomUI;' },
   },
   {

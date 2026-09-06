@@ -21,7 +21,7 @@ import {
   normalizeChildren,
   normalizeNode,
 } from './normalize.js';
-import { isDevMode } from './reactivity.js';
+import { bakedDevMode, isDevMode } from './reactivity.js';
 
 // =====================================================================
 // 定数
@@ -458,7 +458,16 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
     if (entry.d && entry.d.parentNode === parentEl) parentEl.removeChild(entry.d);
   }
 
-  if (hasDuplicateKey && isDevMode()) {
+  // `isDevMode()` を直接条件に置かず `bakedDevMode ?? isDevMode()` にする理由は
+  // src/reactivity.ts の isDevMode 定義直前のコメント参照 (production ビルドで
+  // DCE を効かせるため。関数呼び出しをまたいだ定数伝播は esbuild が行わない)。
+  // **`&&` の左側に置くこと**: `hasDuplicateKey && (bakedDevMode ?? isDevMode())`
+  // のように定数側を右に置くと、esbuild は `bakedDevMode` を `false` に畳み込んだ後も
+  // 左の非定数 (`hasDuplicateKey`) をまたいだ `X && false → false` という再畳み込みを
+  // 行わず、`console.warn(...)` 呼び出しが物理的に残ってしまうことを実測で確認した
+  // (2.0.0-alpha.10)。定数側を左に置けば `false && X` は無条件に `false` へ畳み込まれ、
+  // 右側 (console.warn を含む) ごと dead-code elimination される。
+  if ((bakedDevMode ?? isDevMode()) && hasDuplicateKey) {
     console.warn('RicDOM: 兄弟の key が重複しています。');
   }
 };
