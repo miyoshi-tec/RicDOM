@@ -325,10 +325,20 @@ const PORTAL_CSS = `
 // このルール。子孫セレクタを付けない (`[data-ricdom-theme] *` にしない) のは、ネストした
 // 島 (子孫で再度 applyTheme された要素) が自分の bg で上書きするのは意図どおりだが、
 // それ以外の子孫まで一律に塗ると consumer 自身の要素の背景を勝手に上書きしてしまうため
-// (v1 も `.ric-page` 自身だけを塗っていた)。属性セレクタ 1 つだけなので詳細度は低く、
-// 塗りたくない consumer は自分の CSS で上書きできる (SPEC §8 に FACT として明記)。
+// (v1 も `.ric-page` 自身だけを塗っていた)。
 // `[data-ricdom-theme]` は属性の「有無」で一致する — ThemeVars 指定時に applyTheme が
 // 付与する空文字値 (`data-ricdom-theme=""`) にもマッチする。
+//
+// **詳細度 (パイロット第 5〜7 号、Brownies Desktop からの報告 #1、2.0.0-alpha.8 で修正)**:
+// alpha.3 時点では「属性セレクタ 1 つなので詳細度は低く、consumer は自分の CSS で
+// 上書きできる」と書いていたが事実誤認だった。属性セレクタの詳細度は (0,1,0) で、
+// consumer が「これは既定塗りだから」と要素セレクタ (`body { background: ... }`、
+// (0,0,1)) で上書きしようとしても、(0,1,0) > (0,0,1) のため実際には勝てず、consumer の
+// 意図に反してテーマの色が残ってしまう実機バグだった。ここは「既定」= consumer の
+// どんな規則にも問答無用で負けるべき塗りなので、セレクタを `:where(...)` で包み詳細度を
+// 0 にする (`:where()` の中身は詳細度計算に使われない、疑似要素 `::-webkit-scrollbar*`
+// 部分の (0,0,1) はそのまま残る)。これで consumer 側は要素セレクタ 1 つで確実に上書き
+// できる (SPEC §8 に FACT として明記)。
 //
 // font-size (パイロット第 3 号からの報告 #2、2.0.0-alpha.6): applyTheme は
 // `--ric-font-size` 変数をセットするだけで、要素自身の font-size は塗っていなかった
@@ -337,9 +347,9 @@ const PORTAL_CSS = `
 // (md=14px) ため、bg/fg パリティ (#11) と同じ理由でここに揃える。
 // **既存 consumer への影響**: この要素直下のテキストの見た目が変わりうる (既定 16px →
 // テーマの fontSize、既定 md=14px)。上書きしたい場合は `[data-ricdom-theme] { font-size:
-// ... }` を自分の CSS で後勝ちさせるか、自分の要素に直接指定する (SPEC §8 に FACT 追記)。
+// ... }` のような要素/属性セレクタを自分の CSS に書けば必ず勝てる (SPEC §8 に FACT 追記)。
 const THEME_PAINT_CSS = `
-[data-ricdom-theme] {
+:where([data-ricdom-theme]) {
   background: ${bg};
   color: ${fg};
   font-size: ${fs};
@@ -350,24 +360,28 @@ const THEME_PAINT_CSS = `
 // スコープ用マーカーとして使う (設計書 §13 で確定した方式)。属性を持つ要素自身と、
 // その子孫すべてに適用する (子孫の中でネストして再度 applyTheme された要素があっても、
 // セレクタが重複適用されるだけで害はない)。
+// THEME_PAINT_CSS と同じ理由 (#1、2.0.0-alpha.8) でこれも「既定」なので `:where(...)`
+// で詳細度 0 にする。疑似要素 (`::-webkit-scrollbar` 等) の (0,0,1) は `:where()` の
+// 対象外 (疑似要素自体には掛けられない) なのでそのまま残るが、consumer が同じ疑似要素
+// セレクタで上書きすれば互角以上に勝てるので実用上問題ない。
 const SCROLLBAR_CSS = `
-[data-ricdom-theme], [data-ricdom-theme] * {
+:where([data-ricdom-theme]), :where([data-ricdom-theme]) * {
   scrollbar-width: thin;
   scrollbar-color: ${sbt} transparent;
 }
-[data-ricdom-theme]::-webkit-scrollbar, [data-ricdom-theme] *::-webkit-scrollbar {
+:where([data-ricdom-theme])::-webkit-scrollbar, :where([data-ricdom-theme]) *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-[data-ricdom-theme]::-webkit-scrollbar-track, [data-ricdom-theme] *::-webkit-scrollbar-track,
-[data-ricdom-theme]::-webkit-scrollbar-corner, [data-ricdom-theme] *::-webkit-scrollbar-corner {
+:where([data-ricdom-theme])::-webkit-scrollbar-track, :where([data-ricdom-theme]) *::-webkit-scrollbar-track,
+:where([data-ricdom-theme])::-webkit-scrollbar-corner, :where([data-ricdom-theme]) *::-webkit-scrollbar-corner {
   background: transparent;
 }
-[data-ricdom-theme]::-webkit-scrollbar-thumb, [data-ricdom-theme] *::-webkit-scrollbar-thumb {
+:where([data-ricdom-theme])::-webkit-scrollbar-thumb, :where([data-ricdom-theme]) *::-webkit-scrollbar-thumb {
   background: ${sbt};
   border-radius: 4px;
 }
-[data-ricdom-theme]::-webkit-scrollbar-thumb:hover, [data-ricdom-theme] *::-webkit-scrollbar-thumb:hover {
+:where([data-ricdom-theme])::-webkit-scrollbar-thumb:hover, :where([data-ricdom-theme]) *::-webkit-scrollbar-thumb:hover {
   background: ${sbth};
 }`;
 

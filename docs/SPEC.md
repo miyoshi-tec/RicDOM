@@ -582,10 +582,15 @@ This mirrors v1's `create_ui_page`, which painted `.ric-page` the same way (incl
 - If a themed element has descendants that are themselves `applyTheme`d (a nested "island"
   with its own theme), the nested element paints its own `background`/`color`/`font-size`
   over its ancestor's — this is intentional, matching v1.
-- The selector is a single attribute selector (`[data-ricdom-theme]`, no descendant
-  combinator, no class), so its specificity is low — override `background`/`color`/
-  `font-size` from your own stylesheet (or inline) to opt out for a particular element
-  without needing any extra specificity tricks.
+- **Changed in 2.0.0-alpha.8**: the selector is wrapped in `:where(...)` —
+  `:where([data-ricdom-theme])` — so its specificity is **zero** (`:where()`'s contents
+  never count toward specificity). Before this release the selector was a bare
+  `[data-ricdom-theme]` attribute selector, specificity (0,1,0); that is *higher* than a
+  plain element selector like `body { background: ... }` (0,0,1), so a consumer's ordinary
+  element-selector rule silently lost to this "default" paint unless they added
+  `!important` or extra specificity — a real bug (Brownies Desktop, one of pilots 5-7, all
+  Electron apps migrating at the same time). Any rule of yours, including a bare element
+  selector, now wins — no `!important` or extra specificity needed.
 - The attribute value itself is always the empty string (`applyTheme` always calls
   `el.setAttribute('data-ricdom-theme', '')`, regardless of whether `theme` was a bundled
   name or your own `ThemeVars` object) — `[data-ricdom-theme]` matches on the attribute's
@@ -600,12 +605,16 @@ This mirrors v1's `create_ui_page`, which painted `.ric-page` the same way (incl
 ### `[data-ricdom-theme]` and page-wide scrollbar styling
 
 `ricdom-ui.css` styles `::-webkit-scrollbar`/`scrollbar-color` scoped to
-`[data-ricdom-theme]` and its descendants, using the `--ric-scrollbar-thumb(-hover)`
+`:where([data-ricdom-theme])` and its descendants, using the `--ric-scrollbar-thumb(-hover)`
 tokens above. **This changes the visual appearance of scrollbars for any element inside
 whatever you call `applyTheme` on** — including elements that are not `ricdom/ui`
 components — since the selector is attribute-scoped, not class-scoped. Override
 `--ric-scrollbar-thumb`/`--ric-scrollbar-thumb-hover` yourself, or restyle
-`::-webkit-scrollbar`/`scrollbar-color` with higher specificity, to opt out for a subtree.
+`::-webkit-scrollbar`/`scrollbar-color` (any selector at all, since specificity here is
+also zero as of 2.0.0-alpha.8 — see above), to opt out for a subtree. The
+`::-webkit-scrollbar*` pseudo-elements themselves still carry their own (0,0,1)
+specificity (`:where()` cannot wrap a pseudo-element away), so a same-pseudo-element rule
+of yours ties or wins on source order — in practice this has not required `!important`.
 
 ---
 

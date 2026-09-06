@@ -84,7 +84,7 @@ describe('実ブラウザ: applyTheme した要素に background/color が塗ら
     expect(computed.color).toBe(hexToRgb('#00ff00'));
   });
 
-  it('自分の CSS で上書きできる (属性セレクタ 1 つだけなので詳細度が低い、SPEC §8 の FACT)', () => {
+  it('自分の CSS で上書きできる (クラスセレクタ + !important、詳細度に関わらず勝てる)', () => {
     const app = setupApp();
     applyTheme(app, { theme: 'dark' });
 
@@ -95,6 +95,28 @@ describe('実ブラウザ: applyTheme した要素に background/color が塗ら
 
     expect(getComputedStyle(app).backgroundColor).toBe('rgb(255, 0, 0)');
     document.head.removeChild(override);
+  });
+
+  // Brownies Desktop からの報告 #1 (2.0.0-alpha.8): 修正前は THEME_PAINT_CSS が
+  // `[data-ricdom-theme] { background: ... }` (詳細度 (0,1,0)) で、consumer が
+  // ごく普通に書く要素セレクタ `body { background: ... }` (詳細度 (0,0,1)) では
+  // !important なしで勝てなかった ((0,1,0) > (0,0,1) のため consumer の指定が
+  // 無視され、テーマの色が残ったまま = 赤のはずが実際は theme の bg 色になっていた)。
+  // `:where([data-ricdom-theme])` に変えて詳細度を 0 にしたことで、consumer の
+  // 要素セレクタ 1 つだけで確実に上書きできることを実測する。
+  it('consumer の要素セレクタ (詳細度 (0,0,1)) だけで既定塗りに勝てる (#1、修正前は負けていた)', () => {
+    document.body.innerHTML = '';
+    applyTheme(document.body, { theme: 'dark' });
+
+    const override = document.createElement('style');
+    // !important を使わない、ごく普通の要素セレクタ。
+    override.textContent = 'body { background: rgb(30, 30, 30); }';
+    document.head.appendChild(override);
+
+    expect(getComputedStyle(document.body).backgroundColor).toBe('rgb(30, 30, 30)');
+    document.head.removeChild(override);
+    document.body.removeAttribute('data-ricdom-theme');
+    document.body.removeAttribute('style');
   });
 
   it('ネストした島 (子孫で再度 applyTheme された要素) は自分の bg を塗る (v1 と同じ意図どおりの挙動)', () => {
