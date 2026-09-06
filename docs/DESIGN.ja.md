@@ -176,6 +176,19 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 28. パイロット移行第 9 号 (Potopeta = RicUI デザイナ、単一 HTML 配布) からの確定事項 (2026-09-06、2.0.0-alpha.10)
+
+- **移行実績**: v1 v0.4.5 → v2 alpha.9、5,647 行 + 906 check、**v2 のバグ 0 件**。自作トークナイザで識別子のみ 166 箇所を機械変換 (コメント・文字列・正規表現リテラルを保護)。統括者による独立検収記録 (技術的主張 6 件を dist で裏取り) 付き — パイロット報告の品質基準として参照する
+- **`spacious` は v1 でも無効値**: consumer は「v1→v2 の仕様差」と報告したが、v1 `ric_ui/context.js` の density も `comfortable / compact / tight`。v1 の頃から黙ってフォールバックしており、v2 の warn (alpha.7) が炙り出した (第 4 号の `density: 'md'` と同型、2 件目)。返信で訂正。**教訓: consumer の「v1 ではこうだった」も v1 ソースで裏取りする**
+- **`createDensity` / `createFontSize` 復活** (v1 `create_density` / `create_font_size`、値を返す純粋関数。§20 の原則)。consumer は detached div に applyTheme して変数を読み戻す、非公開の変数命名に依存した回避策を書いていた
+- **IIFE は末尾で `globalThis.ricdom` / `globalThis.ricdomUI` に明示代入**: esbuild の bare `var ricdom=` は、関数スコープで eval するローダ (v1 の LZ 自己展開) では global に立たない。footer で +13B
+- **CSS 読込検知は `document.styleSheets` 走査に**: `<link href$=…>` と injectStyles のマーカーだけでは、生 CSS を `<style>` にインラインする単一ファイル配布で false positive。「規則が実在するか」を見る
+- **dev / production の IIFE を 2 本に** (`.iife.js` = 警告あり・非 minify、`.iife.min.js` = production)。React の development/production と同じ形。README に 1 行
+- **重大な副産物 (実装中に発見): production の `.iife.min.js` でも dev 警告が生きていた**。`isDevMode()` の `typeof process === 'undefined'` 節が define で畳めず、`process` の無いブラウザでは production でも true → 警告コード・文字列が出荷 min に残って実行されていた (SPEC の「DCE される」は事実に反していた)。Potopeta の「min では警告が出ない」という観察はむしろ逆で、**別の理由 (再確認を依頼)**。修正: `__RICDOM_DEV__` をビルド時定数 (`declare const` + tsup define: min=false / dev=true / ESM・CJS は未定義でバンドラの NODE_ENV に委ねる)、`bakedDevMode` をファイル先頭の top-level const にし、**呼び出し側で `(bakedDevMode ?? isDevMode()) && …` の左オペランド**に置く (esbuild は関数の定数戻り値を呼び出し境界を越えて畳まない / `&&` の右側の定数も畳まない / `bakedDevMode` をオブジェクトリテラルの後ろに置くとインライン化されない / 判定は warn を含む関数の先頭で早期 return しないと tree shaking で宣言が残る — いずれも esbuild 直叩きの二分探索で実測)。**コア gzip 5,182B → 4,768B (−414B)**、ui min 24,970B → 24,472B。**天井 5,200B に対し 432B の余裕が戻った** (「コアに機能を足さない」方針は継続)
+- UI 側 `pureHelpers.ts` の `isDevMode` 複製も同じ穴 → 同じ方式で修正 (`4d07b94`)。**この修正は統括の Agent と、統括が spawn した提案タスクを起動した別セッションとが同一ツリーで並行して行い、別セッション側が採用された** (Agent 側の CHANGELOG 記述「ui 固有の変更は不要」は事実誤認で、別セッションが二分探索で反証)。教訓: 同一ツリーでの並行編集は避ける。提案タスクは Agent 委任と二重にしない
+- **良かった点 (据え置き)**: `use()` の failure mode / `renderPortal()` を core が呼ぶ設計 (portal は消えないが内容は毎 render) / splitter の `side`/`main` ラッパー廃止 / dialog a11y / applyTheme の warn / クラス名・role 値の据え置き
+- コア 4,768B、ui 24,472B、css 6,300B。unit 550 / browser 126。**パイロット 9 アプリで計 47 件** (第 9 号 = 復活 1 + 配布 3 + isDevMode 2 + docs 1、うち v2 の実バグは isDevMode の 2 件)
+
 ## 27. パイロット移行第 8 号 (LCP = Local Code Pilot v2、Electron classic script + contextIsolation) からの確定事項 (2026-09-06、2.0.0-alpha.9)
 
 - **移行実績**: v1 v0.4.2 → v2 alpha.8、「移行できた」。E2E 24/24、機械変換 220 箇所 + 手作業 10 点、約 2 時間 (うち移行 40 分、残りは切り分け)。IIFE グローバル (`ricdom` / `ricdomUI`) が classic script + contextIsolation 構成の唯一の導線 — **据え置き対象**。v1 と v2 のスクリーンショット並列比較、v1 develop を同条件で走らせる対照実験、`ricdom-ui.css` を grep しての原因特定 (5 分) — 外部 CSS 1 枚と role レジストリを選んだ理由がそのまま効いた
