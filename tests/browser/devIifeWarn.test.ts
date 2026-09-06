@@ -25,10 +25,16 @@
 // を検証できていなかった。
 //
 // dist は事前にビルドされている必要がある (package.json の `pretest:browser`)。
-
+//
+// 2.0.0-alpha.11 で契約変更 (パイロット第 9 号 Potopeta の push 前指摘、統括確認済み):
+// 深い代入の警告は代入した瞬間ではなく「同じタスクの終わりに再描画が発火しなかったと
+// 確定した時」(queueMicrotask 1 回) に遅延するようになった (src/reactivity.ts の
+// wrapDeepWarn 定義直前のコメント参照)。実ブラウザでもこの遅延が dev IIFE
+// (`.iife.js`) に正しく効いていること、および「深い代入 → 同じタスク内でトップレベル
+// を差し替えて発火」(v1 canon) が無警告になることを確認する。
 import { describe, expect, it, vi } from 'vitest';
 import { commands } from '@vitest/browser/context';
-import { flush, setupApp } from '../_helpers/dom.js';
+import { flush, flushMicrotasks, setupApp } from '../_helpers/dom.js';
 
 interface RicdomGlobal {
   createApp: (target: string | Element, state: object, render: (s: never) => unknown) => Record<string, unknown>;
@@ -62,8 +68,10 @@ describe('実ブラウザ (process 未定義): dev IIFE (.iife.js) は深い代�
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     handle.obj.nested.prop = 2; // 2 段目への代入 (未追跡 = 再描画はトリガーされない)
+    expect(warnSpy).not.toHaveBeenCalled(); // 代入した瞬間はまだ警告しない (発火忘れと確定していない)
+    await flushMicrotasks(); // 同じタスクの終わりに発火が起きなかったと確定 → ここで初めて警告
     expect(warnSpy).toHaveBeenCalled();
-    expect(warnSpy.mock.calls.some((call) => String(call[0]).includes('再描画をトリガーしません'))).toBe(true);
+    expect(warnSpy.mock.calls.some((call) => String(call[0]).includes('再描画が発火されませんでした'))).toBe(true);
     warnSpy.mockRestore();
   });
 
@@ -82,6 +90,7 @@ describe('実ブラウザ (process 未定義): dev IIFE (.iife.js) は深い代�
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     handle.obj.nested.prop = 2;
+    await flushMicrotasks();
     expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -99,7 +108,7 @@ interface RicdomAppGlobal {
 }
 
 describe('実ブラウザ (process 未定義): 配列経由の深い代入は dev IIFE で warn する / production では warn しない・配列は素通し', () => {
-  it('dist/ricdom.iife.js (dev) は app.pages[0].page.width = 1 で console.warn する', async () => {
+  it('dist/ricdom.iife.js (dev) は app.pages[0].page.width = 1 だけで完結すると console.warn する (深い代入のみ → 1)', async () => {
     const code = await commands.readFile('dist/ricdom.iife.js');
     loadScript(code);
 
@@ -112,8 +121,29 @@ describe('実ブラウザ (process 未定義): 配列経由の深い代入は de
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     handle.pages[0]!.page.width = 1;
+    expect(warnSpy).not.toHaveBeenCalled(); // 代入した瞬間はまだ警告しない
+    await flushMicrotasks();
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0]![0]).toContain('pages[0].page.width');
+    warnSpy.mockRestore();
+  });
+
+  it('dist/ricdom.iife.js (dev) は深く書いてから同じタスク内でトップレベルを差し替えると warn しない (深い代入 + spread → 0、v1 canon)', async () => {
+    const code = await commands.readFile('dist/ricdom.iife.js');
+    loadScript(code);
+
+    const ricdom = (window as unknown as { ricdom?: RicdomAppGlobal }).ricdom;
+    expect(ricdom).toBeTruthy();
+
+    const app = setupApp();
+    const handle = ricdom!.createApp('#app', { pages: [{ page: { width: 100 } }] }, () => ({ tag: 'div' }));
+    await flush();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    handle.pages[0]!.page.width = 1; // 深く書く (代入が先)
+    handle.pages = [...handle.pages]; // 同じタスク内でトップレベルを差し替えて発火 (発火が後)
+    await flushMicrotasks();
+    expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 
@@ -144,6 +174,7 @@ describe('実ブラウザ (process 未定義): 配列経由の深い代入は de
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     handle.pages[0]!.page.width = 1; // 代入自体は行われる (production と同じ結果)
+    await flushMicrotasks();
     expect(warnSpy).not.toHaveBeenCalled();
     expect(handle.pages[0]!.page.width).toBe(1);
     // 配列が Proxy で包まれていなければ structuredClone は素通りする (dev との対比)。

@@ -14,7 +14,7 @@
 import type { App, CreateAppOptions, Host, RenderFn, RicElementNode, RicNode, UsePart } from './types.js';
 import { buildDomNode, patchChildren } from './dom.js';
 import { createRenderScheduler } from './scheduler.js';
-import { createReactiveState } from './reactivity.js';
+import { clearPendingDeepWarnings, createReactiveState } from './reactivity.js';
 
 // =====================================================================
 // NOOP App (設計書 §3.6、v1 の NOOP_PROXY を型付きで再定義)
@@ -313,6 +313,16 @@ const createResolvedApp = <S extends object>(
 
   const apiRenderNow = (): void => {
     if (isDestroyed) return;
+    // renderNow() は reactiveState の Proxy trap を経由せず直接描画するため、深い
+    // 代入の発火忘れ pending (src/reactivity.ts) が自動では破棄されない。この直後の
+    // doRender() が state 全体を再読むので、その場で書いた深い変更も反映される
+    // (= 通常の notify で発火したのと同じ結果) → pending を明示的に破棄する。
+    // dev ガードを掛けても (esbuild の DCE を実測で確認済み) この 1 行はモジュール
+    // 境界をまたぐ関数呼び出しのため折り畳まれず production からも消えない
+    // (isDevMode 定義直前のコメントの「関数境界を越えると DCE が止まる」と同種)。
+    // clearPendingDeepWarnings 自体が WeakMap.get の no-op で production でも
+    // 無害なため、isDevMode() 単体と同じ「小さな例外」として無条件に呼ぶ。
+    clearPendingDeepWarnings(state);
     cancelPending(); // 保留中の rAF/バックストップを解除し、二重描画を防ぐ (v1 踏襲)
     doRender();
   };

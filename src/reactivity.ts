@@ -90,14 +90,73 @@ export const isDevMode = (): boolean => {
 // (`pages[]`/`items[]`) は consumer が最も深い代入をやりがちな形で、警告の死角に
 // なっていた。対策: 配列も素通しせずこの警告 Proxy で包む。「追跡 (notify) の
 // 対象外」と「警告の対象外」は別の話であり、後者だけをここで解消する。
+//
+// 上記の対応を push する前に、パイロット第 9 号 (Potopeta) から設計指摘が届いた
+// (統括確認済み): v1 の canon (v1 docs 自身が推奨する書き方) は「深い場所をその場で
+// 書いてから、トップレベルへの代入 (`handle.pages = [...handle.pages]` や
+// `handle.render_tick++`) で発火する」——代入が先、発火が後——という順序であり、
+// 代入の瞬間に警告すると canon 準拠のコードでも必ず鳴ってしまう (Potopeta の
+// 実コードで静的に 29 箇所 + 実行時に数百件)。本当に発火を忘れた代入がそのノイズに
+// 埋もれてしまうため、代入の瞬間に console.warn するのをやめ、「同じタスクの終わりに
+// なっても発火 (notify) が起きなかった」ことが確定してから初めて警告する形に変更した:
+// 深い代入は即座には警告せず、path ごとに 1 件だけ pending に積み、
+// `queueMicrotask` で flush を 1 回だけ予約する。トップレベル代入・1 段目
+// オブジェクトへの代入 (= notify、下の createReactiveState の `notify` 参照) が
+// 同じタスク内で起きれば pending は丸ごと破棄される — render は state 全体を
+// 再読するため、その場で書いた深い変更もその発火で一緒に画面に反映されるからである。
+// 破棄されなかった pending だけが microtask の時点で初めて警告される (path ごとに
+// 1 回、同じ path への複数回の代入は 1 回にまとめる)。`await` を挟んで発火が
+// 別タスクになる場合はこの機構で捕まらず警告が出る — これは意図どおりで、await の
+// 間 UI が古いままになる stale window の実害の検出でもある (docs/SPEC.md §3 の FACT)。
+interface PendingWarnCtx {
+  // 発火忘れ疑惑の path (または `path.method()` のような呼び出し形) → 警告本文。
+  // 同じキーへの再代入は上書きし (dedup)、flush 時に path ごと 1 回だけ warn する。
+  readonly pending: Map<string, string>;
+  // 同じタスク内で queueMicrotask を二重予約しないためのフラグ。
+  flushScheduled: boolean;
+}
+
+// createReactiveState の呼び出し単位 (= 1 app インスタンス) につき 1 つの
+// PendingWarnCtx を持つ。renderNow() (src/app.ts の apiRenderNow) は reactiveState の
+// Proxy trap を一切経由せず直接描画するため、外部から pending を破棄する経路が要る —
+// rawState をキーに公開する (`isDevMode()` 単体と同じく、DCE 対象にならないことを
+// 許容した上での小さな公開 API として残す)。
+const pendingWarnByRawState = new WeakMap<object, PendingWarnCtx>();
+
+/**
+ * renderNow() のように reactiveState の Proxy trap を経由しない同期描画の直前に呼ぶ。
+ * その時点までに積まれていた pending (発火忘れ疑惑) を破棄する — 直後の描画で
+ * state 全体が再読されるため、その場で書いた深い変更も含めて画面に反映される
+ * (= 通常の notify で発火したのと同じ結果になる)。
+ */
+export const clearPendingDeepWarnings = (rawState: object): void => {
+  pendingWarnByRawState.get(rawState)?.pending.clear();
+};
+
+const scheduleFlush = (ctx: PendingWarnCtx): void => {
+  if (ctx.flushScheduled) return;
+  ctx.flushScheduled = true;
+  queueMicrotask(() => {
+    ctx.flushScheduled = false;
+    if (ctx.pending.size === 0) return; // 同じタスク内で notify/renderNow が起きて破棄済み
+    for (const message of ctx.pending.values()) console.warn(message);
+    ctx.pending.clear();
+  });
+};
+
+const recordPendingWarning = (ctx: PendingWarnCtx, key: string, message: string): void => {
+  ctx.pending.set(key, message);
+  scheduleFlush(ctx);
+};
+
 const deepWarnProxies = new WeakMap<object, unknown>();
 
-// 呼び出すと配列の中身を書き換える mutating メソッド。個別に警告し、1 回の呼び出しで
-// 警告 1 回だけ出す (target = 生配列に対して直接 apply することで、内部の要素代入が
-// この Proxy の set トラップを経由せず、要素数分の多重警告を避ける)。
+// 呼び出すと配列の中身を書き換える mutating メソッド。個別に pending へ積み、1 回の
+// 呼び出しで pending 1 件だけにする (target = 生配列に対して直接 apply することで、
+// 内部の要素代入がこの Proxy の set トラップを経由せず、要素数分の多重登録を避ける)。
 const ARRAY_MUTATING_METHODS = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin'];
 
-const wrapDeepWarn = <T extends object>(value: T, path: string): T => {
+const wrapDeepWarn = <T extends object>(value: T, path: string, ctx: PendingWarnCtx): T => {
   const cached = deepWarnProxies.get(value);
   if (cached) return cached as T;
 
@@ -105,50 +164,53 @@ const wrapDeepWarn = <T extends object>(value: T, path: string): T => {
   const rootKey = path.split(/[.[]/)[0]; // 最初の区切り (`.` か `[`) の手前 = 1 段目の state key
   // 配列要素は `path[i]`、オブジェクトのプロパティは `path.prop` で子パスを作る。
   const childPath = (prop: string): string => (isArr && /^\d+$/.test(prop) ? `${path}[${prop}]` : `${path}.${prop}`);
+  const suggestion =
+    `トップレベルを差し替えるか (例: app.${rootKey} = [...app.${rootKey}])、` + 'shallow copy で書き直してください。';
 
   const proxy = new Proxy(value as Record<PropertyKey, unknown>, {
     get(target, prop, receiver) {
       if (isArr && typeof prop === 'string' && ARRAY_MUTATING_METHODS.includes(prop)) {
         return (...args: unknown[]): unknown => {
-          console.warn(
-            `RicDOM: "${path}.${prop}()" の呼び出しは再描画をトリガーしません` +
+          const label = `${path}.${prop}()`;
+          recordPendingWarning(
+            ctx,
+            label,
+            `RicDOM: "${label}" のあと、同じタスク内で再描画が発火されませんでした` +
               ' (配列の mutating メソッドは検知対象外です)。\n' +
-              `差し替えてください (例: app.${rootKey} = [...app.${rootKey}]）`,
+              suggestion,
           );
           // target (生配列) に直接適用する。receiver (この Proxy) 越しに呼ぶと
-          // メソッド内部の要素代入のたびに set トラップが発火し、要素数分の警告が
-          // 出てしまう (例: sort で N 回警告) ため、意図的に target に対して行う。
+          // メソッド内部の要素代入のたびに set トラップが発火し、要素数分の多重登録が
+          // 起きてしまう (例: sort で N 件) ため、意図的に target に対して行う。
           const fn = Array.prototype[prop as keyof unknown[]] as (...a: unknown[]) => unknown;
           return fn.apply(target, args);
         };
       }
       const v = Reflect.get(target, prop, receiver);
       if (v != null && typeof v === 'object' && typeof prop === 'string') {
-        return wrapDeepWarn(v as object, childPath(prop));
+        return wrapDeepWarn(v as object, childPath(prop), ctx);
       }
       return v;
     },
     set(target, prop, value) {
       const label = typeof prop === 'string' ? childPath(prop) : `${path}.${String(prop)}`;
-      if (isArr) {
-        console.warn(
-          `RicDOM: "${label}" への代入は再描画をトリガーしません` +
-            ' (配列要素・length への代入は検知対象外です)。\n' +
-            `差し替えてください (例: app.${rootKey} = [...app.${rootKey}]）`,
-        );
-      } else {
-        console.warn(
-          `RicDOM: "${label}" への代入は再描画をトリガーしません` +
-            ' (Proxy は 1 段目までしか追跡しません)。\n' +
-            `shallow copy で差し替えてください (例: app.${rootKey} = { ...app.${rootKey}, ... }）`,
-        );
-      }
+      recordPendingWarning(
+        ctx,
+        label,
+        `RicDOM: "${label}" への代入のあと、同じタスク内で再描画が発火されませんでした` +
+          ' (Proxy は 1 段目までしか追跡しません)。\n' +
+          suggestion,
+      );
       target[prop] = value; // production と同じ結果になるよう代入自体は実施する
       return true;
     },
     deleteProperty(target, prop) {
       const label = typeof prop === 'string' ? childPath(prop) : `${path}.${String(prop)}`;
-      console.warn(`RicDOM: "${label}" の削除は再描画をトリガーしません。`);
+      recordPendingWarning(
+        ctx,
+        label,
+        `RicDOM: "${label}" の削除のあと、同じタスク内で再描画が発火されませんでした。\n` + suggestion,
+      );
       delete target[prop];
       return true;
     },
@@ -171,6 +233,33 @@ const isTrackableObject = (v: unknown): v is object => v != null && (typeof v ==
 export const createReactiveState = <S extends object>(rawState: S, scheduleRender: () => void): S => {
   const childProxies = new WeakMap<object, unknown>();
 
+  // pending 警告基盤は dev でのみ構築する (production は一切のコードを含まない、
+  // `bakedDevMode ?? isDevMode()` を左に置く規律は isDevMode 定義直前のコメント参照)。
+  // production では pendingCtx は null のまま (`new Map()` すら生成されない)。
+  // 値を生成するための条件分岐は三項演算子ではなく if/else で書く — dom.ts の
+  // 重複 key 検知 (`if ((bakedDevMode ?? isDevMode()) && ...)`) と同じ「値を返さない
+  // 条件分岐」の形に揃えることで、esbuild の定数畳み込みが素直に効くことを
+  // isDevMode 定義直前のコメントの規律の範囲内で保証する (実測: 三項演算子の版でも
+  // 畳み込み自体は確認できたが、if/else の方が本ファイルの既存の書き方と一貫する)。
+  let pendingCtx: PendingWarnCtx | null = null;
+  if (bakedDevMode ?? isDevMode()) pendingCtx = { pending: new Map(), flushScheduled: false };
+  if (pendingCtx) pendingWarnByRawState.set(rawState, pendingCtx);
+
+  // トップレベル代入 (rootProxy の set) と 1 段目オブジェクトへの代入 (wrapChild の
+  // set) はどちらも「発火 (notify)」そのものなので、scheduleRender を呼ぶ前に
+  // pending を破棄する。v1 canon 「深く書いてからトップレベル/1段目を差し替えて
+  // 発火する」が無警告になるのはこの破棄のおかげ (render は state 全体を再読するため、
+  // その場で書いた深い変更もこの発火で一緒に画面へ反映される、wrapDeepWarn 定義直前の
+  // コメント参照)。production では `notify` は `scheduleRender` そのもの (追加の
+  // クロージャを一切生成しない) — 上と同じ理由で if/else を使う。
+  let notify: () => void = scheduleRender;
+  if (bakedDevMode ?? isDevMode()) {
+    notify = (): void => {
+      pendingCtx!.pending.clear();
+      scheduleRender();
+    };
+  }
+
   const wrapChild = (val: object, key: string): unknown => {
     const cached = childProxies.get(val);
     if (cached) return cached;
@@ -189,18 +278,18 @@ export const createReactiveState = <S extends object>(rawState: S, scheduleRende
           typeof prop === 'string' &&
           (isTrackableObject(v) || Array.isArray(v))
         ) {
-          return wrapDeepWarn(v, `${key}.${prop}`);
+          return wrapDeepWarn(v, `${key}.${prop}`, pendingCtx!);
         }
         return v;
       },
       set(target, prop, value) {
         target[prop] = value;
-        if (prop !== 'ignore') scheduleRender();
+        if (prop !== 'ignore') notify();
         return true;
       },
       deleteProperty(target, prop) {
         delete target[prop];
-        if (prop !== 'ignore') scheduleRender();
+        if (prop !== 'ignore') notify();
         return true;
       },
     });
@@ -226,7 +315,7 @@ export const createReactiveState = <S extends object>(rawState: S, scheduleRende
         // の呼び出し自体を副作用ありとみなして残してしまい、DCE が効かない
         // (isDevMode 定義直前のコメント、および dom.ts で一度ハマった教訓と同じ規律)。
         if (prop !== 'ignore' && typeof prop === 'string' && (bakedDevMode ?? isDevMode()) && Array.isArray(v)) {
-          return wrapDeepWarn(v, prop);
+          return wrapDeepWarn(v, prop, pendingCtx!);
         }
         return v;
       }
@@ -234,12 +323,12 @@ export const createReactiveState = <S extends object>(rawState: S, scheduleRende
     },
     set(target, prop, value) {
       target[prop] = value;
-      if (prop !== 'ignore') scheduleRender();
+      if (prop !== 'ignore') notify();
       return true;
     },
     deleteProperty(target, prop) {
       delete target[prop];
-      if (prop !== 'ignore') scheduleRender();
+      if (prop !== 'ignore') notify();
       return true;
     },
   });
