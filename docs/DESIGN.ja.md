@@ -176,6 +176,16 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 29. パイロット第 9 号の追報 (配列経由の深い代入 / 発火忘れ判定) からの確定事項 (2026-09-07、2.0.0-alpha.11)
+
+- **第 9 号完了**: alpha.10 で回避策 3 つ (`globalize()` / CSS マーカー / `theme_vars_of()`) を撤去し 906/906・console 0、**v2 の非公開実装に依存する箇所ゼロ**。`spacious` は v1 時点のバグとして `tight` に (v1 本番にも)
+- **配列経由の深い代入が dev 警告の死角だった**: `wrapDeepWarn` が配列を素通し (`if (Array.isArray(value)) return value`) するため、`app.pages[0].page.width = 1` のような**リスト状 state 経由の代入はどの深さでも warn 0**。SPEC の「Arrays are never wrapped … not warned about」は実装と一致していたが、「再描画の追跡対象外」と「警告もされない」を一文にまとめたことで、consumer が最も深い代入をやりがちな形が丸ごと死角に。Potopeta の 880 check を dev で通しても warn 0 だったのはこのため。**dev 限定で配列も警告 Proxy で包む** (要素 get で object を包む、要素代入・`length`・mutating メソッドを記録。mutating メソッドは 1 回で 1 件、target に直接 apply して set トラップの多重発火を避ける)。再描画の追跡 (`isTrackableObject` の配列除外、差し替え canon) は不変
+- **push 前の設計指摘 (Potopeta 2 通目) で判定方式を変更**: v1 の canon「その場で深く書いてから `handle.pages = [...handle.pages]` / `handle.render_tick++` で発火」(v1 docs 自身が推奨、Potopeta は 22 + 29 箇所) では、代入時 warn は canon 準拠でも必ず鳴り本物が埋もれる。→ **深い代入は pending に記録するだけ、同じ同期タスク内にトップレベル代入 / 1 段目 tracked 代入 / `renderNow()` があれば破棄、microtask の時点で残っていたものだけ path ごとに 1 回 warn**。render は木全体を再読するので「深く書いてから発火」は正しく写る = 無警告が正しい。**深い代入 → `await` → 差し替え は鳴る** (await の間 UI が古い実害の検出、FACT)。`renderNow()` は Proxy を経由しないため `app.ts` から pending 破棄を呼ぶ (production min に `.pending` プロパティ名 1 語だけ残る = `isDevMode` 単体と同じ扱いの小さな例外)
+- **red-first**: canon 4 パターン ((a) 深く書いて spread / (b) push + 無関係な `++` / (c) 複数書いて spread / (d) 深く書いて renderNow) は代入時 warn 版 (1bd53fb) で 1〜2 回鳴り、遅延版で 0。統括も dist の CJS で独立に再現
+- **設計原則として記録**: dev 警告は「規則に反した瞬間」ではなく「**実害が確定した時点**」で出す。警告の目的は canon の強制ではなく silent failure の可視化なので、v1 の正当なスタイルを鳴らすのは目的に反する。production は `__RICDOM_DEV__=false` で全コード DCE (min に `microtask` 等の文字列なし)
+- 前の実装者が途中で停止 (600 秒無応答) → 未コミット差分を別の実装者が引き継いで完成。「esbuild が畳めない三項演算子」は独立 repro では畳めていた (慣習統一のため if/else に変更、サイズ不変)
+- コア min gzip 4,767 → **4,801B** (+34B、`renderNow()` からの破棄経路)、dev IIFE 8,275B。unit 572 / browser 130。**パイロット 9 アプリで計 49 件**。Potopeta に alpha.11 dev IIFE での warn 件数 (= v1 時代から潜んでいた発火忘れの数) の報告を依頼
+
 ## 28. パイロット移行第 9 号 (Potopeta = RicUI デザイナ、単一 HTML 配布) からの確定事項 (2026-09-06、2.0.0-alpha.10)
 
 - **移行実績**: v1 v0.4.5 → v2 alpha.9、5,647 行 + 906 check、**v2 のバグ 0 件**。自作トークナイザで識別子のみ 166 箇所を機械変換 (コメント・文字列・正規表現リテラルを保護)。統括者による独立検収記録 (技術的主張 6 件を dist で裏取り) 付き — パイロット報告の品質基準として参照する
