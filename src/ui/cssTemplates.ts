@@ -181,16 +181,28 @@ const INPUT_CSS = `
   color: ${fm};
 }`;
 
+// z-index (LCP #1、2.0.0-alpha.9): CSS クラス化 (Phase 1) の際に、v1 (ric_ui/popup/
+// create_ui_dialog.js) が inline style で持っていた zIndex: 500/501 が引き継がれず
+// 落ちていた。結果、他の CSS クラス (.ric-splitter__divider の z-index:1 等) がモーダル
+// ダイアログを貫通して描画される実機バグになった (LCP 報告 #1、実機で全ダイアログに影響)。
+// v1 パリティで復活: overlay=500 / 本体=501。toast=600 > dialog=501 > popup/dropdown/
+// tooltip=401 の序列は v1 のまま維持する (下の POPUP_CSS も参照)。
+// 「portal 要素自体に stacking context を持たせる (position:relative + z-index を portal
+// div に付ける)」案は不採用 — portalTo で app 専用 portal ではなく consumer 側の
+// 任意の外部要素を portal 先に指定するケース (設計書 §3.5) では、その外部要素は
+// ricdom-ui.css の管理外なので stacking context を保証できない。個々の部品の
+// overlay/本体クラスに z-index を持たせる方式なら portal 先がどこであっても効く。
 const DIALOG_CSS = `
 @keyframes ric-dlg-in  { from { opacity:0; transform:translate(-50%,-50%) scale(.8); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
 @keyframes ric-dlg-out { from { opacity:1; transform:translate(-50%,-50%) scale(1); } to { opacity:0; transform:translate(-50%,-50%) scale(.8); } }
 @keyframes ric-ovl-in  { from { opacity:0; } to { opacity:1; } }
 @keyframes ric-ovl-out { from { opacity:1; } to { opacity:0; } }
 
-.ric-dialog__overlay { position: fixed; inset: 0; background: color-mix(in srgb, ${tb} 10%, transparent); animation: ric-ovl-in ${da}; }
+.ric-dialog__overlay { position: fixed; inset: 0; z-index: 500; background: color-mix(in srgb, ${tb} 10%, transparent); animation: ric-ovl-in ${da}; }
 .ric-dialog__overlay--out { animation: ric-ovl-out ${da} forwards; pointer-events: none; }
 .ric-dialog {
   position: fixed;
+  z-index: 501;
   top: 50%; left: 50%;
   transform: translate(-50%,-50%);
   background: var(--ric-popup-bg, var(--ric-color-bg));
@@ -224,14 +236,21 @@ const DIALOG_CSS = `
   border-top: ${b1};
 }`;
 
+// z-index (LCP #1、2.0.0-alpha.9): dialog (上の DIALOG_CSS) と同じ理由で落ちていた分の
+// popup/dropdown 側。v1 (ric_ui/popup/_popup_utils.js の _pos_style) は overlay/本体とも
+// 401 固定 (「オーバーレイも本体も z:401 だが、DOM 順で本体が後方に置かれるため自然に
+// 前面になる」という v1 のコメントをそのまま踏襲)。dropdown 本体 (.ric-dropdown__body、
+// DROPDOWN_CSS 側) も createPopup/createDropdown が同じ overlay クラスを共有するため、
+// そちらも 401 に揃える。
 const POPUP_CSS = `
 @keyframes ric-popup-in  { from { opacity:0; transform:scaleY(0.6); } to { opacity:1; transform:scaleY(1); } }
 @keyframes ric-popup-out { from { opacity:1; transform:scaleY(1); }   to { opacity:0; transform:scaleY(0.6); } }
 
-.ric-popup__overlay { position: fixed; inset: 0; }
+.ric-popup__overlay { position: fixed; inset: 0; z-index: 401; }
 
 .ric-popup__body {
   position: fixed;
+  z-index: 401;
   min-width: 160px;
   background: ${ct};
   border: ${b1};
@@ -1105,6 +1124,7 @@ const DROPDOWN_CSS = `
      target が display:flex; flex-direction:column だとページ本体がその分押し込まれる
      実機バグ (#9)。alpha.3 で .ric-popup__body と揃えて修正。 */
   position: fixed;
+  z-index: 401; /* LCP #1、2.0.0-alpha.9: .ric-popup__body/overlay と同じ序列に揃える */
   min-width: 160px;
   background: ${ct};
   border: ${b1};
