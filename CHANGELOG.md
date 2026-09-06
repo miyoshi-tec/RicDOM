@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.11] — not yet published
+
+A minimal-repro report from the ninth pilot (Potopeta), confirmed against the code by the
+maintainer before implementation: the dev-mode deep-assignment warning (`src/reactivity.ts`)
+never fired for anything reached through an array, at any depth, because the code that wraps
+values for the warning skipped arrays outright. Since list-shaped state (`pages[]`, `items[]`)
+is exactly the shape most consumers reach for the deepest assignment, this was a real blind
+spot in the warning's coverage, not a cosmetic gap.
+
+### Added
+
+- **Dev-mode deep-assignment warning now covers arrays, from the first level down.** Reading
+  an array through reactive state in a dev build (`dist/ricdom.iife.js`, or `NODE_ENV !==
+  'production'` in ESM/CJS) now returns a read-only-style Proxy of it, matching what already
+  happened for plain objects one level deep. Element assignment (`arr[0] = x`), `length`
+  assignment, and `delete arr[i]` warn with the element's full path (e.g.
+  `"pages[0].page.width"`); reading further into an object or array reached through an index
+  keeps recursing through the same wrapping, so `app.pages[0].page.width = 1` now warns
+  exactly like `app.o.p.q = 2` already did. The nine mutating array methods
+  (`push`/`pop`/`shift`/`unshift`/`splice`/`sort`/`reverse`/`fill`/`copyWithin`) warn once per
+  *call*: the wrapped method logs one `console.warn`, then applies the real method directly
+  to the underlying (unwrapped) array, so a `sort()` on a five-element array doesn't produce
+  five warnings from element writes happening inside the sort. Every non-mutating read —
+  `map`/`filter`/`slice`/`forEach`/`find`/`includes`/`indexOf`/`join`/`concat`/`flat`/
+  `entries`/`keys`/`values`/`for...of`/`Array.isArray()`/`JSON.stringify()`/`length` reads —
+  stays silent and returns the same values a production build would. **What does not
+  change**: arrays remain entirely untracked for render scheduling at any depth (`app.list =
+  [...app.list]` is still the one supported replacement pattern) — this release only extends
+  the dev *warning*'s coverage to match that existing tracking rule, it does not change what
+  gets tracked. Production (`.iife.min.js`, `__RICDOM_DEV__` baked `false`) is unaffected:
+  array reads stay the plain, unwrapped array, and the new code is fully removed by
+  dead-code elimination (core min gzip unchanged, see below).
+
+### Docs
+
+- **`docs/SPEC.md` §3** split the previous single "arrays are never wrapped" sentence into
+  two separate claims that were being conflated: tracking (unchanged, arrays never
+  scheduled a render at any depth) and the dev warning (changed by this release, arrays now
+  wrapped from the first level down). Added a FACT: because dev-mode reads return Proxy
+  wrappers, passing a value read from state straight into `structuredClone()` or
+  `postMessage()` throws `DataCloneError` in dev builds (this was already true for plain
+  objects below the first level; it is now also true for arrays from the first level down).
+  This is a consequence of the wrapping the warning needs, not a bug — copy the value first
+  (`JSON.parse(JSON.stringify(v))` or a spread) if you need to hand it to one of those APIs.
+
+### Verified
+
+- Unit (jsdom): the table of previously-invisible cases (`app.arr[0].x`, `app.arr[0].p.q`,
+  `app.pages[0].page.width`, the `app.pages = [...app.pages]` canon staying silent) each
+  warn exactly once (or zero times for the canon replacement); `push`/`splice`/`sort` each
+  warn exactly once per call; `map`/`filter`/`for...of`/`Array.isArray`/`JSON.stringify`/
+  `length` produce no warnings; production (`NODE_ENV=production`) leaves the array
+  unwrapped (`state.arr === raw.arr`). 559 unit tests total (was 550).
+- Real browser: `dist/ricdom.iife.js` warns once for `app.pages[0].page.width = 1`;
+  `dist/ricdom.iife.min.js` does not warn for the same assignment and does not wrap the
+  array (`structuredClone` succeeds); `dist/ricdom.iife.js` throws on
+  `structuredClone(app.arr)` (the FACT above, pinned as a regression test). 129 browser
+  tests total (was 126). `npm run test:examples` (production IIFE, unchanged) and a
+  one-off dev-IIFE pass over the same `examples/*.html` (not checked in — swaps in
+  `ricdom.iife.js`/`ricdom-ui.iife.js` and exercises each page's tabs/accordion/collapse
+  triggers) both produced zero `"RicDOM:"` warnings, confirming existing `.map()`-over-
+  `items` render code in the examples and UI components isn't a false positive under the
+  new coverage.
+- Core min gzip: **4,768B → 4,767B** (no meaningful change; raw minified byte length is
+  identical, 12,053B before and after — the 1B gzip difference is an esbuild
+  minifier-symbol-renaming artifact from restructuring the dev-gated branch, not new code).
+  Confirmed via `grep` that none of the new array-warning strings/method names
+  (`copyWithin`, `mutating`, etc.) appear in `dist/ricdom.iife.min.js`. Dev IIFE gzip:
+  7,567B → 7,956B (+389B, the actual cost of the new dev-only code, which is fine since the
+  dev IIFE has no gzip ceiling).
+
 ## [2.0.0-alpha.10] — not yet published
 
 Four reports from the ninth pilot migration (Potopeta = a RicUI theme/component designer,

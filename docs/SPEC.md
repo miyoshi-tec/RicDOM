@@ -227,8 +227,42 @@ regardless of state shape, and keeps "why didn't this re-render" answerable by o
 In a non-production build, reading a nested object through the reactive state returns it
 wrapped in a second, read-only-style Proxy that logs `console.warn` on any
 `set`/`deleteProperty`, then still performs the assignment (so dev and production observe
-the same final data, only dev also warns). Arrays are never wrapped (assigning into array
-elements is not tracked and is not warned about, matching v1).
+the same final data, only dev also warns).
+
+Arrays are a separate axis from this and the two halves must not be conflated:
+
+- **Tracking (render scheduling): arrays are never tracked, at any depth** (matches v1,
+  unchanged by 2.0.0-alpha.11 below). `state.list.push(x)` never schedules a render, no
+  matter how the array was reached. Replacing the array is the one supported pattern —
+  `app.list = [...app.list, x]` — because it is an ordinary top-level (or one-level-deep)
+  assignment and is tracked like any other.
+- **Dev warning: arrays ARE wrapped, from the first level down (2.0.0-alpha.11)**. Before
+  2.0.0-alpha.11, the same code path that wraps nested objects for the warning above skipped
+  arrays entirely, which meant any assignment reached through an array element — the shape
+  most list-like state takes (`state.pages[0].page.width = 1`, `state.items[i].x = 1`) —
+  was invisible to the dev warning at any depth, even though it was exactly as untracked as
+  the plain-object case the warning exists to catch. Reading an array through reactive state
+  in dev now returns a read-only-style Proxy of it (`Array.isArray()` still reports `true`,
+  since it's a Proxy *of* the array): element assignment (`arr[0] = x`), `length` assignment,
+  and `deleteProperty` warn like the object case; the nine mutating methods
+  (`push`/`pop`/`shift`/`unshift`/`splice`/`sort`/`reverse`/`fill`/`copyWithin`) warn once per
+  call (not once per element moved internally — the call runs directly against the
+  underlying array, bypassing the Proxy's own `set` trap, specifically so `sort()` doesn't
+  produce one warning per swap); every non-mutating read (`map`/`filter`/`slice`/`forEach`/
+  `find`/`includes`/`indexOf`/`join`/`concat`/`flat`/`entries`/`keys`/`values`/`for...of`/
+  `JSON.stringify`/`length` reads) stays silent and returns the same values as production.
+  Production (`.iife.min.js`, `__RICDOM_DEV__` baked `false`) is unaffected: arrays read
+  from state are the plain, unwrapped array, identical to before this change.
+
+**FACT — structured cloning a dev-wrapped value throws.** Because dev-mode state reads
+return Proxy wrappers (this was already true for plain objects below the first level, and is
+now also true for arrays from the first level down), passing a value read from state
+straight into `structuredClone()` or `postMessage()` throws `DataCloneError` in dev builds,
+while the same call succeeds in production (where the value is the unwrapped original). This
+is a consequence of the wrapping, not a bug to route around with a special case — if you need
+to hand state data to one of those APIs, produce a plain copy first (`JSON.parse(JSON.stringify(v))`,
+or a shallow/deep spread), which also happens to be the same shape of fix the shallow-copy
+canon above already asks for.
 
 Which build counts as "dev" depends on the distribution format (2.0.0-alpha.10, fixing a
 gap found while auditing the shipped `.iife.min.js`):
