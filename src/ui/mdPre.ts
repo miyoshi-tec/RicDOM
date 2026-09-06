@@ -49,6 +49,8 @@ export interface UiMdPreProps {
   transformText?: MdTransformText;
   transformImageSrc?: MdTransformImageSrc;
   class?: import('../types.js').ClassValue;
+  /** rest スプレッド経由で常に透過されていたが、型に無かった (LCP の指摘、2.0.0-alpha.9)。 */
+  style?: StyleValue;
   [key: string]: unknown;
 }
 

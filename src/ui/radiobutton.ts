@@ -18,7 +18,7 @@
 //   (同じ name を共有すると、意図せず 1 つのグループとして連動してしまう — ブラウザネイティブの
 //   仕様であり、RicDOM 固有のバグではない)。
 
-import type { ClassValue, RicElementNode, RicNode } from '../types.js';
+import type { ClassValue, RicElementNode, RicNode, StyleValue } from '../types.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export interface UiRadiobuttonOption {
@@ -33,6 +33,9 @@ export interface UiRadiobuttonProps {
   options?: (string | UiRadiobuttonOption)[];
   disabled?: boolean;
   class?: ClassValue;
+  /** rest スプレッド経由で常に透過されていたが、型に無かった (LCP の指摘、2.0.0-alpha.9)。
+   *  外側の .ric-radiogroup ラッパーに付く。 */
+  style?: StyleValue;
   onchange?: (ev: Event) => void;
   [key: string]: unknown;
 }

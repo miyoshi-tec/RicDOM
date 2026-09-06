@@ -278,3 +278,19 @@ export interface Host {
 (`ric_ui/control/ui_button.js`) に存在した正式 variant の復活であり新設ではない (設計書 §20
 「v1 で正式 prop だったものは復活が原則」)。`UI_ROLE` の 5 件は `src/ui/dialog.ts`/`popup.ts`/
 `toast.ts`/`tooltip.ts`/`tweakPanel.ts` の役割棚卸しで見つかった非対称の解消 (詳細は SPEC.md §11)。
+
+### 2.0.0-alpha.9: 10 部品の Props 型に `style?: StyleValue` 追加
+
+パイロット第 8 号 (LCP) の型レビューで見つかった型の抜け。対象: `UiButtonProps` / `UiInputProps` /
+`UiTextareaProps` / `UiCheckboxProps` / `UiRadiobuttonProps` / `UiSelectProps` / `UiRangeProps` /
+`UiColorProps` / `UiSeparatorProps` / `UiMdPreProps`。
+
+| 種別 | 名前 | 規約 | 判定 |
+|---|---|---|---|
+| Props フィールド (追加、型のみ) | 上記 10 型それぞれに `style?: StyleValue` | 既存の `uiText`/`uiIcon`/`uiCol`/`uiRow`/`uiGrid`/`uiPanel`/`uiCodePre` と同じフィールド名・型 | OK |
+
+命名規約からの逸脱なし。破壊的変更はゼロ、**挙動変更もゼロ** — これら 10 部品はいずれも
+`[key: string]: unknown` の rest スプレッド契約 (SPEC.md §10.5) により、追加前から `style` を
+実行時にはそのまま透過していた (`...rest` を計算済みフィールドより先に展開する契約なので、
+型に無くても `style` を渡せば効いていた)。今回の変更は「実行時に効く値が、型としても見える・
+補完される」ようにしただけの型レベルの追加。SPEC.md §10.5 に一文追記。

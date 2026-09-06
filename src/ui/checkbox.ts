@@ -13,7 +13,7 @@
 // `checked` を DOM_PROPERTY_KEYS に含み、常にプロパティ代入 (`el.checked = val`) を行うため
 // (src/dom.ts)、boolean をそのまま渡せば型で吸収される (設計書 §3.4 / B15 の解消)。
 
-import type { ClassValue, RicElementNode, RicNode } from '../types.js';
+import type { ClassValue, RicElementNode, RicNode, StyleValue } from '../types.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export interface UiCheckboxProps {
@@ -21,6 +21,9 @@ export interface UiCheckboxProps {
   checked?: boolean;
   disabled?: boolean;
   class?: ClassValue;
+  /** rest スプレッド経由で常に透過されていたが、型に無かった (LCP の指摘、2.0.0-alpha.9)。
+   *  外側の <label> ラッパーに付く (checked/onchange は内部 input 隔離、上のコメント参照)。 */
+  style?: StyleValue;
   onchange?: (ev: Event) => void;
   [key: string]: unknown;
 }

@@ -959,6 +959,11 @@ props that belong to that inner element are isolated and never merged into `rest
 caller cannot accidentally shadow them). Passing `class` through `rest` extends rather
 than replaces the component's base class (`mergeClass`), while any other computed field
 you might collide with (`tag`, `data-ricdom-role`) always wins over what you pass.
+`class` and `style` are always declared explicitly in each component's props type (not
+left to fall through the catch-all `[key: string]: unknown` alone) even where the
+runtime behavior is pure pass-through — a gap an LCP review caught (`uiButton` and
+several others were missing `style?: StyleValue` in the type despite passing it through
+at runtime, 2.0.0-alpha.9).
 
 ### 10.6 Stateful — `createTweakPanel`
 

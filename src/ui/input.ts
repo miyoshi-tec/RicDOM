@@ -5,7 +5,7 @@
 // を rest の後に置き、rest からの上書きを防ぐ。value は常に含める (空文字でも
 // `el.value = ''` が確実に走るよう、FORCE_REAPPLY 対象キーであることを尊重する)。
 
-import type { ClassValue, RicElementNode, RicNode } from '../types.js';
+import type { ClassValue, RicElementNode, RicNode, StyleValue } from '../types.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export interface UiInputProps {
@@ -14,6 +14,8 @@ export interface UiInputProps {
   type?: string;
   disabled?: boolean;
   class?: ClassValue;
+  /** rest スプレッド経由で常に透過されていたが、型に無かった (LCP の指摘、2.0.0-alpha.9)。 */
+  style?: StyleValue;
   oninput?: (ev: Event) => void;
   [key: string]: unknown;
 }

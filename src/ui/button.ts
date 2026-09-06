@@ -8,7 +8,7 @@
 // rest から tag や class を渡しても基底クラスは保たれる
 // (rest を最後に置くと class: 'ric-button foo' が rest.class='foo' で上書きされてしまう)。
 
-import type { ClassValue, RicElementNode, RicNode } from '../types.js';
+import type { ClassValue, RicElementNode, RicNode, StyleValue } from '../types.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 // 'link' は v1 (ric_ui/control/ui_button.js) の正式 variant の復活 (Rancha からの報告、
@@ -29,6 +29,8 @@ export interface UiButtonProps {
   size?: UiButtonSize;
   disabled?: boolean;
   class?: ClassValue;
+  /** rest スプレッド経由で常に透過されていたが、型に無かった (LCP の指摘、2.0.0-alpha.9)。 */
+  style?: StyleValue;
   onclick?: (ev: MouseEvent) => void;
   [key: string]: unknown;
 }

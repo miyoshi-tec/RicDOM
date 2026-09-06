@@ -6,7 +6,7 @@
 // rest スプレッド契約 (v1 A15 継承): rest は外側のラッパー <div class="ric-range"> に付く。
 // oninput/min/max/step/value は内部 <input> に掛けるため rest には入れない (隔離契約)。
 
-import type { ClassValue, RicElementNode, RicNode } from '../types.js';
+import type { ClassValue, RicElementNode, RicNode, StyleValue } from '../types.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
 export interface UiRangeProps {
@@ -16,6 +16,9 @@ export interface UiRangeProps {
   step?: number;
   disabled?: boolean;
   class?: ClassValue;
+  /** rest スプレッド経由で常に透過されていたが、型に無かった (LCP の指摘、2.0.0-alpha.9)。
+   *  外側の .ric-range ラッパーに付く (隔離契約、上のコメント参照)。 */
+  style?: StyleValue;
   oninput?: (ev: Event) => void;
   [key: string]: unknown;
 }
