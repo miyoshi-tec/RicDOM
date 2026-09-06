@@ -14,6 +14,16 @@ values for the warning skipped arrays outright. Since list-shaped state (`pages[
 is exactly the shape most consumers reach for the deepest assignment, this was a real blind
 spot in the warning's coverage, not a cosmetic gap.
 
+A second finding from the same pilot, this time as a push-before-merge review rather than a
+runtime repro: extending the warning to arrays (below) made an existing problem with its
+*timing* much more visible. v1's own documented pattern for a deep update writes the nested
+value in place and only afterward triggers the render that will pick it up
+(`app.pages[0].page.width = 1; app.pages = [...app.pages];`) — assign first, trigger second.
+Warning at the moment of the first line, which is what this warning had always done, fires on
+every single instance of that canon-compliant pattern; Potopeta's codebase had several dozen
+call sites in exactly that shape, producing hundreds of runtime warnings and burying the one
+case the warning exists to catch. See "Changed" below for the fix.
+
 ### Added
 
 - **Dev-mode deep-assignment warning now covers arrays, from the first level down.** Reading
@@ -23,20 +33,43 @@ spot in the warning's coverage, not a cosmetic gap.
   assignment, and `delete arr[i]` warn with the element's full path (e.g.
   `"pages[0].page.width"`); reading further into an object or array reached through an index
   keeps recursing through the same wrapping, so `app.pages[0].page.width = 1` now warns
-  exactly like `app.o.p.q = 2` already did. The nine mutating array methods
-  (`push`/`pop`/`shift`/`unshift`/`splice`/`sort`/`reverse`/`fill`/`copyWithin`) warn once per
-  *call*: the wrapped method logs one `console.warn`, then applies the real method directly
-  to the underlying (unwrapped) array, so a `sort()` on a five-element array doesn't produce
-  five warnings from element writes happening inside the sort. Every non-mutating read —
-  `map`/`filter`/`slice`/`forEach`/`find`/`includes`/`indexOf`/`join`/`concat`/`flat`/
-  `entries`/`keys`/`values`/`for...of`/`Array.isArray()`/`JSON.stringify()`/`length` reads —
-  stays silent and returns the same values a production build would. **What does not
-  change**: arrays remain entirely untracked for render scheduling at any depth (`app.list =
-  [...app.list]` is still the one supported replacement pattern) — this release only extends
-  the dev *warning*'s coverage to match that existing tracking rule, it does not change what
-  gets tracked. Production (`.iife.min.js`, `__RICDOM_DEV__` baked `false`) is unaffected:
-  array reads stay the plain, unwrapped array, and the new code is fully removed by
-  dead-code elimination (core min gzip unchanged, see below).
+  exactly like `app.o.p.q = 2` already did (subject to the deferred timing described under
+  "Changed" below). The nine mutating array methods
+  (`push`/`pop`/`shift`/`unshift`/`splice`/`sort`/`reverse`/`fill`/`copyWithin`) queue at most
+  one warning per *call*: the wrapped method records one pending entry, then applies the real
+  method directly to the underlying (unwrapped) array, so a `sort()` on a five-element array
+  doesn't produce five pending entries from element writes happening inside the sort. Every
+  non-mutating read — `map`/`filter`/`slice`/`forEach`/`find`/`includes`/`indexOf`/`join`/
+  `concat`/`flat`/`entries`/`keys`/`values`/`for...of`/`Array.isArray()`/`JSON.stringify()`/
+  `length` reads — stays silent and returns the same values a production build would. **What
+  does not change**: arrays remain entirely untracked for render scheduling at any depth
+  (`app.list = [...app.list]` is still the one supported replacement pattern) — this release
+  only extends the dev *warning*'s coverage to match that existing tracking rule, it does not
+  change what gets tracked. Production (`.iife.min.js`, `__RICDOM_DEV__` baked `false`) is
+  unaffected: array reads stay the plain, unwrapped array, and the new code is fully removed
+  by dead-code elimination (core min gzip essentially unchanged, see below).
+
+### Changed
+
+- **The deep-assignment dev warning no longer fires at the moment of assignment — it is
+  deferred to the end of the current task, and only fires if the task ends without anything
+  ever triggering a render.** (Push-before-merge finding from the ninth pilot, Potopeta, see
+  above.) A deep `set`/`deleteProperty`/mutating-array-method call now only records its path
+  in a small per-`createApp` pending set and schedules a single `queueMicrotask` flush,
+  instead of calling `console.warn` immediately. Anything that means "the render will pick
+  this up" — a tracked top-level or one-level-deep assignment (i.e. anything that calls
+  `notify`), or an explicit synchronous `renderNow()` — clears the entire pending set before
+  that microtask runs, because the render it triggers re-reads the whole state tree and
+  therefore also picks up the deep write made earlier in the same task, tracked or not. Only
+  entries still pending when the microtask actually runs produce a `console.warn`, one per
+  distinct path (repeated assignments to the same path within the task collapse into a single
+  warning). This makes v1's own canonical deep-update pattern — write deep, then trigger by
+  touching something tracked, in the same synchronous task — entirely silent, which it was
+  never supposed to warn about in the first place. An assignment that never gets picked up in
+  the same task, including one separated from its trigger by an `await` (a `queueMicrotask`
+  runs before the next tick resolves, so the flush has already happened by the time execution
+  resumes), still warns — this is intentional, not a gap, since state left half-updated across
+  an `await` is a real staleness window independent of this warning.
 
 ### Docs
 
@@ -49,32 +82,50 @@ spot in the warning's coverage, not a cosmetic gap.
   objects below the first level; it is now also true for arrays from the first level down).
   This is a consequence of the wrapping the warning needs, not a bug — copy the value first
   (`JSON.parse(JSON.stringify(v))` or a spread) if you need to hand it to one of those APIs.
+  Rewrote the warning's own description to explain the deferred/`queueMicrotask` timing above,
+  including the v1-canon-is-silent and await-crosses-a-task-boundary-and-still-warns FACTs.
+  `docs/TUTORIAL.md` §3 updated to match (a couple of sentences, no structural change).
 
 ### Verified
 
 - Unit (jsdom): the table of previously-invisible cases (`app.arr[0].x`, `app.arr[0].p.q`,
   `app.pages[0].page.width`, the `app.pages = [...app.pages]` canon staying silent) each
-  warn exactly once (or zero times for the canon replacement); `push`/`splice`/`sort` each
+  warn exactly once after a microtask flush (or zero times for the canon replacement, checked
+  both immediately after the assignment and after the flush); `push`/`splice`/`sort` each
   warn exactly once per call; `map`/`filter`/`for...of`/`Array.isArray`/`JSON.stringify`/
-  `length` produce no warnings; production (`NODE_ENV=production`) leaves the array
-  unwrapped (`state.arr === raw.arr`). 559 unit tests total (was 550).
-- Real browser: `dist/ricdom.iife.js` warns once for `app.pages[0].page.width = 1`;
-  `dist/ricdom.iife.min.js` does not warn for the same assignment and does not wrap the
-  array (`structuredClone` succeeds); `dist/ricdom.iife.js` throws on
-  `structuredClone(app.arr)` (the FACT above, pinned as a regression test). 129 browser
-  tests total (was 126). `npm run test:examples` (production IIFE, unchanged) and a
-  one-off dev-IIFE pass over the same `examples/*.html` (not checked in — swaps in
-  `ricdom.iife.js`/`ricdom-ui.iife.js` and exercises each page's tabs/accordion/collapse
-  triggers) both produced zero `"RicDOM:"` warnings, confirming existing `.map()`-over-
-  `items` render code in the examples and UI components isn't a false positive under the
-  new coverage.
-- Core min gzip: **4,768B → 4,767B** (no meaningful change; raw minified byte length is
-  identical, 12,053B before and after — the 1B gzip difference is an esbuild
-  minifier-symbol-renaming artifact from restructuring the dev-gated branch, not new code).
-  Confirmed via `grep` that none of the new array-warning strings/method names
-  (`copyWithin`, `mutating`, etc.) appear in `dist/ricdom.iife.min.js`. Dev IIFE gzip:
-  7,567B → 7,956B (+389B, the actual cost of the new dev-only code, which is fine since the
-  dev IIFE has no gzip ceiling).
+  `length` produce no warnings; production (`NODE_ENV=production`) leaves the array unwrapped
+  (`state.arr === raw.arr`). New: a dedicated suite for the deferred-timing contract
+  (`tests/deepAssignPendingDiscard.test.ts`) covers the four Potopeta-canon cases (deep write
+  + array spread in the same task, deep write + unrelated top-level `++`, several deep writes
+  batched before one spread, deep write + `renderNow()`) staying silent, plus the
+  forgot-to-trigger cases (single path, same path repeated, two distinct paths, a lone
+  `push()`) still warning, plus the await-crosses-a-task case warning even though a trigger
+  eventually follows. Confirmed red-first against the pre-fix code (commit `1bd53fb`): all
+  four Potopeta-canon cases produced warnings there (1, 1, 2, and 1 respectively) before this
+  fix. 572 unit tests total (was 559).
+- Real browser (`tests/browser/devIifeWarn.test.ts`): `dist/ricdom.iife.js` warns once for
+  `app.pages[0].page.width = 1` alone, after a microtask flush, and stays silent for the same
+  write followed by `app.pages = [...app.pages]` in the same task (new tests, both cases);
+  `dist/ricdom.iife.min.js` does not warn for the same assignment and does not wrap the array
+  (`structuredClone` succeeds); `dist/ricdom.iife.js` throws on `structuredClone(app.arr)`
+  (the FACT above, pinned as a regression test). 130 browser tests total (was 129).
+  `npm run test:examples` (production IIFE, unchanged) and a one-off dev-IIFE pass over the
+  same `examples/*.html` (not checked in — swaps in `ricdom.iife.js`/`ricdom-ui.iife.js` and
+  exercises each page's tabs/accordion/collapse/popup triggers) both produced zero deep-
+  assignment warnings, confirming the examples and UI components' existing `.map()`-over-
+  `items` render code isn't a false positive under the new coverage or the new timing.
+- Core min gzip: **4,767B → 4,801B** (+34B; raw minified byte length 12,053B → 12,140B,
+  +87B). The only string from this change that survives in `dist/ricdom.iife.min.js` is the
+  `pending` property name, reached through `clearPendingDeepWarnings()` — the one function
+  `renderNow()` must call unconditionally (across a module boundary, so esbuild can't fold it
+  away) to discard pending warnings before its synchronous re-render, the same kind of small,
+  always-present exception `isDevMode()` itself already is. Confirmed via `grep` (after
+  decoding `\uXXXX` escapes) that none of the other new strings — `pending` context internals
+  (`microtask`, `queueMicrotask`, `flushScheduled`, `PendingWarnCtx`, `scheduleFlush`,
+  `recordPendingWarning`, `pendingWarnByRawState`) or the new warning wording (`発火されませ
+  んでした`) — appear anywhere in the production bundle. Dev IIFE gzip: 7,956B → 8,244B
+  (+288B, the actual cost of the new dev-only pending/microtask machinery, which is fine
+  since the dev IIFE has no gzip ceiling).
 
 ## [2.0.0-alpha.10] — not yet published
 

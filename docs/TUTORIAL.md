@@ -127,10 +127,13 @@ To update something nested two or more levels deep, shallow-copy the level that 
 app.user = { ...app.user, address: { ...app.user.address, city: 'z' } };
 ```
 
-In a development build, writing to an untracked nested path like that logs a
-`console.warn` telling you exactly this — it still writes the value, it just won't
-re-render, so you'll notice a stale UI and a matching warning in the console rather than
-silence.
+In a development build, writing to an untracked nested path like that still writes the
+value — it just won't re-render on its own. If you write the nested value and then, in the
+same synchronous task, trigger a render some other way (e.g. `app.user = { ...app.user }`,
+matching the shallow-copy pattern above), nothing is logged — the render picks up your
+nested write along with everything else. Only if nothing ends up triggering a render does
+`console.warn` fire, once per path, at the end of that task — that's the actual bug this
+warning is for.
 
 ---
 

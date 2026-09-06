@@ -225,9 +225,53 @@ regardless of state shape, and keeps "why didn't this re-render" answerable by o
 ### Dev-mode warning for untracked deep assignment
 
 In a non-production build, reading a nested object through the reactive state returns it
-wrapped in a second, read-only-style Proxy that logs `console.warn` on any
-`set`/`deleteProperty`, then still performs the assignment (so dev and production observe
-the same final data, only dev also warns).
+wrapped in a second, read-only-style Proxy that detects any `set`/`deleteProperty` reached
+through it, then still performs the assignment (so dev and production observe the same
+final data — dev additionally may warn, later, once it is clear the assignment was never
+picked up by a render).
+
+**The warning is deferred to the end of the task, not fired at the moment of assignment
+(2.0.0-alpha.11, changed from firing immediately).** v1's own documented pattern for a deep
+update is to write into the nested object in place and *then* trigger the render that will
+pick it up, by touching something tracked afterward:
+
+```js
+app.pages[0].page.width = 1;   // deep write — not tracked by itself
+app.pages = [...app.pages];    // trigger — the render this schedules re-reads the whole
+                                // state tree, so the deep write above reaches the screen
+                                // through it regardless of whether it was itself "tracked"
+```
+
+Warning at the moment of the first line fires on every single instance of this
+canon-compliant pattern — which is what 2.0.0-alpha.10 and earlier did, surfaced by a pilot
+whose codebase had several dozen call sites in this exact shape, firing hundreds of runtime
+warnings and drowning out the one case the warning exists to catch: a deep assignment that
+truly never gets picked up because nothing tracked is ever touched afterward.
+
+The fix: a deep `set`/`deleteProperty`/array-mutating-method call no longer calls
+`console.warn` immediately. It records the path in a small per-`createApp` pending set and
+schedules one `queueMicrotask` flush. Anything that means "the render will pick this up" —
+a tracked top-level or one-level-deep assignment (i.e. anything that calls `notify`), or an
+explicit synchronous `renderNow()` — clears the entire pending set before that microtask
+runs. Only entries still pending when the microtask actually runs (meaning nothing in the
+same task ever triggered a render) produce a `console.warn`, one per distinct path
+(repeated assignments to the same path within the task collapse into a single warning).
+
+**FACT — an `await` between the deep write and the trigger defeats this.**
+`queueMicrotask` callbacks run as soon as the current task finishes, which is before the
+continuation after an `await` runs:
+
+```js
+app.pages[0].page.width = 1;
+await something();             // the pending flush already ran here — too late
+app.pages = [...app.pages];    // this trigger no longer has anything to clear; the
+                                // warning already fired
+```
+
+This still warns, and that is intentional rather than a gap in the deferral: state left
+half-updated across an `await` is a real staleness window in its own right (a render
+triggered by something else between the two lines above would see the old value), and the
+warning is incidentally also catching that.
 
 Arrays are a separate axis from this and the two halves must not be conflated:
 
