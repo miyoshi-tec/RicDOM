@@ -176,6 +176,18 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 27. パイロット移行第 8 号 (LCP = Local Code Pilot v2、Electron classic script + contextIsolation) からの確定事項 (2026-09-06、2.0.0-alpha.9)
+
+- **移行実績**: v1 v0.4.2 → v2 alpha.8、「移行できた」。E2E 24/24、機械変換 220 箇所 + 手作業 10 点、約 2 時間 (うち移行 40 分、残りは切り分け)。IIFE グローバル (`ricdom` / `ricdomUI`) が classic script + contextIsolation 構成の唯一の導線 — **据え置き対象**。v1 と v2 のスクリーンショット並列比較、v1 develop を同条件で走らせる対照実験、`ricdom-ui.css` を grep しての原因特定 (5 分) — 外部 CSS 1 枚と role レジストリを選んだ理由がそのまま効いた
+- **z-index が CSS クラス化で落ちていた**: v1 は dialog overlay/本体 `zIndex: 500/501`、popup `401` を inline で持っていたが、v2 の CSS 化で dialog / popup / dropdown の分だけ落ち (toast 600 / tooltip 401 は残っていた)、`.ric-splitter__divider { z-index: 1 }` がモーダルを貫通した。CSS クラスに v1 と同じ値を復元 (序列 toast 600 > dialog 501 > popup/dropdown/tooltip 401)。「portal に stacking context」案は `portalTo` で外部要素を使う consumer に効かないので不採用。**教訓: inline style → CSS クラスの移植は、値だけでなく「inline で持っていた理由 (stacking)」ごと移す。Phase 2 の移植レビューで見落とした**
+- **テスト設計の罠 (実装中に発見)**: dialog は開くと portal の兄弟を `inert` にし、`inert` 要素は `elementFromPoint()` のヒットテストから外れる → splitter を兄弟に置いた素朴な構成では **z-index 未修正でも緑になる偽陽性**。`portalTo` で portal を splitter の main 内に置いて初めて赤/緑を正しく判定できた。「観測結果を assert する」テストでも、観測手段そのものが仕様 (inert) に影響される場合がある — テストが赤になることの確認 (red-first) を必須にしている理由
+- **dialog の既定初期フォーカス順を「本文 → フッター → ✕ → root」に変更** (LCP #4、Trend Guard も同じ経験で 2 件目)。DOM 順で最初 = ヘッダの ✕ にリングが付き、スクリーンリーダーが「閉じる」を最初に読んでいた。`[autofocus]` 最優先と「既に内側にあれば奪わない」ガードは維持。**`initialFocus` prop は引き続き作らない** (§21)。見た目が変わるので CHANGELOG は Changed
+- **`createScrollPane` の追従に rAF + 200ms バックストップ** (コアのスケジューラと同じ二重化、UI 側にローカル実装 — 状態が pane ごと)。v1 と同じ rAF のみだった
+- **純粋関数部品の Props 型に `style?: StyleValue` を明示** (10 部品)。rest 透過で動いてはいたが型に無かった
+- **docs**: `createApp` の同期初回描画と TDZ (render が参照する `const` より後に書く、v1 の `handle.render = render` 後付けと同じ理由) / **Electron の隠れウィンドウは rAF 停止 + setTimeout ≈1s 間引き** (コアの backstop も間引かれる、v1 と同じ、E2E は `backgroundThrottling: false`) を SPEC §7 脚注に
+- 出荷 CSS に長い説明コメントを入れると css gzip が肥大する (+850B) → 説明は TS 側の `//` に、出荷 CSS は 1 行コメントまで
+- コア未変更 (gzip 5,169B)、ui 24,726B、css 6,288B。unit 540 / browser 113。**パイロット 8 アプリで計 41 件** (第 8 号 = バグ 1 + 変更 1 + 追加 2 + docs 2)
+
 ## 26. パイロット移行第 5〜7 号 (RaccoonMemo / Rancha / Brownies Desktop、Electron 3 アプリ同時) からの確定事項 (2026-09-06、2.0.0-alpha.8)
 
 - **移行実績**: v1 v0.4.5 → v2 alpha.7、3 アプリとも「移行できた」。unit + e2e (スナップショット含む) が v1 と同数で全緑 (Brownies 361+27 / Rancha 392+116 / Raccoon 223+39)。推奨手順 0 (v1 依存を 1 ファイルに寄せる) は打診より前に自発的に完了しており、v2 化は「アダプタ 1 本 + 機械変換 1 種類」。**アダプタ先行の有効性を第 3〜7 号の 5 アプリで確認**
