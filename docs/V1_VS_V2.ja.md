@@ -67,11 +67,12 @@
 | portal 系 (popup/dialog/toast/tooltip) の props | 手動 (API 変更) |
 | アイコン descriptor | そのまま |
 
-## 移行の落とし穴 (第 3〜7 号のフィードバックより — 表のとおりに書くと必ず 1 回踏む)
+## 移行の落とし穴 (第 3〜8 号のフィードバックより — 表のとおりに書くと必ず 1 回踏む)
 
 移行ガイドの対応表は「何が変わったか」を短く伝えるものだが、実際に手を動かすと表の 1 行だけでは
-気づけない具体的な落とし穴がある。ここでは実際のパイロット移行 (第 3〜4 号、および Electron 3 アプリ
-同時移行だった第 5〜7 号 = RaccoonMemo/Rancha/Brownies Desktop) が踏んだものを、再現手順ごと記録する。
+気づけない具体的な落とし穴がある。ここでは実際のパイロット移行 (第 3〜4 号、Electron 3 アプリ
+同時移行だった第 5〜7 号 = RaccoonMemo/Rancha/Brownies Desktop、および第 8 号 = LCP) が踏んだものを、
+再現手順ごと記録する。
 
 ### `setup` オプション: `app.use()` を呼ぶタイミング
 
@@ -145,6 +146,31 @@ app.render = (s) => panel({ title: '設定', data: s.params }); // 循環参照�
 コード量が少ないので、そちらを既定に推奨する。この節のパターンは「v1 の順序をそのまま踏襲
 したい」「render の組み立てが `createApp` 呼び出し時点でまだ用意できない」ような場合の
 代替として使う (canon はこの 2 つのみ)。
+
+### `createApp` を呼ぶ位置: render が参照する `const` より後に書くと TDZ で落ちる (第 8 号・LCP)
+
+`createApp` は**呼び出しそのものの最中に**同期で初回 render を実行する (上の 2 節で繰り返し
+出てきた FACT)。ここまでは「`use()` した部品を render が参照できるタイミング」の話だったが、
+同じ FACT がもう 1 つ別の踏み方をする: render 関数が閉じ込めている**普通の `const`** が、
+`createApp(...)` の呼び出し行より**後ろ**で宣言されていると、初回 render の同期実行時点では
+まだその `const` の初期化が (JS の実行順として) 済んでいない — TDZ (temporal dead zone) の
+`ReferenceError` になる。`console.error` + NOOP で済む `use()` 忘れ (このページの最初の節) と
+違い、こちらは例外で即死する:
+
+```js
+// ❌ ReferenceError: Cannot access 'CONFIG' before initialization.
+// createApp の同期初回 render が render 関数を即座に呼ぶが、その時点で
+// まだ CONFIG の const 宣言 (次の行) は実行されていない。
+const app = createApp('#app', {}, () => uiText({ children: [CONFIG.title] }));
+const CONFIG = { title: '設定' };
+```
+
+対応は簡単で、`CONFIG` の宣言を `createApp(...)` より前に移すか、上の「`app.render` の後付け」
+節と同じパターン (`() => null` で作ってから本物の render を後付け) を使う — 後付けされた
+render 関数は代入されるまで一度も呼ばれないので、それまでに `CONFIG` が用意されていれば
+TDZ を踏まない。v1 で `handle.render = render` を「依存物を全部揃えてから最後に」代入する
+書き方をしていたコードがこの罠を踏まなかったのも、同じ理由 (本物の render 関数は
+代入されるまで呼ばれない) による。
 
 ### page 行の補足: `applyTheme` が塗るのは bg/fg/font-size のみ
 

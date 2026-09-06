@@ -220,6 +220,28 @@ Assigning to `app.render` re-renders synchronously right away, same as assigning
 other property on the handle — there's no lenient mode where a missing/placeholder render
 function skips the first paint.
 
+**Pitfall (a pilot migration, 2.0.0-alpha.9): `createApp` runs its first render
+synchronously, during the call itself** — so if the render function you pass closes over
+a `const` declared *after* that `createApp(...)` call in the same module, you hit a
+temporal-dead-zone `ReferenceError`, not a `console.error`-and-NOOP like the `use()`
+mistake above:
+
+```js
+// ❌ ReferenceError: Cannot access 'CONFIG' before initialization.
+// createApp's synchronous first render calls the render function immediately,
+// and CONFIG's `const` declaration hasn't executed yet at that point.
+const app = createApp('#app', {}, () => uiText({ children: [CONFIG.title] }));
+const CONFIG = { title: 'Settings' };
+```
+
+The fix is the same shape as the two patterns above: either declare `CONFIG` before the
+`createApp(...)` call, or use the `() => null` + `app.render = ...` pattern shown above so
+the *real* render function (the one referencing `CONFIG`) isn't wired up — and therefore
+never executed — until after `CONFIG` exists. This is the same underlying reason v1 code
+that assigned `handle.render = render` after building up its dependencies never hit this:
+the real render function simply wasn't called until you attached it, same as the `app.render`
+pattern above.
+
 If you forget the `app.use(...)` step and call `createToast()()` directly, nothing
 crashes — `ricdom/ui` logs one `console.error` explaining the fix and renders nothing.
 There's no implicit wiring to get subtly wrong: either a part is registered with `use()`,

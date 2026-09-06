@@ -514,6 +514,31 @@ target):
 [data-ricdom-role="portal"] { -webkit-app-region: no-drag; }
 ```
 
+### FACT: Electron — hidden windows throttle both `requestAnimationFrame` and the `setTimeout` backstop (2.0.0-alpha.9)
+
+When an Electron `BrowserWindow` is hidden (minimized, on an inactive workspace, or an
+off-screen/background window used for pre-rendering), `document.visibilityState` becomes
+`'hidden'` and Chromium stops firing `requestAnimationFrame` entirely — the same throttling
+a background browser tab gets. This is not unique to ricdom: the core scheduler's
+rAF-and-200ms-`setTimeout`-backstop double-up (§4) exists precisely because rAF can stop,
+and every `ricdom/ui` part that waits on an entrance/exit CSS `animationend` (dialog,
+popup, toast, tooltip, `createScrollPane`'s follow-scroll as of 2.0.0-alpha.9 — see §10)
+has the same 200ms-or-`ANIMATION_FALLBACK_MS`-backstop shape for the same reason. But in a
+hidden window, Chromium *also* clamps `setTimeout`/`setInterval` to fire no more than about
+once per second — so the backstop itself is throttled, not just rAF. The practical
+consequence: rendering and every animation-driven state transition (a dialog finishing its
+open/close, a toast auto-dismissing, `createScrollPane` catching up to newly-added
+content) can lag up to roughly 1 second behind in a hidden Electron window, instead of the
+usual ~16ms (rAF) or 200ms (backstop) upper bound. This is confirmed unchanged from v1 (a
+pilot app ran the same scenario against v1 and v2 side by side and saw the same ~1s lag in
+both) — it is a Chromium/Electron platform behavior, not a ricdom regression.
+
+If your E2E tests drive a window that starts hidden, is backgrounded during the test, or
+runs against `nativeWindowOpen`/multiple `BrowserWindow`s where only one has focus, set
+`webPreferences: { backgroundThrottling: false }` on that `BrowserWindow` — this disables
+the throttling described above (both rAF and the `setTimeout` clamp) so timing in tests
+matches what a focused, visible window would do.
+
 ### FACT: the portal element always exists, and can add to flex/grid gaps while empty (2.0.0-alpha.6)
 
 The auto-generated portal element (`[data-ricdom-role="portal"]`) is appended to `target`

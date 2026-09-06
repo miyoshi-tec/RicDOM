@@ -5,6 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.9] — not yet published
+
+Five reports from the eighth pilot migration (LCP = Local Code Pilot v2, an Electron
+classic-script + `contextIsolation` app using both `ricdom`/`ricdom/ui` as IIFE globals,
+confirmed migrated successfully at `2.0.0-alpha.8`), triaged and verified against the code
+by the maintainer before implementation.
+
+### Fixed
+
+- **`createDialog`/`createPopup`/`createDropdown` had no `z-index`, so `createSplitter`'s
+  divider could draw on top of them (#1)**: when the CSS layer was split out of inline
+  styles into `ricdom-ui.css` classes, the `z-index: 500`/`501` (dialog overlay/body) and
+  `z-index: 401` (popup/dropdown overlay/body, tooltip already had it) that v1 held as
+  inline styles (`ric_ui/popup/create_ui_dialog.js`, `create_ui_popup.js`,
+  `_popup_utils.js`) never made it into the corresponding CSS classes. In practice, any
+  other rule that happened to declare a `z-index` — `.ric-splitter__divider { z-index: 1 }`
+  being the one that actually surfaced this on a real app — was then the only element with
+  a stacking order above `auto`, so it painted over an open modal dialog or an open popup
+  menu wherever the two happened to overlap on screen. Fixed by adding
+  `.ric-dialog__overlay { z-index: 500 }`, `.ric-dialog { z-index: 501 }`, and
+  `.ric-popup__overlay` / `.ric-popup__body` / `.ric-dropdown__body { z-index: 401 }` to
+  `src/ui/cssTemplates.ts`, restoring the v1 stacking order (toast 600 > dialog 501 >
+  popup/dropdown/tooltip 401) exactly. Giving the portal element itself a stacking context
+  was considered and rejected: a consumer using `portalTo` to target their own external
+  element (outside `ricdom-ui.css`'s reach) would get no benefit from that, whereas
+  per-component `z-index` on the overlay/body classes works regardless of where the portal
+  physically lives. New tests in `tests/browser/uiZIndex.test.ts` assert (via
+  `document.elementFromPoint()` at the actual overlap coordinates) that an open dialog/popup
+  wins over a splitter divider they're made to overlap — both were red before this fix.
+
+### Changed
+
+- **`createDialog`'s default initial focus order is now body → footer → close button →
+  root, not "first focusable in DOM order" (#4)**: DOM order for a dialog is header (with
+  its `✕` close button) → body → footer, so "first focusable in DOM order" always landed on
+  `✕` regardless of what the dialog actually contains — meaning every dialog opened with a
+  focus ring on its close button, and a screen reader's first announcement was always
+  "Close," ahead of whatever the dialog is actually asking the user to look at or do. `[
+  autofocus]` still wins over everything (unchanged); absent that, focus now goes to the
+  first focusable inside the body, then the first inside the footer/`actions`, then the `✕`,
+  then the dialog root as a last resort. This can change the appearance/behavior of
+  existing `2.0.0-alpha.x` consumers whose dialogs have a focusable body or footer — the
+  visible focus ring on open moves from `✕` to that element. The `Tab`/`Shift+Tab` focus
+  trap's cycle order is unaffected (still plain DOM order); only the one-time initial
+  target changed. See SPEC.md §10.3.1c and `src/ui/dialog.ts`'s `focusFirstElement`. Tests
+  in `tests/browser/uiDialogFocusOrder.test.ts` cover all four cases (body focusable,
+  footer-only, neither, `[autofocus]` still wins) and were red before this fix (asserted
+  `document.activeElement` landed on the body/footer target, not `✕`); the pre-existing
+  `tests/browser/uiDialog.test.ts` and `uiDialogFocusFilter.test.ts` initial-focus
+  assertions were updated to the new order.
+
+### Added
+
+- **`createScrollPane`'s follow-scroll now has the same rAF + 200ms `setTimeout` backstop
+  double-up as the core scheduler (#5)**: it previously scheduled its post-render
+  `scrollTop` application with a bare `requestAnimationFrame`, which — like the core
+  render scheduler this mirrors (`src/scheduler.ts`, §4) — stops firing in a hidden
+  Electron window (`backgroundThrottling`, see the new SPEC.md §7 FACT below), silently
+  breaking auto-follow there. `src/ui/scrollPane.ts` now races an rAF against a 200ms
+  `setTimeout`, whichever fires first applies the scroll position and cancels the other
+  (same "first wins, second is a no-op" shape as `src/scheduler.ts`, reimplemented locally
+  rather than imported — the state needs to live per scroll-pane instance, and this file is
+  outside the `src/*.ts` core). New jsdom unit tests in `tests/ui/scrollPane.test.ts` stub
+  a non-firing `requestAnimationFrame` and confirm the 200ms backstop still updates
+  `scrollTop` (red before this fix — `scrollTop` never moved), and confirm a healthy rAF +
+  the backstop together only apply once.
+- **`style?: StyleValue` made explicit on stateless component prop types that were missing
+  it** (`uiButton`, `uiInput`, `uiTextarea`, `uiCheckbox`, `uiRadiobutton`, `uiSelect`,
+  `uiRange`, `uiColor`, `uiSeparator`, `uiMdPre` — an LCP type-review finding). All of these
+  already passed `style` through to the rendered node at runtime via the `[key: string]:
+  unknown` rest-spread contract (§10.5); only the TypeScript type was missing it, so `style`
+  on these components previously typechecked only by falling through the catch-all index
+  signature rather than being a documented, autocompletable prop. No runtime behavior
+  change. See SPEC.md §10.5.
+
+### Docs
+
+- **TUTORIAL.md / V1_VS_V2.ja.md**: documented a `createApp` pitfall from the LCP migration
+  (#2) — because `createApp` runs its first render synchronously during the call itself, a
+  render function that closes over a `const` declared *after* the `createApp(...)` call (in
+  the same module) hits a temporal-dead-zone `ReferenceError`, not the `console.error`+NOOP
+  of the `use()`-ordering mistake documented alongside it. Cross-referenced with the
+  `2.0.0-alpha.8` "`app.render` reassignment" pattern, which is also the fix (the real
+  render function isn't called until it's assigned) — the same reason v1 code that assigned
+  `handle.render = render` only after wiring up its dependencies never hit this.
+- **SPEC.md §7**: added a FACT that a hidden Electron `BrowserWindow` throttles not just
+  `requestAnimationFrame` (already documented via the scheduler's backstop, §4) but also
+  clamps `setTimeout`/`setInterval` to roughly once per second — so the *backstop itself*
+  can lag up to ~1s in a hidden window, not just rAF. Confirmed unchanged from v1 (LCP ran
+  the same scenario against both and observed the same ~1s lag in each — a Chromium/Electron
+  platform behavior, not a ricdom regression). Recommends
+  `webPreferences: { backgroundThrottling: false }` for E2E tests driving a window that
+  starts hidden or is backgrounded mid-test.
+- **API_AUDIT.ja.md**: noted the `style?: StyleValue` additions above.
+
 ## [2.0.0-alpha.8] — not yet published
 
 Seven cross-cutting reports from pilots 5-7 (RaccoonMemo, Rancha, Brownies Desktop — three
