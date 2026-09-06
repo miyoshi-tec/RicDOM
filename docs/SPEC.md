@@ -666,7 +666,7 @@ the accessibility contract, which is FACT that is easy to miss by reading types 
 
 | Component | Notes |
 |---|---|
-| `uiButton(props)` | `variant`: `'default' \| 'primary' \| 'ghost'`. `size`: `'sm' \| 'md' \| 'lg'`, default `'md'` (`'md'` adds no size class — it *is* the core `.ric-button` size). Rest-spread contract (§10.5) |
+| `uiButton(props)` | `variant`: `'default' \| 'primary' \| 'ghost' \| 'link'` (`'link'` restored from v1 in 2.0.0-alpha.8, pilots 5-7/Rancha — strips background/border/height-constraint for a text-like button, e.g. breadcrumbs/inline links). `size`: `'sm' \| 'md' \| 'lg'`, default `'md'` (`'md'` adds no size class — it *is* the core `.ric-button` size; `'link'` ignores `size` the way it ignores density's height, matching v1). Rest-spread contract (§10.5) |
 | `uiInput(props)` | Text input, controlled. `value` is always emitted (even `''`) so it participates in `FORCE_REAPPLY`/the editing guard |
 | `uiTextarea(props)` | `autoResize?: { minRows?, maxRows? }` grows/shrinks height to content, clamped, with overflow scrolling past `maxRows`. **IME note**: a controlled textarea can have its value overwritten mid-composition before IME confirmation — consider driving updates from `onchange` instead of `oninput` for CJK-heavy input |
 | `uiCheckbox(props)` | Renders `<label><input type=checkbox>…</label>`; `checked`/`onchange` are isolated to the inner `<input>` (rest props go on the outer `<label>`) |

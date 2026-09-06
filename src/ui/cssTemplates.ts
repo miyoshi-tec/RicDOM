@@ -111,6 +111,32 @@ const BUTTON_CSS = `
   border-color: ${fm};
   background: ${bd};
 }
+/* v1 ric_ui/control/ui_button.js の 'link' variant を復活 (Rancha からの報告、
+   2.0.0-alpha.8、設計書 §20「v1 で正式 prop だったものは復活が原則」)。背景・枠・
+   高さ制限を全部外したテキスト風ボタン (breadcrumb / inline link 用途)。size (sm/md/lg)
+   の高さ指定より後ろに置かず、hover/active で height:auto を再上書きされないよう
+   sm/md/lg より先に定義する (CSS 内の記述順は詳細度が同じ場合の後勝ちに影響するため、
+   v1 (css_templates.js) と同じ並び順を踏襲)。 */
+.ric-button--link {
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  height: auto;
+  padding: 1px 5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.ric-button--link:hover:not(:disabled) {
+  background: ${bd};
+  border-color: transparent;
+}
+.ric-button--link:active:not(:disabled) {
+  /* link variant: テキスト風なので press-jump (translate/filter) はさせない */
+  translate: 0;
+  filter: none;
+  background: color-mix(in srgb, ${fg} 14%, transparent);
+}
 .ric-button--sm {
   height: 22px;
   font-size: 12px;

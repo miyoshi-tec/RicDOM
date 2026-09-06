@@ -51,6 +51,13 @@ describe('uiButton', () => {
     expect(node.class).toBe('ric-button');
   });
 
+  // 'link' variant の復活 (Rancha からの報告、2.0.0-alpha.8、設計書 §20「v1 で正式 prop
+  // だったものは復活が原則」)。他 variant と同じ `.ric-button--${variant}` 命名規則。
+  it('variant: "link" がクラスに反映される', () => {
+    const node = uiButton({ variant: 'link', children: ['x'] }) as unknown as TestButtonNode;
+    expect(node.class).toBe('ric-button ric-button--link');
+  });
+
   it('size: sm/lg がクラスに反映される (variant と併用可)', () => {
     const sm = uiButton({ size: 'sm', children: ['x'] }) as unknown as TestButtonNode;
     expect(sm.class).toBe('ric-button ric-button--sm');

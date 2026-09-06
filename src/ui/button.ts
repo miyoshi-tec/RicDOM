@@ -11,7 +11,12 @@
 import type { ClassValue, RicElementNode, RicNode } from '../types.js';
 import { UI_ROLE, mergeClass } from './internal/pureHelpers.js';
 
-export type UiButtonVariant = 'default' | 'primary' | 'ghost';
+// 'link' は v1 (ric_ui/control/ui_button.js) の正式 variant の復活 (Rancha からの報告、
+// 2.0.0-alpha.8)。背景・枠・高さ制限を全部外したテキスト風ボタン (breadcrumb / inline
+// link 用途、density の高さ制約も無視する)。設計書 §20「v1 で正式 prop だったものは
+// 復活が原則」に基づき、他 variant と同じ `.ric-button--${variant}` 命名規則にそのまま乗る
+// (JS 側は class 文字列を付与するだけで済み、CSS_TEMPLATES 側で見た目を定義する)。
+export type UiButtonVariant = 'default' | 'primary' | 'ghost' | 'link';
 /** ボタンの寸法 (v1 ric_ui/css_templates.js の .ric-button--sm/--lg を移植、既定は 'md')。 */
 export type UiButtonSize = 'sm' | 'md' | 'lg';
 
