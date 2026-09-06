@@ -187,6 +187,9 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **docs**: `createApp` の同期初回描画と TDZ (render が参照する `const` より後に書く、v1 の `handle.render = render` 後付けと同じ理由) / **Electron の隠れウィンドウは rAF 停止 + setTimeout ≈1s 間引き** (コアの backstop も間引かれる、v1 と同じ、E2E は `backgroundThrottling: false`) を SPEC §7 脚注に
 - 出荷 CSS に長い説明コメントを入れると css gzip が肥大する (+850B) → 説明は TS 側の `//` に、出荷 CSS は 1 行コメントまで
 - コア未変更 (gzip 5,169B)、ui 24,726B、css 6,288B。unit 540 / browser 113。**パイロット 8 アプリで計 41 件** (第 8 号 = バグ 1 + 変更 1 + 追加 2 + docs 2)
+- **追検証 (2026-09-06、alpha.9) で第 8 号は完了**: z-index 回避策撤去で貫通なし、3 ダイアログの初期フォーカスが本文/フッターへ (E2E 30/30、alpha.8 の dist で 5 件赤 → alpha.9 で緑)。回避策ゼロ
+- **LCP も同じ `elementFromPoint` の偽陽性を踏み `capturePage` のピクセル比較へ切り替えていた**。v2 側の `portalTo` 回避は「CSS 規則」は検証するが「LCP 型の構造 (splitter = portal の兄弟)」を検証しない、という指摘を受け、**兄弟構造のまま dialog を開き、判定直前にテスト側で兄弟の `inert` を外してから `elementFromPoint` する変種**を追加 (`inert` はヒットテストにだけ効き描画順には影響しない)。修正前 CSS で赤、`inert` を外さない素朴版は修正前でも緑 = 偽陽性、を両方固定。browser 114
+- **初期フォーカス変更 × 編集中ガードの組み合わせ** (LCP B): 本文先頭が textarea/input の dialog は開いた直後からガードが効く。E2E の JS `.click()` はフォーカスを移さないので「state から本文を書き戻す」ボタンが無反映になる → `focus()` → `click()`。仕様どおりの帰結だが alpha.9 で新しく生まれた組み合わせなので SPEC / TUTORIAL / V1_VS_V2 / 移行プロンプトに FACT 化
 
 ## 26. パイロット移行第 5〜7 号 (RaccoonMemo / Rancha / Brownies Desktop、Electron 3 アプリ同時) からの確定事項 (2026-09-06、2.0.0-alpha.8)
 
