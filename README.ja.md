@@ -38,6 +38,9 @@ English version: [README.md](README.md)
 import { createApp } from 'https://esm.sh/ricdom@2';
 ```
 
+開発中は `dist/ricdom.iife.min.js` の代わりに `dist/ricdom.iife.js` (非 minify、dev 警告あり) を、
+配布には `.iife.min.js` を使ってください。
+
 ## 競合との位置づけ
 
 | | UI ツリー記法 | リアクティビティ | gzip | ビルド不要 | TS 型 | 導線 |

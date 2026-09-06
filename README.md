@@ -37,6 +37,9 @@ Or with native ESM / a bundler:
 import { createApp } from 'https://esm.sh/ricdom@2';
 ```
 
+While developing, use `dist/ricdom.iife.js` (unminified, dev-mode warnings enabled) instead
+of `dist/ricdom.iife.min.js`; ship `.iife.min.js`.
+
 ## Where ricdom sits
 
 | | UI tree | Reactivity | gzip | No build step | TS types | Distribution |

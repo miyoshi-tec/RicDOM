@@ -43,12 +43,12 @@
 | 状態を持つ部品の契約 | `s.x = create_ui_x()` で `__notify` を**暗黙注入** (state トップレベル必須、誤ると silent failure) | **`const x = app.use(createX())`** で明示登録。未登録で呼ぶと console.error + NOOP、`dispose()` あり。**注意: `createApp` は同期で初回描画するため、`use()` は `render` 関数の外で行う** — canon は 2 通り: `setup` オプション (下記「`setup` オプション」節)、または `() => null` で作ってから `app.render` を後付けする (下記「二段階配線のもう 1 つの解」節、v1 の handle→配線→render 後付けの順序をそのまま再現したい場合向け) |
 | 状態を持たない部品 | `ui_button(...)` 等 | `uiButton(...)` 等 (純粋関数、`use()` 不要) |
 | portal (popup/dialog/toast/tooltip) | `create_ui_page` の render が drain (**page 必須**、css_for 島では不可) | **app 単位の portal ホスト** (page 部品なし)、`portalTo` で任意要素 |
-| CSS 配布 | per-instance で使用クラスを収集注入 (通らない mount は**無装飾**)、`css_for` 3 点セット | **1 枚の `ricdom-ui.css`** (`<link>` or `injectStyles()`)、無装飾 silent failure は構造的に消滅 |
-| テーマ | `create_ui_page({theme})` / `make_css_vars` / `create_theme` / `export_theme` | **`applyTheme(el, {theme, density, fontSize})`** (`data-ricdom-theme` 付与 + `color-scheme`) / `createTheme` / `exportTheme`。変数名 `--ric-*` は継続 |
+| CSS 配布 | per-instance で使用クラスを収集注入 (通らない mount は**無装飾**)、`css_for` 3 点セット | **1 枚の `ricdom-ui.css`** (`<link>` or `injectStyles()`)、無装飾 silent failure は構造的に消滅。**LZ 自己展開ツールなど「関数スコープの中で eval する」ローダとの組み合わせ**は IIFE の footer による明示 global 代入で対応 (alpha.10〜、下記「移行の落とし穴」節)。**生 CSS を `<style>` に直接埋め込む単一ファイル配布**は、CSS 読込検知 (`warnIfStylesMissing`) を `document.styleSheets` 走査方式にしたことで false positive の warn が出なくなった (alpha.10〜、Potopeta = パイロット第 9 号からの報告) |
+| テーマ | `create_ui_page({theme})` / `make_css_vars` / `create_theme` / `export_theme` | **`applyTheme(el, {theme, density, fontSize})`** (`data-ricdom-theme` 付与 + `color-scheme`) / `createTheme` / `exportTheme` / **`createDensity`** / **`createFontSize`** (density/fontSize 版の `createTheme`、alpha.10 で復活)。変数名 `--ric-*` は継続。**density の有効値は v1/v2 とも `comfortable` / `compact` / `tight`** の 3 つのみ (`spacious` 等は v1 でも無効で黙って既定値にフォールバックしていた — v2 の `applyTheme` invalid-name warn (alpha.7〜) がこれを初めて可視化する) |
 | page 部品 | `create_ui_page` (テーマ + CSS 注入 + portal drain の要 + `.ric-page` への bg/fg/font-size 塗り + `padding: var(--ric-gap-md)` / `overflow: hidden` / `box-sizing: border-box`) | **廃止** (役割は `applyTheme` / CSS 1 枚 / portal ホストに分解)。`create_ui_page` が塗っていた **bg/fg/font-size のみ** `applyTheme` した要素自身に塗られる形でパリティ確保 (bg/fg は alpha.3〜、font-size は alpha.6〜)。**`padding`/`overflow`/`box-sizing` はパリティ対象外** — `applyTheme` を当てた要素がページ全体とは限らないため (詳細・補償 CSS は下記「移行の落とし穴」節) |
 | a11y | 意図的に最小 (inline_menu に ARIA なし、dialog に focus trap なし) | **APG 準拠を初期設計に**: dialog = focus trap + `inert` + Esc 復帰、menu = 矢印キー、tabs = roving tabindex、splitter = 矢印キーリサイズ、toast = `aria-live` |
 | popup | `create_ui_popup` (label / icon / menu モード混在、`open_at` v0.4.3) | **`createPopup` = menu 専用** (`openAt` 継承) + **`createDropdown`** (Popover、新設)。トリガーの見た目 (icon+ghost の丸ボタン等) は `trigger` に **object 形** `{ icon?, label?, ghost?, size?, class?, style? }` を渡すと再現できる (alpha.2、v1 parity)。従来の `RicNode`/`RicNode[]` 形と二択。**`createDropdown` は同じ見た目を top-level props (`label`/`icon`/`chevron`/`ghost`) で指定する** (`trigger` object 形は持たない、canon 1 つ) — 見た目の指定場所が部品によって違う点に注意 |
-| tabs | controlled のみ (`bind_tabs`) | controlled / **uncontrolled**。全 item に `children` が無ければ tabpanel を描かない**パネル無しモード** (alpha.2、セグメントコントロール用途) |
+| tabs | `ui_tabs` は**純関数** (`bind_tabs` で外側から controlled 制御、部品自体は状態を持たない) | **`createTabs` は状態を持つ部品** (`app.use(createTabs())` が必須、v1 の `ui_tabs` をそのまま呼ぶだけのコードは動かない)。controlled / **uncontrolled**。全 item に `children` が無ければ tabpanel を描かない**パネル無しモード** (alpha.2、セグメントコントロール用途) |
 | layout の `gap` | `ui_row({gap})` は正式 prop | **`uiRow`/`uiCol` の `gap` prop は復活** (alpha.2 — v2 は当初 rest 経由の属性化で黙って崩れていた、25 箇所以上で報告)。`uiGrid` の `gap` は元から存在 |
 | `focus_when` | 条件の立ち上がりで ref 先へ focus (4 箇所で使用) | **`createFocusWhen`** (`ricdom/ui`、alpha.2)。`app.use()` 登録 + `fw(refName, condition)`。dialog の既定初期フォーカスでは代替できない「特定要素へ」「dialog 以外のタイミングでも」のケース向け |
 | tweak パネル | `create_ui_tweak_panel` + `ui_tweak_row` + folder | **`createTweakPanel` 1 部品** (Tier1 `data` / Tier2 `keys` / Tier3 `rows`) |
@@ -205,6 +205,29 @@ alpha.9 で dialog の既定初期フォーカスが「本文 → フッター �
 ```
 
 (`#root .page` はセレクタ例。`applyTheme(el)` を呼んだ要素自身に相当するセレクタに置き換える。)
+
+### LZ 自己展開ツールなど「関数スコープで eval する」ローダとの組み合わせ (第 9 号・Potopeta、alpha.10 で解決)
+
+Potopeta (RicUI デザイナ) は v1 の LZ 自己展開ツール (`scripts/lz.js`) を流用し、`ricdom`/
+`ricdom/ui` の IIFE を圧縮したうえで自己完結 HTML バンドルに埋め込んでいた。この手のツールは
+復元コードを `(()=>{ eval(s) })()` という**関数スコープの中で eval する**形をとることが多い。
+esbuild が出す IIFE のトップレベルは `var ricdom=(()=>{...})();` という bare `var` で、通常の
+`<script>` 実行 (グローバルスコープでの評価) では問題なく `window.ricdom` になるが、関数スコープの
+中で eval すると `var` はその関数のローカル変数になるだけで `window`/`globalThis` には現れない。
+v1 の LZ 自己展開版 (`RicDOM.lz.min.js` 等) は元からこの対策 (明示的な global 代入) を持っていた
+ため、この非対称に誰も気づいていなかった。**alpha.10 で解決**: `dist/ricdom.iife.min.js` /
+`dist/ricdom-ui.iife.min.js` の末尾に `globalThis.ricdom=ricdom;` / `globalThis.ricdomUI=ricdomUI;`
+を明示的に追加した (tsup の `footer` オプション)。同じ関数スコープ内であれば `var` のローカル
+変数を参照できるため、eval のされ方に関わらず必ず `globalThis` に張られる。
+
+### 単一ファイル配布 (CSS インライン埋め込み) の CSS 読込検知 (第 9 号・Potopeta、alpha.10 で解決)
+
+`ricdomUI` の CSS 読込検知 (`warnIfStylesMissing`、未読み込みなら `console.warn` する仕組み) は
+alpha.9 まで `injectStyles()` 自身のマーカーと `<link href="...ricdom-ui.css">` の 2 経路しか
+見ておらず、`ricdom-ui.css` の生 CSS を `<style>` に直接埋め込む単一ファイル配布 (Potopeta の
+自己完結 HTML バンドル) ではどちらにも一致しないため誤って「未読み込み」と警告していた
+(false positive)。alpha.10 で `document.styleSheets` を走査し `.ric-button` セレクタを持つ
+規則が実在するかを見る方式に変更、この構成でも警告が出なくなった。
 
 ### 機械変換の節: `s/\bctx:/children:/` が取りこぼす 2 形
 

@@ -5,6 +5,100 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.10] — not yet published
+
+Four reports from the ninth pilot migration (Potopeta = a RicUI theme/component designer,
+5,647 lines + 906 tests, distributed as a self-contained HTML bundle built with v1's LZ
+self-extraction tool), triaged and verified against the code by the maintainer before
+implementation.
+
+### Added
+
+- **`createDensity(base, overrides)` / `createFontSize(base, overrides)`** (`ricdom/ui`):
+  the `density`/`fontSize` counterparts of `createTheme`, restoring v1's
+  `create_density`/`create_font_size` (`ric_ui/context.js`), which return a plain variable
+  map as a value rather than requiring `applyTheme` to be called first. Before this
+  release, reading a density/font-size preset's computed CSS variables required calling
+  `applyTheme` on a detached element and reading them back off `el.style` — undocumented,
+  and dependent on `applyTheme`'s internal (non-public) variable names. Both functions
+  accept a bundled name or your own `ThemeVars` object as `base`, merge in `overrides`, and
+  return a `ThemeVars` object suitable for passing straight into
+  `applyTheme(el, { density: createDensity(...) })` / `applyTheme(el, { fontSize:
+  createFontSize(...) })` — this round-trips exactly with what `applyTheme` computes from
+  the same name. An invalid string `base` warns using the same rule as `applyTheme`'s
+  invalid-name warning (dev builds only), since both reuse the same name-resolution
+  helpers.
+- **Unminified dev IIFE builds**: `dist/ricdom.iife.js` / `dist/ricdom-ui.iife.js`, built
+  without `NODE_ENV` statically inlined to `'production'` and without minification.
+  `dist/ricdom.iife.min.js` / `dist/ricdom-ui.iife.min.js` remain the production builds,
+  unchanged (still subject to the core gzip ceiling). Before this release, the only IIFE
+  builds shipped were the production ones, which meant the dev-mode console warnings
+  documented elsewhere in this project (deep-assignment tracking, duplicate keys, etc.)
+  could not actually be observed by anyone using the single-`<script>`-tag distribution
+  form, contradicting the "dev builds warn" story told everywhere else in the docs. This
+  mirrors the development/production split React and other major libraries ship. Use the
+  `.iife.js` build during development, `.iife.min.js` for what you ship — see the README
+  Quick start.
+
+### Fixed
+
+- **The IIFE builds now assign their global explicitly, so they survive being `eval`'d
+  inside a function scope (#Potopeta)**: esbuild's IIFE output is a bare top-level `var
+  ricdom=(()=>{...})();` (same for `ricdomUI`). A normal `<script>` tag executes at global
+  scope, where a top-level `var` becomes a `window` property, so this was never a problem
+  for ordinary usage — but Potopeta's self-contained HTML bundle restores its embedded code
+  through v1's LZ self-extraction tool, whose decompression wrapper evaluates the restored
+  source as `(()=>{ eval(s) })()`, i.e. **inside a function scope**. A `var` declared inside
+  a function scope is local to that function and never reaches `window`/`globalThis` at
+  all, so after decompression, `window.ricdom` (and `window.ricdomUI`) simply didn't exist
+  — even though the exact same code, loaded via a plain `<script src>`, worked fine. v1's
+  own LZ-self-extracting builds already carried an explicit global assignment as protection
+  against exactly this, and v2's esbuild-based IIFE output never picked up the equivalent —
+  an asymmetry nobody had reason to notice until a consumer combined the two independently
+  evolving tools. Fixed by adding a `footer: { js: 'globalThis.ricdom=ricdom;' }` (`ricdomUI`
+  analogously) to each of the four IIFE entries in `tsup.config.ts` — a statement in the
+  same lexical/function scope as the preceding `var` declaration can always read it,
+  regardless of how many scopes the whole file itself is nested inside when it runs. New
+  tests in `tests/browser/iifeSmoke.test.ts`/`uiIifeSmoke.test.ts` evaluate the built file
+  via `new Function(code)` (which, like the LZ tool's `eval`, creates a fresh function
+  scope) and assert `globalThis.ricdom`/`globalThis.ricdomUI` end up defined; both were
+  confirmed red (the global stayed `undefined`) before the footer was added. Core gzip:
+  **5,169B → 5,182B** (+13B, `globalThis.ricdom=ricdom;` on the core build only — the `ui`
+  IIFE has no gzip ceiling), still under the 5,200B budget.
+- **CSS-loaded detection (`warnIfStylesMissing`) no longer false-positives when the raw CSS
+  is inlined directly into a `<style>` tag (#Potopeta)**: the check only ever looked for
+  `injectStyles()`'s own marker (`style[data-ricdom-role="styles"]`) or a
+  `link[href$="ricdom-ui.css"]`, so a single-file distribution that embeds
+  `ricdom-ui.css`'s text directly inside a plain `<style>` tag (as Potopeta's self-contained
+  HTML bundle does) matched neither, and was warned at as "not loaded" even though the
+  styles were, in fact, present and working. Fixed by additionally scanning
+  `document.styleSheets` for a `CSSStyleRule` whose selector includes `.ric-button`
+  (cross-origin sheets, which throw on `.cssRules` access, are skipped and don't count
+  against the check) — checking whether ricdom's rules are actually *in effect* is a more
+  direct test than looking for a particular loading mechanism, and covers any future
+  loading method the same way. `buildStylesheet()`'s output also now starts with a
+  `/*! ricdom-ui */` marker comment (kept by most minifiers due to the `/*!` convention) as
+  a human-readable identifier, independent of the `styleSheets` check that actually drives
+  the warning. New browser tests in `tests/browser/uiStylesInlineDetect.test.ts` cover:
+  inlined raw CSS in a `<style>` (no warning — confirmed red before the fix), nothing
+  loaded (warns once), an existing `<link>` (no warning), and an unrelated `<style>` that
+  doesn't contain `.ric-button` (still warns).
+
+### Docs
+
+- `docs/V1_VS_V2.ja.md`: noted that `density`'s valid values are the same three
+  (`comfortable`/`compact`/`tight`) in both v1 and v2 — v1 silently fell back to the
+  default for anything else (e.g. `spacious`) too, it just never warned about it; added
+  notes on the LZ self-extraction footer fix and the inline-`<style>` CSS-detection fix
+  above; noted that `createTabs` is a stateful component (`app.use()` required) where v1's
+  `ui_tabs` was a pure function.
+- `CHANGELOG.md` (this entry) and `package.json` version bumped to `2.0.0-alpha.10`.
+- README (EN/JA): one line after the Quick start snippet pointing at `.iife.js` (dev,
+  warnings enabled) vs. `.iife.min.js` (what to ship).
+- `docs/SPEC.md` §8 (Themes): documented `createDensity`/`createFontSize`.
+- `docs/API_AUDIT.ja.md`: addendum for the two new `ricdom/ui` exports, confirming naming
+  convention compliance (`create` + noun, same shape as `createTheme`).
+
 ## [2.0.0-alpha.9] — not yet published
 
 Five reports from the eighth pilot migration (LCP = Local Code Pilot v2, an Electron
