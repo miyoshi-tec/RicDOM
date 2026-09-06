@@ -239,6 +239,36 @@ export const createTheme = (base: ThemeName | ThemeVars = 'light', overrides: Th
   ...overrides,
 });
 
+/**
+ * ベース密度に部分上書きした ThemeVars を返す (v1 `ric_ui/context.js` の
+ * `create_density(base='comfortable', overrides={})` 継承、パイロット第 9 号 = Potopeta
+ * からの報告、2.0.0-alpha.10)。v1 のこの関数は値をそのまま返す純粋関数で、consumer
+ * (RicUI デザイナ) はプリセットの寸法一式を「テーマ適用前に」読み取って UI 自体の
+ * レイアウト計算に使っていた。v2 には `createTheme` (色) しか無く、consumer は
+ * 「detached div に applyTheme して el.style から読み戻す」という回避策 — しかも
+ * `--ric-gap`/`--ric-pad-x` 等の非公開の変数名決め打ちに依存する — を書かざるを得な
+ * かった。`createTheme` と同じ形 (base → 解決 → overrides 上書き) にすることで、
+ * `applyTheme(el, { density: createDensity('compact') })` にそのまま渡せる。
+ *   const myDensity = createDensity('compact', { '--ric-gap': '2px' });
+ *   applyTheme(el, { density: myDensity });
+ */
+export const createDensity = (base: DensityName | ThemeVars = 'comfortable', overrides: ThemeVars = {}): ThemeVars => ({
+  ...resolveSizeVars(base),
+  ...overrides,
+});
+
+/**
+ * ベースフォントサイズに部分上書きした ThemeVars を返す (v1 `ric_ui/context.js` の
+ * `create_font_size(base='md', overrides={})` 継承、createDensity と同じ理由・同じ形、
+ * 2.0.0-alpha.10)。
+ *   const myFontSize = createFontSize('lg', { '--ric-font-size': '18px' });
+ *   applyTheme(el, { fontSize: myFontSize });
+ */
+export const createFontSize = (base: FontSizeName | ThemeVars = 'md', overrides: ThemeVars = {}): ThemeVars => ({
+  ...resolveFontVars(base),
+  ...overrides,
+});
+
 // `color-scheme` は `--ric-` プレフィックスを持たない通常の CSS プロパティだが、
 // テーマの一部として export 対象に含める (他の --ric-* と同様、v1 v0.4.2 由来)。
 const isThemeKey = (key: string): boolean => key === 'color-scheme' || key.startsWith('--ric-');

@@ -612,11 +612,25 @@ native browser chrome inside the themed subtree — scrollbars, `<select>` dropd
 checkboxes, date pickers — automatically follows light/dark, without any ricdom-specific
 styling of those controls.
 
-### `createTheme` / `exportTheme`
+### `createTheme` / `createDensity` / `createFontSize` / `exportTheme`
 
 - `createTheme(base, overrides)` returns a plain `ThemeVars` object (a merge of a base
   theme's color variables with your overrides) suitable for passing back into
   `applyTheme(el, { theme: createTheme(...) })`.
+- `createDensity(base, overrides)` / `createFontSize(base, overrides)` are the `density`/
+  `fontSize` counterparts of `createTheme`, added in `2.0.0-alpha.10` (a straight port of
+  v1's `create_density`/`create_font_size` from `ric_ui/context.js`, which return the same
+  kind of plain variable map). Each defaults its `base` to the same bundled default
+  `applyTheme` uses (`'comfortable'` / `'md'` respectively), merges in `overrides`, and
+  accepts either one of the bundled names or a `ThemeVars` object as `base` (in which case
+  it's used as-is, bypassing name resolution). The result is a plain `ThemeVars` object,
+  suitable for passing straight into `applyTheme(el, { density: createDensity(...) })` /
+  `applyTheme(el, { fontSize: createFontSize(...) })` — including the round-trip case where
+  the values you get back exactly match what `applyTheme` would have computed from the same
+  name. Before this release, `ricdom/ui` had no way to *read* a density/font-size preset's
+  computed variables without calling `applyTheme` on a detached element and reading them
+  back off `el.style` — undocumented, and dependent on the exact (non-public) variable
+  names `applyTheme` happens to use.
 - `exportTheme(el)` reads the current `--ric-*`/`color-scheme` inline-style values off
   `el` (density/font-size variables are excluded) — round-trips with `applyTheme`, e.g.
   for persisting a user's theme choice to `localStorage`.

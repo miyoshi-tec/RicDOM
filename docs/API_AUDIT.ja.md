@@ -294,3 +294,21 @@ export interface Host {
 実行時にはそのまま透過していた (`...rest` を計算済みフィールドより先に展開する契約なので、
 型に無くても `style` を渡せば効いていた)。今回の変更は「実行時に効く値が、型としても見える・
 補完される」ようにしただけの型レベルの追加。SPEC.md §10.5 に一文追記。
+
+### 2.0.0-alpha.10: `createDensity` / `createFontSize` 追加 (`ricdom/ui`)
+
+パイロット第 9 号 (Potopeta = RicUI デザイナ) からの報告。v1 `ric_ui/context.js` の
+`create_density(base, overrides)` / `create_font_size(base, overrides)` (v1 では正式 API) の
+v2 版が欠けており、consumer は detached div に `applyTheme` して `el.style` から読み戻す
+回避策 (非公開の変数命名決め打ち) を書いていた。
+
+| 種別 | 名前 | 規約 | 判定 |
+|---|---|---|---|
+| 関数 (追加) | `createDensity(base?, overrides?)` | `create` + 名詞、既存の `createTheme(base, overrides)` と同一の形 (base → 解決 → overrides で上書きした `ThemeVars` を返す純粋関数) | OK |
+| 関数 (追加) | `createFontSize(base?, overrides?)` | 同上 | OK |
+
+命名規約からの逸脱なし。`createTheme`/`applyTheme` が既に持つ「無効な文字列名は
+`console.warn` + 既定値へフォールバック」規則を `resolveSizeVars`/`resolveFontVars` の
+再利用によりそのまま継承しており、警告文言・フォールバック挙動に新規分岐は無い
+(既存の `applyTheme` 経由と全く同じコードパスを通る)。破壊的変更はゼロ (追加のみ)。
+SPEC.md §8 に追記。

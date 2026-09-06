@@ -5,7 +5,7 @@
 // まとめてグローバルに公開される (tsup.config.ts 参照)。`ricdom` (コア) の後に
 // 読み込む想定 (型のみの参照であり、バンドル上の実行時依存は無い — 詳細は最終報告)。
 
-export { applyTheme, createTheme, exportTheme } from './theme.js';
+export { applyTheme, createTheme, createDensity, createFontSize, exportTheme } from './theme.js';
 export type { ThemeName, DensityName, FontSizeName, ThemeVars, ApplyThemeOptions } from './theme.js';
 
 export { buildStylesheet } from './cssTemplates.js';

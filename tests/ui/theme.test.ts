@@ -1,7 +1,7 @@
 // applyTheme / createTheme / exportTheme (設計書 §4)
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyTheme, createTheme, exportTheme } from '../../src/ui/theme.js';
+import { applyTheme, createTheme, createDensity, createFontSize, exportTheme } from '../../src/ui/theme.js';
 
 const THEMES = ['light', 'dark', 'teal', 'cyber', 'aqua'] as const;
 const DARK_LIKE = new Set(['dark', 'cyber']);
@@ -143,6 +143,66 @@ describe('createTheme: 継承・上書き', () => {
     applyTheme(el, { theme: custom });
     expect(el.style.getPropertyValue('--ric-color-accent')).toBe('#ff00ff');
     expect(el.style.getPropertyValue('color-scheme')).toBe('dark'); // dark ベースの color-scheme も継承
+  });
+});
+
+describe('createDensity: v1 create_density 継承 (2.0.0-alpha.10)', () => {
+  it('3 名前 (comfortable/compact/tight) それぞれの寸法値を返す', () => {
+    expect(createDensity('comfortable')['--ric-control-h']).toBe('36px');
+    expect(createDensity('compact')['--ric-control-h']).toBe('28px');
+    expect(createDensity('tight')['--ric-control-h']).toBe('22px');
+  });
+
+  it('省略時は comfortable が既定', () => {
+    expect(createDensity()).toEqual(createDensity('comfortable'));
+  });
+
+  it('overrides で個別の変数を上書きできる (継承していない値はベースのまま)', () => {
+    const custom = createDensity('compact', { '--ric-gap': '2px' });
+    expect(custom['--ric-gap']).toBe('2px');
+    expect(custom['--ric-pad-x']).toBe('10px'); // compact のまま (上書きしていない)
+  });
+
+  it('ThemeVars (object) を直接渡すとそのまま (name 解決をバイパス)', () => {
+    const custom = createDensity({ '--ric-control-h': '99px' });
+    expect(custom).toEqual({ '--ric-control-h': '99px' });
+  });
+
+  it('applyTheme との round-trip: createDensity(\'compact\') を渡した結果が SIZE_VARS_COMPACT と一致する', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { density: createDensity('compact') });
+    expect(el.style.getPropertyValue('--ric-control-h')).toBe('28px');
+    expect(el.style.getPropertyValue('--ric-gap')).toBe('4px');
+    expect(el.style.getPropertyValue('--ric-pad-x')).toBe('10px');
+    expect(el.style.getPropertyValue('--ric-pad-y')).toBe('4px');
+  });
+});
+
+describe('createFontSize: v1 create_font_size 継承 (2.0.0-alpha.10)', () => {
+  it('3 名前 (sm/md/lg) それぞれのフォントサイズを返す', () => {
+    expect(createFontSize('sm')['--ric-font-size']).toBe('12px');
+    expect(createFontSize('md')['--ric-font-size']).toBe('14px');
+    expect(createFontSize('lg')['--ric-font-size']).toBe('16px');
+  });
+
+  it('省略時は md が既定', () => {
+    expect(createFontSize()).toEqual(createFontSize('md'));
+  });
+
+  it('overrides で上書きできる', () => {
+    const custom = createFontSize('sm', { '--ric-font-size': '10px' });
+    expect(custom['--ric-font-size']).toBe('10px');
+  });
+
+  it('ThemeVars (object) を直接渡すとそのまま (name 解決をバイパス)', () => {
+    const custom = createFontSize({ '--ric-font-size': '99px' });
+    expect(custom).toEqual({ '--ric-font-size': '99px' });
+  });
+
+  it('applyTheme との round-trip: createFontSize(\'lg\') を渡した結果が FONT_VARS_LG と一致する', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { fontSize: createFontSize('lg') });
+    expect(el.style.getPropertyValue('--ric-font-size')).toBe('16px');
   });
 });
 
