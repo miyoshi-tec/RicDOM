@@ -83,6 +83,29 @@ implementation.
   inlined raw CSS in a `<style>` (no warning — confirmed red before the fix), nothing
   loaded (warns once), an existing `<link>` (no warning), and an unrelated `<style>` that
   doesn't contain `.ric-button` (still warns).
+- **`dist/ricdom.iife.min.js` (production) no longer ships live dev-mode warning code in a
+  plain browser with no `process` global** — the primary target of a `<script src>`
+  distribution. `isDevMode()` (`src/reactivity.ts`) previously read
+  `typeof process === 'undefined' || typeof process.env === 'undefined' ||
+  process.env.NODE_ENV !== 'production'`; tsup's `define` only replaces the
+  `process.env.NODE_ENV` token, so the first two `typeof` guards stayed live code and
+  evaluated `true` whenever `process` didn't exist, making `isDevMode()` return `true` in
+  "production" too — the deep-assignment and duplicate-`key` warning code (and their
+  strings) shipped active, un-eliminated, in every alpha.9-and-earlier `.iife.min.js`.
+  Fixed by introducing a build-time constant `__RICDOM_DEV__` (`declare`d in
+  `src/env.d.ts`), baked to `false`/`true` by `tsup.config.ts`'s `define` for the four IIFE
+  entries (`.iife.min.js`/`.iife.js`, core and `ui`) and left unset for ESM/CJS. The two
+  call sites (`src/reactivity.ts`'s deep-read trap, `src/dom.ts`'s duplicate-`key` check)
+  reference the baked constant with it as the **left** operand of `??`/`&&`
+  (`bakedDevMode ?? isDevMode()`, dev-flag check before the other condition) rather than
+  calling `isDevMode()` directly — esbuild does not propagate a function's constant return
+  value across the call boundary, so calling `isDevMode()` directly left the warning code
+  physically present (confirmed by direct esbuild experiments during this fix); only a
+  bare constant referenced first in the condition gets properly dead-code-eliminated.
+  `tests/browser/devIifeWarn.test.ts` no longer shims `window.process` — it now asserts the
+  real condition (no `process` global at all) directly. Core gzip: **5,182B → 4,774B**
+  (net **−408B**, comfortably under the 5,200B ceiling — the removed dead code was larger
+  than the constant-check overhead added).
 
 ### Docs
 
@@ -98,6 +121,11 @@ implementation.
 - `docs/SPEC.md` §8 (Themes): documented `createDensity`/`createFontSize`.
 - `docs/API_AUDIT.ja.md`: addendum for the two new `ricdom/ui` exports, confirming naming
   convention compliance (`create` + noun, same shape as `createTheme`).
+- `docs/SPEC.md` §3 ("Dev-mode warning for untracked deep assignment"): corrected the
+  false "dead-code elimination removes this in the shipped bundle" claim to describe the
+  actual per-distribution-format behavior (`.iife.min.js` DCE'd via `__RICDOM_DEV__`,
+  `.iife.js` always warns, ESM/CJS defer to the consumer's bundler, a no-bundler ESM import
+  falls back to dev mode) — see the `isDevMode()` fix above.
 
 ## [2.0.0-alpha.9] — not yet published
 

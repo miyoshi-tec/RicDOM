@@ -224,16 +224,32 @@ regardless of state shape, and keeps "why didn't this re-render" answerable by o
 
 ### Dev-mode warning for untracked deep assignment
 
-In a non-production build (`process.env.NODE_ENV !== 'production'`, which is also the
-fallback when `process` is undefined, e.g. plain `<script>` usage without a bundler — the
-library treats "can't tell" as dev mode rather than silently hiding the problem), reading
-a nested object through the reactive state returns it wrapped in a second, read-only-style
-Proxy that logs `console.warn` on any `set`/`deleteProperty`, then still performs the
-assignment (so dev and production observe the same final data, only dev also warns). The
-production IIFE build has `process.env.NODE_ENV` statically inlined to `'production'` by
-the build, so this entire code path is removed by dead-code elimination — it costs nothing
-in the shipped bundle. Arrays are never wrapped (assigning into array elements is not
-tracked and is not warned about, matching v1).
+In a non-production build, reading a nested object through the reactive state returns it
+wrapped in a second, read-only-style Proxy that logs `console.warn` on any
+`set`/`deleteProperty`, then still performs the assignment (so dev and production observe
+the same final data, only dev also warns). Arrays are never wrapped (assigning into array
+elements is not tracked and is not warned about, matching v1).
+
+Which build counts as "dev" depends on the distribution format (2.0.0-alpha.10, fixing a
+gap found while auditing the shipped `.iife.min.js`):
+
+- **`dist/ricdom.iife.min.js`** (the production `<script src>` build) has a build-time
+  constant `__RICDOM_DEV__` statically inlined to `false`, which removes this entire code
+  path by dead-code elimination — it costs nothing in the shipped bundle. Before
+  2.0.0-alpha.10, only `process.env.NODE_ENV` was inlined, but the surrounding
+  `typeof process === 'undefined'` guards were not — so in a plain browser with no
+  `process` global (the primary target of a `<script src>` build), those guards stayed true
+  at runtime and the warning code shipped active in "production" despite the intent.
+- **`dist/ricdom.iife.js`** (the dev `<script src>` build, alongside the minified one) has
+  `__RICDOM_DEV__` inlined to `true`, so the warning is always active — this is the build to
+  use locally when you want to see these warnings from a no-bundler `<script>` tag.
+- **ESM/CJS** (the `import`/`require` entry points) do not inline `__RICDOM_DEV__`; they
+  defer to whatever `process.env.NODE_ENV` your bundler (Vite, webpack, etc.) substitutes,
+  matching the convention used by React and other major libraries.
+- Loading the ESM build directly with **no bundler** (e.g. from `esm.sh` or another CDN, or
+  a plain `<script type="module">` import) has neither `__RICDOM_DEV__` nor a `process`
+  global, so it falls back to dev mode (warnings on) — the library treats "can't tell" as
+  dev mode rather than silently hiding the problem.
 
 ### `ignore`
 
