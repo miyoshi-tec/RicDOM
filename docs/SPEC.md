@@ -167,6 +167,11 @@ render (it's exempting `value` precisely because the DOM is already right), and 
 element blurs, state and DOM must already match — there is no separate blur-time
 reconciliation step.
 
+**Interaction with dialog initial focus (LCP, pilot 8, 2.0.0-alpha.9)**: for a dialog whose
+body starts with a focusable `textarea`/`input`/`select`, §10.3.1c's default initial focus
+lands there the instant it opens, so this guard is already active from that first render —
+a state-driven write to that field's `value` is silently skipped until it loses focus.
+
 ### 2.5 Islands
 
 `{ tag: 'div', island: true, children: [...] }` tells ricdom to build the element once and

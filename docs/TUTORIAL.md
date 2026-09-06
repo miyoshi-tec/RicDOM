@@ -316,6 +316,17 @@ dlg({
 });
 ```
 
+**A trap when the dialog body starts with an input (LCP, pilot 8)**: a dialog's default
+initial focus (SPEC.md §10.3.1c) can land on the first focusable element in the body, so if
+that's a `textarea`/`input`/`select`, the editing guard (§2.4's FACT) is active from the
+moment the dialog opens — a button elsewhere in the dialog that writes that field's value
+back from state will silently do nothing while the field is still focused. This bites E2E
+tests specifically: a plain `el.click()` never moves focus, so a test that opens the dialog
+and immediately `.click()`s a "reset from state" button *appears* to pass the guard (the
+field was never focused by the test), while a real user's mouse click on that same button
+does move focus away from the input first, un-blocking the write. Write the test the way a
+real click behaves: `resetBtn.focus(); resetBtn.click();`.
+
 `createPopup` follows the same `use()`-then-call pattern for a `role="menu"` dropdown menu
 with arrow-key navigation built in:
 

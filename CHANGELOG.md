@@ -99,6 +99,30 @@ by the maintainer before implementation.
   `webPreferences: { backgroundThrottling: false }` for E2E tests driving a window that
   starts hidden or is backgrounded mid-test.
 - **API_AUDIT.ja.md**: noted the `style?: StyleValue` additions above.
+- **SPEC.md §2.4 / TUTORIAL.md / V1_VS_V2.ja.md**: documented a second alpha.9 follow-on
+  from #4's new default initial focus (LCP, one further finding from the same pilot) — a
+  dialog whose body starts with a focusable `textarea`/`input`/`select` has the editing
+  guard active from the moment it opens, so a state-driven write to that field is silently
+  skipped while it holds focus. This mainly bites E2E tests: `el.click()` never moves focus
+  the way a real mousedown does, so a test that opens the dialog and immediately `.click()`s
+  a "reset from state" button sees the guard block the write, whereas a real user's click
+  would first move focus off the field and unblock it. Not a bug — write such tests as
+  `btn.focus(); btn.click();`.
+
+### Tests
+
+- **`tests/browser/uiZIndex.test.ts`** (+1): added a third z-index/divider-vs-dialog
+  variant that reproduces LCP's actual DOM shape more closely than the existing two — the
+  splitter is *not* routed around via `portalTo` this time, so it ends up as an actual
+  sibling of the dialog's own portal, meaning `createDialog`'s `setInert(true)` makes it
+  `inert` (the same structure LCP verified with a pixel-diffed `capturePage()`). Since
+  `inert` only removes an element from hit-testing and does not affect paint order, the
+  test clears `inert` on the splitter right before calling `elementFromPoint()`, so the
+  z-index fix is still what's under test rather than the inert side effect. Confirmed red
+  against the pre-#1-fix CSS (`elementFromPoint()` returned the divider); also confirmed
+  that the same test *without* clearing `inert` stays green against that same pre-fix CSS
+  — i.e. that naive shape would have been a false positive, which is why the existing two
+  tests route the portal away from the splitter instead of clearing `inert`.
 
 ## [2.0.0-alpha.8] — not yet published
 
