@@ -29,6 +29,41 @@ export const injectStyles = (doc: Document = document): void => {
   (doc.head ?? doc.documentElement).appendChild(styleEl);
 };
 
+// CSS 読込検知の false positive 解消 (パイロット第 9 号 = Potopeta からの報告、
+// 2.0.0-alpha.10): 従来は injectStyles 自身のマーカー (`style[data-ricdom-role="styles"]`)
+// と `link[href$="ricdom-ui.css"]` の 2 経路しか見ておらず、`ricdom-ui.css` の中身を
+// consumer が自前で `<style>` にインライン埋め込みした単一ファイル配布 (Potopeta の
+// 自己完結 HTML バンドル、v1 の LZ 自己展開ツールで生成) では、そのどちらにも
+// マッチしないため誤って「未読み込み」と警告していた。
+//
+// 「CSS テキストの内容で判定」が本質であり、コメント検索 (cssTemplates.ts の
+// `/*! ricdom-ui */` マーカー) より確実な方法として `document.styleSheets` を走査し、
+// ricdom の規則 (`.ric-button` セレクタを持つ CSSStyleRule) が実際に存在するかを見る
+// 方式を採用する。理由:
+//   - コメントは `<style>`/`<link>` どちらでも DOM/CSSOM からは読めない
+//     (style.textContent はコメントも含む生テキストだが、consumer が minify した CSS を
+//     埋め込むとコメントごと消える可能性がある一方、規則そのものは CSS として機能する
+//     以上 CSSOM には必ず現れる — 「動くかどうか」に一致する判定基準になる)
+//   - cross-origin の <link rel="stylesheet"> は `sheet.cssRules` へのアクセスで
+//     SecurityError を投げる (CORS 未許可の場合) ため、シートごとに try/catch で読み飛ばす
+//     (読めないシートは「ricdom かどうか判定不能」なだけで、他のシートに本物があれば
+//     そちらで検知できる)
+const hasRicdomStylesheetLoaded = (doc: Document): boolean => {
+  const sheets = doc.styleSheets;
+  for (let i = 0; i < sheets.length; i++) {
+    try {
+      const rules = sheets[i]!.cssRules; // cross-origin シートはここで例外を投げる
+      for (let j = 0; j < rules.length; j++) {
+        const rule = rules[j] as CSSStyleRule;
+        if (typeof rule.selectorText === 'string' && rule.selectorText.includes('.ric-button')) return true;
+      }
+    } catch {
+      continue; // 読み取り不可 (cross-origin 等) → このシートは判定不能として次へ
+    }
+  }
+  return false;
+};
+
 /** 部品の初回 use() 時、スタイルが未注入なら案内を出す (設計書 §4、throw しない・1 回だけ) */
 let warnedMissingStyles = false;
 export const warnIfStylesMissing = (doc: Document = document): void => {
@@ -36,6 +71,7 @@ export const warnIfStylesMissing = (doc: Document = document): void => {
   if (!doc || typeof doc.querySelector !== 'function') return;
   if (doc.querySelector(`style[${STYLE_MARKER_ATTR}="${STYLE_MARKER_VALUE}"]`)) return;
   if (doc.querySelector('link[href$="ricdom-ui.css"]')) return; // <link> 読み込み済みの可能性が高い
+  if (hasRicdomStylesheetLoaded(doc)) return; // 生 CSS を <style> にインライン埋め込み済み (#Potopeta)
   warnedMissingStyles = true;
   console.warn(
     'RicDOM UI: ricdom-ui.css がまだ読み込まれていないようです。\n' +

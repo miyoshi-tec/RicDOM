@@ -1268,6 +1268,15 @@ const TWEAK_CSS = `
   flex-direction: column;
 }`;
 
+// CSS 読込検知 (`warnIfStylesMissing`、パイロット第 9 号 = Potopeta からの報告、
+// 2.0.0-alpha.10) 用の識別コメント。`buildStylesheet()` の出力先頭に固定で入る。
+// 検知の本体は `document.styleSheets` を走査して `.ric-button` 規則の実在を見る方式
+// (injectStyles.ts 参照) — こちらはあくまで人間が生 CSS を眺めたときの目印。
+// minify で消えないよう `/*! ... */` 形式にする (多くの minifier は `!` 付きコメントを
+// 保持する規約に従う。buildStylesheet の出力自体は本プロジェクトでは minify しないが、
+// consumer 側が自前で CSS を minify して単一ファイルに埋め込むケースを想定した保険)。
+const STYLESHEET_MARKER_COMMENT = '/*! ricdom-ui */';
+
 /**
  * ricdom/ui の CSS 1 枚分の文字列を組み立てる (設計書 §4)。
  * `injectStyles()` (実行時注入) と `dist/ricdom-ui.css` 生成スクリプト
@@ -1275,6 +1284,7 @@ const TWEAK_CSS = `
  */
 export const buildStylesheet = (): string =>
   [
+    STYLESHEET_MARKER_COMMENT,
     BUTTON_CSS,
     INPUT_CSS,
     DIALOG_CSS,
