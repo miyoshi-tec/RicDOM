@@ -63,6 +63,30 @@ export default defineConfig([
     footer: { js: 'globalThis.ricdom=ricdom;' },
   },
   {
+    // dev 版 IIFE (`dist/ricdom.iife.js`、2.0.0-alpha.10、統括決定): 上の production
+    // IIFE (`.iife.min.js`) は NODE_ENV='production' を静的注入するため、深い代入警告
+    // (§3.3) 等の dev 専用コードが esbuild の dead-code elimination で最初から消えている
+    // — 主要な配布形態である `<script> 1 行` では、これらの警告が仕組み上「最初から
+    // 効かせようがない」ことを意味していた (V1_VS_V2 の「dev ビルドで警告」との整合が
+    // 取れていなかった穴)。React の development/production ビルドと同じ発想で、
+    // NODE_ENV を注入しない非 minify 版を別出力する。ブラウザには `process` グローバル
+    // が無いため、`isDevMode()` (src/reactivity.ts) の
+    // `typeof process === 'undefined' → dev 扱い` 分岐が自然に true になり、警告が有効に
+    // なる。production 版 (`.iife.min.js`) はコア gzip 天井の対象のまま変更しない —
+    // この dev 版は天井の対象外 (配布はしても CDN 常用を想定しない、ローカル開発用)。
+    entry: { ricdom: 'src/index.ts' },
+    format: ['iife'],
+    globalName: 'ricdom',
+    dts: false,
+    sourcemap: true,
+    minify: false,
+    clean: false,
+    target: 'es2020',
+    outExtension: () => ({ js: '.iife.js' }),
+    // production 版と同じ理由 (B) で、関数スコープ eval 耐性のため footer は dev 版にも付ける。
+    footer: { js: 'globalThis.ricdom=ricdom;' },
+  },
+  {
     // ricdom/ui サブパスの ESM/CJS + 型宣言。コアと同じく consumer 側の bundler が
     // 自分の NODE_ENV で置換する (ui 自体は dev/prod 分岐を持たないが、コアと構成を揃える)。
     entry: { ui: 'src/ui/index.ts' },
@@ -88,6 +112,22 @@ export default defineConfig([
       'process.env.NODE_ENV': JSON.stringify('production'),
     },
     // 上のコア IIFE と同じ理由・同じ対策 (2.0.0-alpha.10、パイロット第 9 号 = Potopeta)。
+    footer: { js: 'globalThis.ricdomUI=ricdomUI;' },
+  },
+  {
+    // dev 版 ui IIFE (`dist/ricdom-ui.iife.js`)。上のコア dev IIFE と同じ理由
+    // (2.0.0-alpha.10、統括決定) — ui 側は現状 dev/prod 分岐 (NODE_ENV 依存の
+    // dead-code) を持たないが、コアと構成・命名規則を揃えるために同じ形で用意する
+    // (将来 ui 側に dev-only warn が増えたときにも即座に有効になる)。
+    entry: { 'ricdom-ui': 'src/ui/index.ts' },
+    format: ['iife'],
+    globalName: 'ricdomUI',
+    dts: false,
+    sourcemap: true,
+    minify: false,
+    clean: false,
+    target: 'es2020',
+    outExtension: () => ({ js: '.iife.js' }),
     footer: { js: 'globalThis.ricdomUI=ricdomUI;' },
   },
   {
