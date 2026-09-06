@@ -87,6 +87,71 @@ describe('実ブラウザ (process 未定義): dev IIFE (.iife.js) は深い代�
   });
 });
 
+// 2.0.0-alpha.11: 配列経由の深い代入も dev IIFE では警告する (Potopeta の最小再現、
+// src/reactivity.ts の wrapDeepWarn 定義直前のコメント参照)。list 状 state
+// (`pages[]`) の最も深い代入パターンを実ブラウザ (process 未定義) で確認する。
+interface RicdomAppGlobal {
+  createApp: (
+    target: string | Element,
+    state: object,
+    render: (s: never) => unknown,
+  ) => { pages: Array<{ page: { width: number } }> };
+}
+
+describe('実ブラウザ (process 未定義): 配列経由の深い代入は dev IIFE で warn する / production では warn しない・配列は素通し', () => {
+  it('dist/ricdom.iife.js (dev) は app.pages[0].page.width = 1 で console.warn する', async () => {
+    const code = await commands.readFile('dist/ricdom.iife.js');
+    loadScript(code);
+
+    const ricdom = (window as unknown as { ricdom?: RicdomAppGlobal }).ricdom;
+    expect(ricdom).toBeTruthy();
+
+    const app = setupApp();
+    const handle = ricdom!.createApp('#app', { pages: [{ page: { width: 100 } }] }, () => ({ tag: 'div' }));
+    await flush();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    handle.pages[0]!.page.width = 1;
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]![0]).toContain('pages[0].page.width');
+    warnSpy.mockRestore();
+  });
+
+  it('dist/ricdom.iife.js (dev) では state から読んだ配列は Proxy 化されており structuredClone が throw する (副作用の FACT)', async () => {
+    const code = await commands.readFile('dist/ricdom.iife.js');
+    loadScript(code);
+
+    const ricdom = (window as unknown as { ricdom?: { createApp: (t: string, s: object, r: () => unknown) => { arr: number[] } } })
+      .ricdom;
+    const app = setupApp();
+    const handle = ricdom!.createApp('#app', { arr: [1, 2, 3] }, () => ({ tag: 'div' }));
+    await flush();
+
+    expect(() => structuredClone(handle.arr)).toThrow();
+  });
+
+  it('dist/ricdom.iife.min.js (production) は process が無くても app.pages[0].page.width = 1 で console.warn しない・配列は Proxy で包まれない', async () => {
+    const code = await commands.readFile('dist/ricdom.iife.min.js');
+    loadScript(code);
+
+    const ricdom = (window as unknown as { ricdom?: RicdomAppGlobal }).ricdom;
+    expect(ricdom).toBeTruthy();
+
+    const app = setupApp();
+    const rawPages = [{ page: { width: 100 } }];
+    const handle = ricdom!.createApp('#app', { pages: rawPages }, () => ({ tag: 'div' }));
+    await flush();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    handle.pages[0]!.page.width = 1; // 代入自体は行われる (production と同じ結果)
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(handle.pages[0]!.page.width).toBe(1);
+    // 配列が Proxy で包まれていなければ structuredClone は素通りする (dev との対比)。
+    expect(() => structuredClone(handle.pages)).not.toThrow();
+    warnSpy.mockRestore();
+  });
+});
+
 // ricdom/ui 側の複製 (src/ui/internal/pureHelpers.ts の isDevMode/bakedDevMode) も
 // コアと同じ穴を抱えていたため、同じ規則で修正した (2.0.0-alpha.10)。focusWhen/
 // inlineMenu/theme の 3 箇所のうち、`applyTheme` (無効な theme/density/fontSize 名で

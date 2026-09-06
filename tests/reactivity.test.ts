@@ -31,6 +31,9 @@ describe('createReactiveState', () => {
   });
 
   it('配列は追跡されない (mutation では notify されない)', () => {
+    // push は dev 警告 (tests/devDeepAssignWarning.test.ts 参照) を伴うが、notify
+    // (再描画) には無関係なのでここでは console.warn を黙らせて notify だけ見る。
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const notify = vi.fn();
     const state = createReactiveState({ list: [1, 2, 3] }, notify);
     state.list.push(4);
@@ -38,6 +41,7 @@ describe('createReactiveState', () => {
     // 配列の置き換え (shallow copy canon) は通常のトップレベル代入なので追跡される
     state.list = [...state.list, 5];
     expect(notify).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
   });
 
   it('ignore 配下への代入は notify されない', () => {

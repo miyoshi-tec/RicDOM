@@ -79,36 +79,76 @@ export const isDevMode = (): boolean => {
 };
 
 // =====================================================================
-// 2 段目以降: read-only 相当の警告 Proxy (dev only)
+// 2 段目以降 (+ 配列は 1 段目から): read-only 相当の警告 Proxy (dev only)
 // =====================================================================
-
+//
+// 2.0.0-alpha.11 で判明した穴 (Potopeta の最小再現、統括確認済み、v2 の負債 B5 続き):
+// 配列は「再描画の追跡対象外」(isTrackableObject が除外、これは変更しない — 配列の
+// 差し替え `app.pages = [...app.pages]` が canon であることの帰結) だが、旧実装は
+// この関数自体も配列を素通しにしていたため、配列要素を経由した先はどの深さでも
+// dev 警告が出ないという別の穴になっていた (`app.arr[0].x = 2` 等)。list 状 state
+// (`pages[]`/`items[]`) は consumer が最も深い代入をやりがちな形で、警告の死角に
+// なっていた。対策: 配列も素通しせずこの警告 Proxy で包む。「追跡 (notify) の
+// 対象外」と「警告の対象外」は別の話であり、後者だけをここで解消する。
 const deepWarnProxies = new WeakMap<object, unknown>();
 
+// 呼び出すと配列の中身を書き換える mutating メソッド。個別に警告し、1 回の呼び出しで
+// 警告 1 回だけ出す (target = 生配列に対して直接 apply することで、内部の要素代入が
+// この Proxy の set トラップを経由せず、要素数分の多重警告を避ける)。
+const ARRAY_MUTATING_METHODS = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin'];
+
 const wrapDeepWarn = <T extends object>(value: T, path: string): T => {
-  if (Array.isArray(value)) return value; // 配列は追跡対象外 (v1 継承、SPEC 記載事項)
   const cached = deepWarnProxies.get(value);
   if (cached) return cached as T;
 
+  const isArr = Array.isArray(value);
+  const rootKey = path.split(/[.[]/)[0]; // 最初の区切り (`.` か `[`) の手前 = 1 段目の state key
+  // 配列要素は `path[i]`、オブジェクトのプロパティは `path.prop` で子パスを作る。
+  const childPath = (prop: string): string => (isArr && /^\d+$/.test(prop) ? `${path}[${prop}]` : `${path}.${prop}`);
+
   const proxy = new Proxy(value as Record<PropertyKey, unknown>, {
     get(target, prop, receiver) {
+      if (isArr && typeof prop === 'string' && ARRAY_MUTATING_METHODS.includes(prop)) {
+        return (...args: unknown[]): unknown => {
+          console.warn(
+            `RicDOM: "${path}.${prop}()" の呼び出しは再描画をトリガーしません` +
+              ' (配列の mutating メソッドは検知対象外です)。\n' +
+              `差し替えてください (例: app.${rootKey} = [...app.${rootKey}]）`,
+          );
+          // target (生配列) に直接適用する。receiver (この Proxy) 越しに呼ぶと
+          // メソッド内部の要素代入のたびに set トラップが発火し、要素数分の警告が
+          // 出てしまう (例: sort で N 回警告) ため、意図的に target に対して行う。
+          const fn = Array.prototype[prop as keyof unknown[]] as (...a: unknown[]) => unknown;
+          return fn.apply(target, args);
+        };
+      }
       const v = Reflect.get(target, prop, receiver);
       if (v != null && typeof v === 'object' && typeof prop === 'string') {
-        return wrapDeepWarn(v as object, `${path}.${prop}`);
+        return wrapDeepWarn(v as object, childPath(prop));
       }
       return v;
     },
     set(target, prop, value) {
-      const rootKey = path.split('.')[0];
-      console.warn(
-        `RicDOM: "${path}.${String(prop)}" への代入は再描画をトリガーしません` +
-          ' (Proxy は 1 段目までしか追跡しません)。\n' +
-          `shallow copy で差し替えてください (例: app.${rootKey} = { ...app.${rootKey}, ... }）`,
-      );
+      const label = typeof prop === 'string' ? childPath(prop) : `${path}.${String(prop)}`;
+      if (isArr) {
+        console.warn(
+          `RicDOM: "${label}" への代入は再描画をトリガーしません` +
+            ' (配列要素・length への代入は検知対象外です)。\n' +
+            `差し替えてください (例: app.${rootKey} = [...app.${rootKey}]）`,
+        );
+      } else {
+        console.warn(
+          `RicDOM: "${label}" への代入は再描画をトリガーしません` +
+            ' (Proxy は 1 段目までしか追跡しません)。\n' +
+            `shallow copy で差し替えてください (例: app.${rootKey} = { ...app.${rootKey}, ... }）`,
+        );
+      }
       target[prop] = value; // production と同じ結果になるよう代入自体は実施する
       return true;
     },
     deleteProperty(target, prop) {
-      console.warn(`RicDOM: "${path}.${String(prop)}" の削除は再描画をトリガーしません。`);
+      const label = typeof prop === 'string' ? childPath(prop) : `${path}.${String(prop)}`;
+      console.warn(`RicDOM: "${label}" の削除は再描画をトリガーしません。`);
       delete target[prop];
       return true;
     },
@@ -140,7 +180,15 @@ export const createReactiveState = <S extends object>(rawState: S, scheduleRende
         const v = Reflect.get(target, prop, receiver);
         // `isDevMode()` を直接条件に置かず `bakedDevMode ?? isDevMode()` にする理由は
         // 上の isDevMode 定義直前のコメント参照 (production ビルドで DCE を効かせるため)。
-        if ((bakedDevMode ?? isDevMode()) && prop !== 'ignore' && typeof prop === 'string' && isTrackableObject(v)) {
+        // オブジェクトは従来どおり (isTrackableObject、関数含む・配列除く)。配列は
+        // notify 追跡の対象外という判定 (isTrackableObject) はそのままに、警告 Proxy
+        // だけは別途かける (alpha.11、v2 の負債 B5 続き — wrapDeepWarn 定義直前のコメント参照)。
+        if (
+          (bakedDevMode ?? isDevMode()) &&
+          prop !== 'ignore' &&
+          typeof prop === 'string' &&
+          (isTrackableObject(v) || Array.isArray(v))
+        ) {
           return wrapDeepWarn(v, `${key}.${prop}`);
         }
         return v;
@@ -163,7 +211,25 @@ export const createReactiveState = <S extends object>(rawState: S, scheduleRende
   const rootProxy = new Proxy(rawState as Record<PropertyKey, unknown>, {
     get(target, prop, receiver) {
       const v = Reflect.get(target, prop, receiver);
-      if (prop === 'ignore' || typeof prop !== 'string' || !isTrackableObject(v)) return v;
+      // 元の分岐 (`prop === 'ignore' || typeof prop !== 'string' || !isTrackableObject(v)`)
+      // はそのまま温存する (production ビルドの minify 後の形を変えないため —
+      // 分岐を組み替えると内容が同じでも esbuild の変数名割り当てがずれ、DCE で
+      // 消えるはずの配列分岐が無くても gzip が数バイト変動することを実測で確認した)。
+      // 配列は notify 追跡の子 Proxy (wrapChild) を持たない (`app.pages = [...]` の
+      // 差し替えがそのままトップレベル代入として追跡されるため、それで十分) が、
+      // 1 段目で読んだ配列そのものへの要素代入・mutating メソッドは dev では
+      // 警告 Proxy で包む (alpha.11、wrapDeepWarn 定義直前のコメント参照) ので、
+      // この分岐の内側にだけ追加する。
+      if (prop === 'ignore' || typeof prop !== 'string' || !isTrackableObject(v)) {
+        // 定数 (`bakedDevMode ?? isDevMode()`) を `&&` の左に置く。右に置くと
+        // (`Array.isArray(v) && 定数`) 、左が非定数のため esbuild は `Array.isArray(v)`
+        // の呼び出し自体を副作用ありとみなして残してしまい、DCE が効かない
+        // (isDevMode 定義直前のコメント、および dom.ts で一度ハマった教訓と同じ規律)。
+        if (prop !== 'ignore' && typeof prop === 'string' && (bakedDevMode ?? isDevMode()) && Array.isArray(v)) {
+          return wrapDeepWarn(v, prop);
+        }
+        return v;
+      }
       return wrapChild(v, prop);
     },
     set(target, prop, value) {
