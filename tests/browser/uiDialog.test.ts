@@ -16,7 +16,7 @@ import { flush, setupApp } from '../_helpers/dom.js';
 injectStyles(document);
 
 describe('実ブラウザ: createDialog の focus trap', () => {
-  it('開くと最初の focusable 要素にフォーカスが移る', async () => {
+  it('開くと本文内の最初の focusable 要素にフォーカスが移る (LCP #4、2.0.0-alpha.9: ✕ より本文を優先)', async () => {
     const app = setupApp();
     let dlg: ReturnType<typeof createDialog>;
     const handle = createApp('#app', {}, () =>
@@ -35,10 +35,11 @@ describe('実ブラウザ: createDialog の focus trap', () => {
     // エントランスアニメーション終了 (onanimationend) を待つ
     await new Promise((r) => setTimeout(r, 300));
 
-    // DOM 順で最初の focusable 要素はヘッダーの ✕ (close) ボタン (body の項目より先)。
-    const firstFocusable = app.querySelector('[role="dialog"] button')!;
-    expect(firstFocusable.className).toBe('ric-dialog__close');
-    expect(document.activeElement).toBe(firstFocusable);
+    // DOM 順で最初の focusable 要素はヘッダーの ✕ (close) ボタンだが、新順序 (本文 →
+    // フッター → ✕ → root) では本文内の最初の要素 (ここでは「最初」ボタン) が勝つ。
+    const bodyFirst = app.querySelector('.ric-dialog__body button')!;
+    expect(bodyFirst.textContent).toBe('最初');
+    expect(document.activeElement).toBe(bodyFirst);
   });
 
   it('Tab / Shift+Tab がダイアログ内でループする (focus trap)', async () => {
@@ -62,20 +63,22 @@ describe('実ブラウザ: createDialog の focus trap', () => {
     const closeBtn = app.querySelector('.ric-dialog__close') as HTMLElement;
     const [itemA, itemB] = Array.from(app.querySelectorAll('.ric-dialog__body button')) as HTMLElement[];
 
-    // フォーカス可能要素は DOM 順で [close, A, B]。開いた直後は close (最初の focusable)。
-    expect(document.activeElement).toBe(closeBtn);
-    await userEvent.tab();
+    // Tab トラップの循環順序 (DOM 順) 自体は変わらず [close, A, B]。変わるのは
+    // 「開いた直後にどこへ置くか」だけ (LCP #4、2.0.0-alpha.9) — 新順序では本文内の
+    // 最初の要素 (A) が初期フォーカスを受ける。
     expect(document.activeElement).toBe(itemA);
     await userEvent.tab();
     expect(document.activeElement).toBe(itemB);
     await userEvent.tab(); // 最後 (B) から Tab すると先頭 (close) へループ
     expect(document.activeElement).toBe(closeBtn);
-    await userEvent.tab({ shift: true }); // Shift+Tab で先頭 (close) から末尾 (B) へループ
+    await userEvent.tab();
+    expect(document.activeElement).toBe(itemA);
+    await userEvent.tab({ shift: true }); // Shift+Tab で A から close へ (DOM 順で 1 つ前)
+    expect(document.activeElement).toBe(closeBtn);
+    await userEvent.tab({ shift: true }); // 先頭 (close) から Shift+Tab で末尾 (B) へループ
     expect(document.activeElement).toBe(itemB);
     await userEvent.tab({ shift: true });
     expect(document.activeElement).toBe(itemA);
-    await userEvent.tab({ shift: true });
-    expect(document.activeElement).toBe(closeBtn);
   });
 
   it('Esc で閉じ、起動元 (trigger ボタン) へフォーカスが復帰する', async () => {

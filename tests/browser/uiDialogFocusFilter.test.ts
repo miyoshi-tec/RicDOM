@@ -36,14 +36,15 @@ describe('実ブラウザ: createDialog の focus trap 可視要素フィルタ'
     const closeBtn = app.querySelector('.ric-dialog__close') as HTMLElement;
     const [itemA, , itemC] = Array.from(app.querySelectorAll('.ric-dialog__body button')) as HTMLElement[];
 
-    // フォーカス可能要素は [close, A, C] (B は display:none で除外される)。
-    expect(document.activeElement).toBe(closeBtn);
-    await userEvent.tab();
+    // フォーカス可能要素は [close, A, C] (B は display:none で除外される)。開いた直後は
+    // 本文内の最初の可視要素 (A) が初期フォーカスを受ける (LCP #4、2.0.0-alpha.9)。
     expect(document.activeElement).toBe(itemA);
     await userEvent.tab();
     expect(document.activeElement).toBe(itemC); // B を飛ばして C へ
     await userEvent.tab(); // 末尾 (C) から Tab すると先頭 (close) へループ
     expect(document.activeElement).toBe(closeBtn);
+    await userEvent.tab(); // close から Tab で A へ
+    expect(document.activeElement).toBe(itemA);
   });
 
   it('disabled / tabindex="-1" だけでなく非表示要素も getFocusables から除外されるので、全 focusable が非表示なら root 自身にフォーカスが留まる', async () => {

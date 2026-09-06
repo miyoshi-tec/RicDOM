@@ -741,7 +741,7 @@ completes even without `ricdom-ui.css` present, it just skips the animation.
 
 | Component | ARIA / a11y contract |
 |---|---|
-| `createDialog()` | Modal. `role="dialog"` + `aria-modal="true"` + `aria-labelledby`/`aria-describedby`. Opening moves focus to the first focusable descendant (visible-element–filtered); `Tab`/`Shift+Tab` are trapped inside; `Escape` closes and returns focus to the triggering element; every sibling of the portal is set `inert` while open. Three usage modes: uncontrolled + auto trigger (`triggerChildren` given → call returns a trigger `RicNode`), uncontrolled + your own trigger (`triggerChildren` omitted → call `dlg.open()`/`dlg.close()`), or controlled (`open`/`onClose(reason)` where `reason` is `'overlay' \| 'close-button' \| 'escape' \| 'api'`). `returnFocus` (§10.3.1) controls where focus goes on close |
+| `createDialog()` | Modal. `role="dialog"` + `aria-modal="true"` + `aria-labelledby`/`aria-describedby`. Opening moves focus to body → footer → close-button → root, in that priority order (visible-element–filtered, `[autofocus]` wins over all of it — §10.3.1c); `Tab`/`Shift+Tab` are trapped inside (plain DOM order, unaffected by the above); `Escape` closes and returns focus to the triggering element; every sibling of the portal is set `inert` while open. Three usage modes: uncontrolled + auto trigger (`triggerChildren` given → call returns a trigger `RicNode`), uncontrolled + your own trigger (`triggerChildren` omitted → call `dlg.open()`/`dlg.close()`), or controlled (`open`/`onClose(reason)` where `reason` is `'overlay' \| 'close-button' \| 'escape' \| 'api'`). `returnFocus` (§10.3.1) controls where focus goes on close |
 | `createPopup()` | `role="menu"` dropdown. Trigger gets `aria-haspopup="menu"` + `aria-expanded`; every menu child is auto-wrapped with `role="menuitem"`, its `class` merged (not replaced) with `.ric-popup__item`. `ArrowUp`/`ArrowDown`/`Home`/`End` move focus among items; `Escape` closes and restores focus to the trigger. Activating a menuitem (click; for a `<button>` item, `Enter`/`Space` fire a native click) closes the menu and returns focus to the trigger too (APG menu button pattern) — set `closeOnSelect: false` to opt out (checkbox-style menus); a `disabled: true`/`aria-disabled="true"` item, or one whose `role` was overridden away from `'menuitem'` (e.g. a separator), never triggers this regardless of `closeOnSelect` (§10.3.1d). `openAt({x,y} \| MouseEvent)` opens at an arbitrary point instead of a trigger button — the same close-on-select behavior applies to menus opened this way. `trigger` accepts a `RicNode`/`RicNode[]` (used as-is) or a `{ icon?, label?, ghost?, size?, class?, style? }` object (§10.3.1a). Menu-open state is exclusive with `createDropdown` within the same app (opening one closes any other open popup/dropdown) |
 | `createToast()` | `toast.show(msg, { type, duration })` queues a notification; `type: 'error'` renders `role="alert"`/`aria-live="assertive"`, everything else `role="status"`/`aria-live="polite"`. `duration: 0` disables auto-dismiss (manual close only). Never steals focus |
 | `createTooltip()` | `aria-describedby` links trigger ↔ popup; shown on hover or focus, dismissed on blur/mouseleave/`Escape`. `dir: 'auto' \| 'top' \| 'bottom' \| 'right' \| 'left'`, `'auto'` picks a direction that fits the viewport |
@@ -803,12 +803,22 @@ When a dialog opens, it decides where to send focus in this order:
    itself — the fallback target from a *previous* run of this same step, see 3 below — this
    case is skipped and the search continues to steps 2/3, rather than being treated as
    "already focused.")
-2. **`[autofocus]`.** The first visible focusable descendant carrying the standard HTML
-   `autofocus` attribute (`{ autofocus: true }` on a `RicNode` — same idea as native
-   `<dialog>`'s focusing steps) wins over DOM order — so an autofocus target later in the
-   dialog's body still beats, say, the header's close button.
-3. **First focusable, or the dialog root.** Falls back to the first focusable descendant
-   (visible-element–filtered, §14), and if there are none, focuses the dialog root itself.
+2. **`[autofocus]`.** The first visible focusable descendant (searched across the whole
+   dialog, DOM order) carrying the standard HTML `autofocus` attribute (`{ autofocus:
+   true }` on a `RicNode` — same idea as native `<dialog>`'s focusing steps) wins over
+   everything below — so an autofocus target anywhere in the dialog still beats the
+   header's close button or the body's own first focusable.
+3. **Body, then footer, then the close button, then the dialog root.** Falls back, in
+   order, to: the first visible focusable descendant *inside* `children` (the
+   `dialog-body` region, §14 filtering applies); if none, the first one *inside*
+   `actions` (the `dialog-footer` region); if none, the header's close button
+   (`.ric-dialog__close`); and if that isn't present either, the dialog root itself.
+   Changed in 2.0.0-alpha.9 (LCP #4) — before that, this step was simply "first
+   focusable in DOM order," which always landed on the header's close button (DOM order
+   is header → body → footer) even though the close button is rarely what a dialog's
+   opener actually wants focused first. The `Tab`/`Shift+Tab` trap's cycle order is
+   unaffected by this change — it is still plain DOM order (`[close, ...body,
+   ...footer]`); only which element receives focus *the moment the dialog opens* moved.
 
 This runs on both the CSS `animationend` path and the 700ms fallback timer (§10.3, whichever
 fires first; the other is a no-op) — step 1 makes both of those safe to skip when something

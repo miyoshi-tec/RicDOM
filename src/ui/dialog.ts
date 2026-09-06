@@ -9,9 +9,16 @@
 //     開いたら最初の focusable にフォーカス、Tab/Shift+Tab の focus trap、Esc で閉じて
 //     起動元へフォーカス復帰、背景を inert (付録 E)。
 //   - 初期フォーカスは「既に dialog 内にフォーカスがある (createFocusWhen 等) なら
-//     何もしない」→「[autofocus] があれば最優先」→「最初の focusable」→「root」の順
-//     (#12、2.0.0-alpha.3。focusFirstElement 参照。DialogProps.initialFocus は新設しない —
-//     autofocus 属性と createFocusWhen で表現できるため、canon 1 つの方針を維持)。
+//     何もしない」→「[autofocus] があれば最優先」→「本文 (dialog-body) 内の最初の
+//     focusable」→「フッター (dialog-footer/actions) 内の最初の focusable」→
+//     「ヘッダの ✕ (close ボタン)」→「root」の順 (#12 で新設、LCP #4 で本文/フッター優先に
+//     変更、2.0.0-alpha.9。focusFirstElement 参照)。旧順序 (#12、2.0.0-alpha.3) は
+//     単純に「DOM 順で最初の focusable」= 常にヘッダの ✕ だった — ✕ は「閉じる」
+//     ボタンであり、開いた直後にそこへフォーカスリングが付く/スクリーンリーダーが
+//     真っ先に「閉じる」を読み上げるのは、ダイアログの主目的 (本文の確認・入力・
+//     アクション選択) と噛み合わないという報告 (LCP #4、Trend Guard でも同種の体験報告)。
+//     DialogProps.initialFocus は新設しない — autofocus 属性と createFocusWhen で
+//     表現できるため、canon 1 つの方針を維持する。
 //
 // 3 つの使い方 (v1 継承):
 //   (1) uncontrolled + 自動トリガー: dlg({ triggerChildren: ['開く'], title, children, actions })
@@ -159,12 +166,37 @@ export const createDialog = (): DialogInstance => {
     // そうしないと (今回 focusables が非空になっていても) 一生 root に留まってしまう。
     const active = document.activeElement;
     if (active && active !== root && root.contains(active)) return;
-    const focusables = getFocusables(root);
+
     // [autofocus] を持つ可視 focusable を最優先する (HTML 標準の autofocus 属性を
     // dialog が尊重する形。native <dialog> の focusing steps と同じ考え方、#12)。
-    // 見つからなければ従来どおり最初の focusable、それも無ければ root へフォールバック。
-    const autofocusTarget = focusables.find((el) => el.hasAttribute('autofocus'));
-    (autofocusTarget ?? focusables[0] ?? root).focus();
+    // ここだけは本文/フッター/✕ の優先順位より先に判定する — dialog 内のどこにあっても
+    // consumer が明示的に「ここへ」と指定した意思を尊重するため。
+    const allFocusables = getFocusables(root); // Tab トラップ (handleKeydown) と同じ DOM 順一覧
+    const autofocusTarget = allFocusables.find((el) => el.hasAttribute('autofocus'));
+    if (autofocusTarget) {
+      autofocusTarget.focus();
+      return;
+    }
+
+    // 初期フォーカス優先順位 (LCP #4、2.0.0-alpha.9): 本文 → フッター → ヘッダの ✕ → root。
+    // 「DOM 順で最初の focusable」(= 常にヘッダの ✕) だった旧順序をやめ、ダイアログの
+    // 主目的である本文の操作を優先する。Tab トラップの循環順序 (allFocusables、DOM 順=
+    // [close, body..., footer...]) 自体は変更しない — 変わるのは「開いた瞬間にどこへ
+    // 置くか」だけ。
+    const bodyEl = root.querySelector<HTMLElement>(`#${bodyId}`);
+    const bodyFirst = bodyEl ? getFocusables(bodyEl)[0] : undefined;
+    if (bodyFirst) {
+      bodyFirst.focus();
+      return;
+    }
+    const footerEl = root.querySelector<HTMLElement>(`[data-ricdom-role="${UI_ROLE.dialogFooter}"]`);
+    const footerFirst = footerEl ? getFocusables(footerEl)[0] : undefined;
+    if (footerFirst) {
+      footerFirst.focus();
+      return;
+    }
+    const closeEl = root.querySelector<HTMLElement>('.ric-dialog__close');
+    (closeEl ?? root).focus();
   };
 
   // 実 CSS アニメーション (ric-dlg-in の animationend) を初期フォーカスの合図にするが、
