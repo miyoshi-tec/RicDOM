@@ -48,18 +48,34 @@ export const UI_ROLE = {
   /** dialog の背景オーバーレイ (2.0.0-alpha.2 追補、§14 の全部品方針をサブパーツへ拡張) */
   dialogOverlay: 'dialog-overlay',
   dialogHeader: 'dialog-header',
+  /** dialog のタイトル文字列 (`.ric-dialog__title`、パイロット第 5〜7 号 = Brownies Desktop
+   *  からの報告 #2、2.0.0-alpha.8)。dialogHeader は「タイトル+閉じるボタンを束ねる行」の
+   *  コンテナで、タイトル文字列そのものを CSS/E2E から掴む手段が無かった (title/close を
+   *  分離して掴みたいケースを塞いでいた) ため新設。 */
+  dialogTitle: 'dialog-title',
   /** dialog の本文コンテナ (`.ric-dialog__body`)。dialog 自身 (portal ルート) は `dialog` のまま */
   dialogBody: 'dialog-body',
   dialogFooter: 'dialog-footer',
   dialogClose: 'dialog-close',
   popup: 'popup',
   popupItem: 'popup-item',
+  /** popup を開くトリガーボタン (2.0.0-alpha.8、#2 の役割棚卸しで発見: dropdown には
+   *  dropdownTrigger があるのに popup のトリガー (`aria-haspopup="menu"` の button) には
+   *  role が無かった非対称を解消)。 */
+  popupTrigger: 'popup-trigger',
   /** popup/dropdown で共有する背景オーバーレイ (`.ric-popup__overlay`、両部品が同じ要素を使う) */
   popupOverlay: 'popup-overlay',
   toast: 'toast',
   toastItem: 'toast-item',
+  /** toast 1 件のメッセージ文字列 (`.ric-toast__msg`、2.0.0-alpha.8、#2 の役割棚卸しで追加。
+   *  toastItem (行全体) と toastClose (閉じるボタン) はあったが、本文だけを掴む手段が無かった)。 */
+  toastMsg: 'toast-msg',
   toastClose: 'toast-close',
   tooltip: 'tooltip',
+  /** tooltip のホバー/フォーカス対象トリガー (`.ric-tooltip`、2.0.0-alpha.8、#2 の役割棚卸しで
+   *  追加。dropdownTrigger/popupTrigger と同じ理由 — トリガー自身と portal 側の本体
+   *  (tooltip role) を CSS/E2E から別々に掴めるようにする)。 */
+  tooltipTrigger: 'tooltip-trigger',
   scrollPane: 'scroll-pane',
   splitter: 'splitter',
   splitterSide: 'splitter-side',
@@ -81,6 +97,11 @@ export const UI_ROLE = {
   inlineMenu: 'inline-menu',
   // ── パラメータ調整パネル ──
   tweakPanel: 'tweak-panel',
+  /** パネル全体のタイトル (`.ric-tweak__title`、2.0.0-alpha.8、#2 の役割棚卸しで追加。
+   *  行ごとの label (`.ric-tweak-row__label` 等) は data-ricdom-tweak-key 付きの行が既に
+   *  一意に掴めるため見送ったが、パネル全体のタイトルは唯一無二の見出しなので dialogTitle/
+   *  tweakFolderHeader と同じ扱いにする)。 */
+  tweakTitle: 'tweak-title',
   tweakFolder: 'tweak-folder',
   tweakFolderHeader: 'tweak-folder-header',
   tweakFolderBody: 'tweak-folder-body',

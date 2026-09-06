@@ -964,21 +964,46 @@ extends to sub-parts of the portal-mounted components, not just their root:
 
 `button` `input` `textarea` `checkbox` `radiogroup` `select` `range` `color` `separator`
 `text` `icon` `col` `row` `grid` `panel` `md-pre` `code-pre` — `dialog` `dialog-overlay`
-`dialog-header` `dialog-body` `dialog-footer` `dialog-close` `popup` `popup-overlay`
-`popup-item` `toast` `toast-item` `toast-close` `tooltip` `dropdown` `dropdown-trigger` —
+`dialog-header` `dialog-title` `dialog-body` `dialog-footer` `dialog-close` `popup`
+`popup-trigger` `popup-overlay` `popup-item` `toast` `toast-item` `toast-msg`
+`toast-close` `tooltip` `tooltip-trigger` `dropdown` `dropdown-trigger` —
 `scroll-pane` `splitter` `splitter-side` `splitter-main` `splitter-divider`
 `splitter-toggle` `collapse-box` `accordion` `accordion-item` `accordion-header`
 `accordion-body` `accordion-title` `tabs` `tabs-bar` `tabs-tab` `tabs-panel` `inline-menu`
-— `tweak-panel` `tweak-folder` `tweak-folder-header` `tweak-folder-body` `tweak-row`
-(§10.6).
+— `tweak-panel` `tweak-title` `tweak-folder` `tweak-folder-header` `tweak-folder-body`
+`tweak-row` (§10.6).
 
 `popup-overlay` is shared by `createPopup` and `createDropdown` — both use the same
 `.ric-popup__overlay` element and role. Dialog's sub-part roles map onto its existing CSS
 classes one-to-one: `dialog-overlay` → `.ric-dialog__overlay`, `dialog-header` →
-`.ric-dialog__header`, `dialog-body` → `.ric-dialog__body`, `dialog-footer` →
-`.ric-dialog__footer`, `dialog-close` → `.ric-dialog__close`. Tooltip has only one
-sub-part (its floating popup), which already carried `data-ricdom-role="tooltip"` — no
-change there.
+`.ric-dialog__header`, `dialog-title` → `.ric-dialog__title`, `dialog-body` →
+`.ric-dialog__body`, `dialog-footer` → `.ric-dialog__footer`, `dialog-close` →
+`.ric-dialog__close`.
+
+**Sub-part role audit (2.0.0-alpha.8, pilots 5-7 = RaccoonMemo / Rancha / Brownies
+Desktop, three Electron apps migrating at once)**: `dialog`'s plain-button trigger
+(`buildTrigger`, rendered when you pass `triggerChildren` without `open`/`onClose`) now
+also carries `data-ricdom-role="button"` — it renders `class: 'ric-button'` directly
+instead of going through `uiButton()`, so it had silently been the one `.ric-button`-styled
+element with no role at all. `createPopup`'s trigger button now carries
+`popup-trigger` (it had `aria-haspopup="menu"` but, unlike `createDropdown`'s
+`dropdown-trigger`, no role — an inconsistency, now fixed). `createTooltip`'s hover/focus
+wrapper (`.ric-tooltip`, the trigger — not the floating `tooltip` popup) now carries
+`tooltip-trigger`, for the same reason. `createToast`'s per-item message text
+(`.ric-toast__msg`) now carries `toast-msg`, so it can be targeted separately from the
+whole item (`toast-item`) or its close button (`toast-close`). `createTweakPanel`'s
+optional `title` (`.ric-tweak__title`) now carries `tweak-title`.
+
+**Deliberately not roled** (same audit): the per-row label spans/legends inside
+`createTweakPanel` rows and folders (`.ric-tweak-row__label`, `.ric-tweak-folder__label`)
+and the JSON-fallback preview (`.ric-tweak-row__json`). Unlike the roots above, these
+repeat once per row/folder and the row/folder container already carries a unique hook
+(`data-ricdom-tweak-key` on the row, `tweak-folder` role on the folder) — combine that with
+the class name (e.g. `[data-ricdom-tweak-key="x"] .ric-tweak-row__label`) instead. Also not
+roled: plain unclassed wrapper `<span>`s used purely to group text (e.g. `createDropdown`'s
+label wrapper, `createTooltip`'s default string-content wrapper) — they carry no `ric-*`
+class in the first place, so they were out of scope for this audit (which only looked at
+elements that already have a `ric-*` class but no role).
 
 The core library itself uses `data-ricdom-role="portal"` for the auto-generated portal
 sentinel (§7) and `data-ricdom-ref` (a different attribute) for `ref`-registered elements

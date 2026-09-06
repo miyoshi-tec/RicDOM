@@ -88,6 +88,10 @@ export const createTooltip = (): TooltipInstance => {
     return {
       tag: 'span',
       class: 'ric-tooltip',
+      // dropdownTrigger/popupTrigger と同じ理由で追加 (#2 の役割棚卸し、2.0.0-alpha.8):
+      // ホバー/フォーカス対象のトリガーそのものと、portal 側に出る本体 (tooltip role) を
+      // CSS/E2E から別々に掴めるようにする。
+      'data-ricdom-role': UI_ROLE.tooltipTrigger,
       'aria-describedby': tooltipId,
       onmouseenter: (ev: MouseEvent) => show(ev.currentTarget as Element, dirOpt),
       onmouseleave: hide,

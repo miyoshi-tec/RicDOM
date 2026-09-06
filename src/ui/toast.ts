@@ -80,7 +80,7 @@ export const createToast = (): ToastInstance => {
         'data-ricdom-role': UI_ROLE.toastItem,
         onanimationend: item.closing ? () => remove(item.id) : item.entering ? () => { item.entering = false; } : undefined,
         children: [
-          { tag: 'span', class: 'ric-toast__msg', children: [item.msg] },
+          { tag: 'span', class: 'ric-toast__msg', 'data-ricdom-role': UI_ROLE.toastMsg, children: [item.msg] },
           { tag: 'button', class: 'ric-toast__close', 'data-ricdom-role': UI_ROLE.toastClose, 'aria-label': 'Close', onclick: () => beginClose(item), children: ['✕'] },
         ],
       })),

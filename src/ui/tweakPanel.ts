@@ -179,6 +179,14 @@ interface RowArgs {
 // leaf row の安定フック (設計書「tweak の leaf row に安定フック」)。number/range/checkbox/
 // text/select/radiobutton/color/計算値、全ての行コンテナに付与する。checkbox 行だけは
 // uiCheckbox 自体が <label> を内蔵するため row 側にラベル span が無い (JSDoc/SPEC 明記)。
+//
+// **role 棚卸しでの見送り (#2、2.0.0-alpha.8)**: `.ric-tweak-row__label` / `.ric-tweak-folder__label` /
+// `.ric-tweak-row__json` / 出所不明にならない `<legend>` は role を追加しなかった。
+// dialog/toast/tweak パネルのタイトルと違い、これらは「行/folder ごとに繰り返される
+// 装飾的サブパーツ」で、親の行/folder 自体が既に一意なフック (`[data-ricdom-tweak-key="..."]`
+// または `data-ricdom-role="tweak-folder"`) を持つため、`[data-ricdom-tweak-key="x"]
+// .ric-tweak-row__label` のようにクラスセレクタと組み合わせれば十分掴める。全 leaf row に
+// role を増やすと粒度が細かすぎて一貫性の割に得るものが小さいと判断した。
 const rowHookAttrs = (path: string): Record<string, string> => ({
   'data-ricdom-role': UI_ROLE.tweakRow,
   'data-ricdom-tweak-key': path,
@@ -542,7 +550,11 @@ export const createTweakPanel = (): TweakPanelInstance => {
         ev.preventDefault();
       },
       ...(Object.keys(mergedStyle).length ? { style: mergedStyle } : {}),
-      children: [...(title != null ? [{ tag: 'div', class: 'ric-tweak__title', children: [title] } as RicElementNode] : []), ...autoRows, ...rows],
+      children: [
+        ...(title != null ? [{ tag: 'div', class: 'ric-tweak__title', 'data-ricdom-role': UI_ROLE.tweakTitle, children: [title] } as RicElementNode] : []),
+        ...autoRows,
+        ...rows,
+      ],
     } as unknown as RicElementNode;
   }) as TweakPanelInstance;
 

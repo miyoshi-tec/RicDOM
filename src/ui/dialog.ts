@@ -296,6 +296,9 @@ export const createDialog = (): DialogInstance => {
   const buildTrigger = (triggerChildren: RicNode | RicNode[]): RicNode => ({
     tag: 'button',
     class: 'ric-button',
+    // uiButton を経由しない直書きの button (見た目だけ ric-button を借りている) だったため
+    // 他の全 uiButton と違い role が付いていなかった (#2 の役割棚卸しで発見、2.0.0-alpha.8)。
+    'data-ricdom-role': UI_ROLE.button,
     onclick: () => {
       if (isOpenInternal) {
         beginClose();
@@ -344,7 +347,7 @@ export const createDialog = (): DialogInstance => {
             class: 'ric-dialog__header',
             'data-ricdom-role': UI_ROLE.dialogHeader,
             children: [
-              { tag: 'span', class: 'ric-dialog__title', id: titleId, children: [titleLast] },
+              { tag: 'span', class: 'ric-dialog__title', id: titleId, 'data-ricdom-role': UI_ROLE.dialogTitle, children: [titleLast] },
               { tag: 'button', class: 'ric-dialog__close', 'data-ricdom-role': UI_ROLE.dialogClose, 'aria-label': 'Close', onclick: () => requestClose('close-button'), children: ['✕'] },
             ],
           },

@@ -271,6 +271,9 @@ export const createPopup = (): PopupInstance => {
       tag: 'button',
       class: `${triggerBaseClass}${isOpen ? ' ric-popup__trigger--open' : ''}`,
       ...(triggerObj?.style ? { style: triggerObj.style } : {}),
+      // dropdown には dropdownTrigger role があるのに popup のトリガーには無かった非対称を
+      // 解消 (#2 の役割棚卸しで発見、2.0.0-alpha.8)。
+      'data-ricdom-role': UI_ROLE.popupTrigger,
       'aria-haspopup': 'menu',
       'aria-expanded': isOpen ? 'true' : 'false',
       onclick: (ev: MouseEvent) => {
