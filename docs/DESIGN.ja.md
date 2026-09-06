@@ -184,6 +184,8 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **移行ガイドの穴 (docs)**: (1) 対応表の `app.use()` セルに `setup` が無く、表どおりに書くと初回 render で未登録 error を必ず 1 回踏む → setup を明記し、v1 の state キー ↔ setup 内 use の 1 対 1 例を追加。**仕組み (未登録 = error + 未描画) は consumer も「絶対に残して」と評価、変えない** (2) `applyTheme` が塗るのは bg / fg / font-size のみ、`padding` / `overflow` / `box-sizing` は塗らない (テーマ要素 = ページ全体とは限らない) → 補償 CSS のスニペット (3) スクロールバー: 既定値は v1 v0.4.2 以降と同一、変わったのはスコープ。ただし v0.3.x からの移行者には既定値も変わって見える (v0.3.x は常時透明・hover でアクセント) と両方書く (4) 機械変換の取りこぼし 2 形 (ES2015 短縮記法 `{ …, ctx }` と後付け代入 `node.ctx =`、壊れ方は静か) と「`ctx` を使うが ricdom の木ではない vnode 層」の併存 → リポジトリ全体に変換をかけない (5) **推奨手順「まず v1 依存を 1 ファイル (アダプタ) に寄せてから移る」** — 第 3 号・第 4 号がこれで手の量を 300 行台に抑えた
 - 第 4 号の「良かった点」7 件 (未登録 error / CSS 1 枚 + warn / setup / data-ricdom-role 全部品 / gap 復活 / renderNow・nextRender の契約 / エラーの「✅ 例:」) は据え置き対象
 - コア未変更 (gzip 5,169B)、ui gzip 23,649→23,949B。unit 537 / browser 104。パイロット 4 アプリで計 28 件 (第 4 号 = API 1 + warn 1 + docs 5)
+- **追報 (2026-09-05、alpha.7 取り込み) で第 4 号は「移行できた」に**: controlled モードで「探索で①が閉じる」が v1 と同じ挙動、**共有 URL の開閉復元まで同じ道で通った** (consumer 評: 「要望どおり setOpen を作らなかったほうが良かった例」)。density warn が 1 回出て `comfortable` に直すと無音。font-size の補償 CSS 1 行を撤去 (padding/overflow/box-sizing は「色と文字サイズは vendor、余白とはみ出しは consumer」の切り分けとして残す方針に同意)。1,658 テスト、凍結ディレクトリ変更 0、DOM 直書き 0
+- **FACT 追加 (docs のみ)**: `nextMap` は直近の描画時の `open` 由来。重い再描画 (実測 227ms) の完了前の連打は落ちる (150ms 間隔 3 回で 2 回反転) — controlled の一般的性質 (React と同じ)、バグではない。SPEC に「重い画面では live な state から作り直す (`{...s.x, [id]: next}`)」を明記、TUTORIAL の例もその形に。**関数形 `(current) => nextMap` の引数追加は見送り** (consumer 自身が「docs 1 行で十分」、API を増やさない)。再検討の条件: live 値から作るのが `multi: false` で煩雑だという実害報告
 
 ## 24. パイロット移行第 3 号 (Unizon 展示ビューア、kiosk/embed、file:// 直開き) からの確定事項 (2026-09-05、2.0.0-alpha.6)
 

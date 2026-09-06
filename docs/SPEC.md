@@ -867,6 +867,15 @@ switch, no separate imperative method:
     callers that only care about the one item that changed). With `multi: false` (exclusive),
     `nextMap` closes every other item's entry to `false` regardless of what was in the
     incoming `open` object, keyed by every id present in the current `items` prop.
+  - **`nextMap` is derived from the `open` prop of the most recent render**, not from your
+    live state. If a second click lands before the re-render triggered by the first one has
+    completed (measured by a pilot consumer: a 227ms render, clicks 150ms apart → 2 of 3
+    toggles applied), `nextMap` still reflects the older `open` and the intermediate toggle
+    is lost. This is the ordinary controlled-component contract (same as React), not a bug.
+    When re-renders are heavy, derive the next state from your live value instead:
+    `onToggle: (id, next) => { s.x = { ...s.x, [id]: next }; }` (for `multi: false`, close
+    the others yourself in the same expression). When renders are fast the two forms produce
+    identical results.
   - If `onToggle` is omitted, nothing happens on click — the same treatment `createTabs`
     gives an `active`-only call with no `onChange`.
 - `isOpen(id)` returns the correct value in both modes (reading the most recently passed

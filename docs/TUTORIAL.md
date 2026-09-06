@@ -329,7 +329,10 @@ const app = createApp(
             { id: 'b', title: 'Section B', children: ['...'] },
           ],
           open: s.acc,
-          onToggle: (id, next, nextMap) => { s.acc = nextMap; },
+          // Derive from the live state. `nextMap` (3rd arg) is computed from the `open`
+          // of the last render, so a click that lands before a heavy re-render finishes
+          // would be lost if you assigned it directly (see SPEC §10.3.3a).
+          onToggle: (id, next) => { s.acc = { ...s.acc, [id]: next }; },
         }),
       ],
     }),
