@@ -59,6 +59,15 @@ export const createScrollPane = (options: CreateScrollPaneOptions = {}): ScrollP
   let followNow = false; // render 前に計測した「追従すべきか」
   let forceTo: 'bottom' | 'top' | null = null;
 
+  // rAF + setTimeout(200ms) バックストップの二重化用の状態 (LCP #5)。
+  // 「先に来た方が実行し、後発は no-op」はコアの描画スケジューラ (src/scheduler.ts) と
+  // 同じ考え方 (コア自体は import せず、同じアルゴリズムをここに複製する — 状態が
+  // インスタンスごとに閉じているべきで、かつ createScrollPane はコア (src/*.ts 直下) の
+  // 一部ではないため)。
+  let applyScheduled = false;
+  let applyRafId: number | null = null;
+  let applyBackstopId: ReturnType<typeof setTimeout> | null = null;
+
   const findEl = (): HTMLElement | null => (typeof document === 'undefined' ? null : document.querySelector(`[data-ricdom-scroll-pane-id="${id}"]`));
 
   const shouldFollow = (el: HTMLElement): boolean => {
@@ -81,6 +90,27 @@ export const createScrollPane = (options: CreateScrollPaneOptions = {}): ScrollP
     followNow = false;
   };
 
+  // requestAnimationFrame だけに頼ると、hidden ウィンドウ (Electron の隠れウィンドウ・
+  // 最小化タブ等) では rAF が止まり追従が効かなくなる (LCP #5、コアのスケジューラが
+  // v1 から抱えているのと同じ問題)。rAF と setTimeout(200ms) の両方を張り、先に来た方が
+  // 適用して後発は no-op にする (applyScheduled フラグでガード)。
+  const scheduleApplyScroll = (): void => {
+    if (applyScheduled) return; // 同一フレーム内の重複予約を防ぐ
+    applyScheduled = true;
+    const run = (): void => {
+      if (!applyScheduled) return; // 相方が既に処理済み
+      applyScheduled = false;
+      applyRafId = null;
+      if (applyBackstopId !== null) {
+        clearTimeout(applyBackstopId);
+        applyBackstopId = null;
+      }
+      applyScroll();
+    };
+    if (typeof requestAnimationFrame !== 'undefined') applyRafId = requestAnimationFrame(run);
+    if (typeof setTimeout !== 'undefined') applyBackstopId = setTimeout(run, 200);
+  };
+
   const inst = ((props: ScrollPaneProps = {}): RicNode => {
     const host = guard.ensure();
     if (!host) return null;
@@ -91,8 +121,8 @@ export const createScrollPane = (options: CreateScrollPaneOptions = {}): ScrollP
     const el = findEl();
     if (el) followNow = shouldFollow(el);
 
-    // 描画後に rAF でスクロール位置を適用する
-    if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(applyScroll);
+    // 描画後にスクロール位置を適用する (rAF + 200ms バックストップの二重化、LCP #5)
+    scheduleApplyScroll();
 
     return {
       ...rest,
@@ -106,7 +136,22 @@ export const createScrollPane = (options: CreateScrollPaneOptions = {}): ScrollP
   }) as ScrollPaneInstance;
 
   inst.attach = guard.attach;
-  inst.dispose = (): void => guard.dispose();
+  inst.dispose = (): void => {
+    // 保留中の rAF/バックストップを解除する (unmount 後に発火して findEl() が null を
+    // 返すだけの空振りになるとはいえ、タイマーを残さないほうが行儀が良い)。
+    if (applyScheduled) {
+      applyScheduled = false;
+      if (applyRafId !== null) {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(applyRafId);
+        applyRafId = null;
+      }
+      if (applyBackstopId !== null) {
+        clearTimeout(applyBackstopId);
+        applyBackstopId = null;
+      }
+    }
+    guard.dispose();
+  };
 
   inst.scrollToBottom = (): void => {
     forceTo = 'bottom';

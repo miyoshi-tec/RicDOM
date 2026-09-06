@@ -89,6 +89,83 @@ describe('createScrollPane: scrollToBottom/scrollToTop', () => {
   });
 });
 
+// rAF + setTimeout(200ms) バックストップの二重化 (LCP #5)。requestAnimationFrame が
+// 発火しない環境 (Electron の隠れウィンドウ・最小化タブ等) でも追従が効くことと、
+// 両方来ても 1 回だけ適用されることを確認する (コアの scheduler.test.ts と同じ
+// rAF スタブの流儀)。
+describe('createScrollPane: rAF + 200ms バックストップの二重化 (LCP #5)', () => {
+  let originalRaf: typeof requestAnimationFrame;
+  beforeEach(() => {
+    originalRaf = globalThis.requestAnimationFrame;
+  });
+  afterEach(() => {
+    globalThis.requestAnimationFrame = originalRaf;
+  });
+
+  it('rAF が永久に発火しない環境でも 200ms 後の setTimeout バックストップで scrollTop が更新される', async () => {
+    globalThis.requestAnimationFrame = (() => 0) as typeof requestAnimationFrame; // 何もしない rAF
+    const app = setupApp();
+    let pane: ReturnType<typeof createScrollPane>;
+    const handle = createApp('#app', {}, () => (pane ? pane({}) : null));
+    pane = handle.use(createScrollPane({ follow: 'bottom' }));
+    // .use() 自体もコアのスケジューラ (scheduleRender) 経由で再描画を予約するだけなので、
+    // rAF を止めている今回はそれも 200ms バックストップ待ちになってしまう —
+    // renderNow() で同期的に初回マウントを終わらせる (この rAF スタブは
+    // createScrollPane 側の 200ms バックストップだけを計測したいためのもの)。
+    handle.renderNow();
+
+    const el = app.querySelector('.ric-scroll-pane') as HTMLElement;
+    // jsdom はレイアウトを持たず scrollHeight は常に 0 なので、scrollTo で観測できる
+    // ように scrollHeight を明示的にスタブする (forceTo='bottom' → el.scrollTop =
+    // el.scrollHeight を検証したいだけで、実レイアウトは無関係)。
+    Object.defineProperty(el, 'scrollHeight', { value: 777, configurable: true });
+
+    // scrollToBottom() 自体はコアの描画スケジューラ (host.notify = scheduleRender、
+    // これも rAF+200ms バックストップの二重化を持つ) 経由で再描画を予約するだけなので、
+    // ここで検証したい「createScrollPane 自身の 200ms バックストップ」の時間計測が
+    // コア側の 200ms と合算されて紛れないよう、handle.renderNow() で同期的に
+    // 即時再描画させる (pane() が同期的に呼ばれ、scheduleApplyScroll() だけが
+    // 新たにスケジュールされる状態を作る)。
+    pane!.scrollToBottom(); // forceTo='bottom' をセットする
+    handle.renderNow();
+    await new Promise((r) => setTimeout(r, 250)); // rAF は発火しないので 200ms バックストップ経由のはず
+
+    expect(el.scrollTop).toBe(777);
+  });
+
+  it('rAF と 200ms バックストップの両方が来ても、scrollTop の適用は 1 回だけ (二重適用しない)', async () => {
+    // 健常な rAF (即座に発火する) をスタブする。setTimeout(200ms) のバックストップも
+    // 同時に張られるが、rAF 側が先に run() を呼んで applyScheduled を倒すので、
+    // 200ms 後のバックストップは no-op になるはず。
+    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => setTimeout(() => cb(0), 0)) as unknown as typeof requestAnimationFrame;
+    const app = setupApp();
+    let pane: ReturnType<typeof createScrollPane>;
+    const handle = createApp('#app', {}, () => (pane ? pane({}) : null));
+    pane = handle.use(createScrollPane({ follow: 'bottom' }));
+    handle.renderNow(); // 初回マウントを同期的に終わらせる (上のテストと同じ理由)
+
+    const el = app.querySelector('.ric-scroll-pane') as HTMLElement;
+    Object.defineProperty(el, 'scrollHeight', { value: 500, configurable: true });
+    let setCount = 0;
+    let scrollTopValue = 0;
+    Object.defineProperty(el, 'scrollTop', {
+      get: () => scrollTopValue,
+      set: (v: number) => {
+        setCount++;
+        scrollTopValue = v;
+      },
+      configurable: true,
+    });
+
+    pane!.scrollToBottom();
+    handle.renderNow(); // コア側のスケジューラを介さず同期的に再描画し、scheduleApplyScroll() だけを検証する
+    await new Promise((r) => setTimeout(r, 300)); // rAF 経由 (即時) + 200ms バックストップの両方が過ぎるまで待つ
+
+    expect(scrollTopValue).toBe(500);
+    expect(setCount).toBe(1); // 二重適用されていない
+  });
+});
+
 describe('createScrollPane: dispose', () => {
   it('unmount 後は再度呼んでも描画されない', async () => {
     const app = setupApp();
