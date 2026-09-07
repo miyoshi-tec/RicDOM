@@ -37,8 +37,13 @@ import { uiIcon } from './icon.js';
 const CHEVRON_DOWN = { p: 'm6 9 6 6 6-6' };
 
 export interface DropdownProps {
-  /** ラベルモード (旧 dropdown)。ポップオーバーはトリガー幅を最小幅として広がる。icon と排他。 */
-  label?: string;
+  /**
+   * ラベルモード (旧 dropdown)。ポップオーバーはトリガー幅を最小幅として広がる。icon と排他。
+   * `RicNode | RicNode[]` (2.0.0-alpha.12、`PopupTriggerObject.label` と型を揃えた —
+   * 線茶からの報告。旧 string 限定だと `uiIcon(...)` を混ぜたラベル (例: `[uiIcon(ICON),
+   * ' テーマ']`) が組めなかった)。文字列 1 つを渡す従来の使い方はそのまま動く。
+   */
+  label?: RicNode | RicNode[];
   /** アイコンモード (旧 menu)。正方形ボタン、ポップオーバーは min-width:160px。label と排他。 */
   icon?: RicNode;
   /** label モードのみ有効。開閉インジケータ (▼) を付ける (開くと 180° 回転)。 */
@@ -156,7 +161,10 @@ export const createDropdown = (): DropdownInstance => {
     if (!host) return null;
 
     const isLabel = !!props.label && !props.icon;
-    const triggerContent: RicNode | RicNode[] = isLabel ? [{ tag: 'span', children: [props.label] }] : (props.icon ?? '≡');
+    // label は RicNode | RicNode[] (2.0.0-alpha.12、PopupTriggerObject.label と型を揃えた —
+    // 線茶からの報告。旧 string 限定では uiIcon() 等を混ぜたラベルが組めなかった)。
+    // 配列ならそのまま展開、単体ならこれまでどおり 1 要素の配列に包む。
+    const triggerContent: RicNode | RicNode[] = isLabel ? [{ tag: 'span', children: Array.isArray(props.label) ? props.label : [props.label as RicNode] }] : (props.icon ?? '≡');
     bodyChildrenLast = props.children ?? [];
     bindKeydownIfNeeded();
     bindLightDismissIfNeeded();

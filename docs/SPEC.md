@@ -984,6 +984,13 @@ passed. `createDropdown`'s existing `label`/`icon`/`ghost` top-level props cover
 icon/ghost-button use case for that component — it does not have a separate `trigger`
 object form.
 
+`label` on both `PopupTriggerObject` and `DropdownProps` is typed `RicNode | RicNode[]` (a
+plain string still works, unchanged) — `DropdownProps.label` was widened from `string`-only
+to match `PopupTriggerObject.label` in 2.0.0-alpha.12 (reported by the tenth pilot, 線茶: a
+`string`-only label couldn't mix in a `uiIcon(...)` the way `PopupTriggerObject`'s already
+could). Implementation is unchanged either way: `Array.isArray(label) ? label : [label]`
+becomes the label `<span>`'s `children`.
+
 ### 10.3.1b FACT: `createTabs` panel-less mode
 
 If no `TabItem` in `items` has a `children` field, `createTabs` renders only the tab list

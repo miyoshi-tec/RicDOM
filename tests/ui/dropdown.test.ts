@@ -49,6 +49,21 @@ describe('createDropdown: トリガーの ARIA / モード', () => {
     expect(trigger.textContent).toBe('⚙');
   });
 
+  it('label に RicNode[] (アイコン+テキスト混在) を渡せる (2.0.0-alpha.12、PopupTriggerObject.label と型を揃えた)', async () => {
+    const app = setupApp();
+    let dd: ReturnType<typeof createDropdown>;
+    const handle = createApp('#app', {}, () =>
+      dd ? dd({ label: [{ tag: 'span', id: 'star', children: ['★'] }, ' テーマ'] }) : null,
+    );
+    dd = handle.use(createDropdown());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    expect(trigger.className).toContain('ric-dropdown__trigger--label');
+    expect(trigger.querySelector('#star')).not.toBeNull();
+    expect(trigger.textContent).toBe('★ テーマ');
+  });
+
   it('label/icon どちらも省略するとデフォルトアイコン (≡)', async () => {
     const app = setupApp();
     let dd: ReturnType<typeof createDropdown>;

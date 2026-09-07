@@ -311,4 +311,21 @@ v2 版が欠けており、consumer は detached div に `applyTheme` して `el
 `console.warn` + 既定値へフォールバック」規則を `resolveSizeVars`/`resolveFontVars` の
 再利用によりそのまま継承しており、警告文言・フォールバック挙動に新規分岐は無い
 (既存の `applyTheme` 経由と全く同じコードパスを通る)。破壊的変更はゼロ (追加のみ)。
+
+### 2.0.0-alpha.12: `DropdownProps.label` を `RicNode | RicNode[]` に
+
+パイロット第 10 号 (線茶、Rancha 派生の Electron アプリ) からの報告。`createPopup` の
+`PopupTriggerObject.label` は 2.0.0-alpha.2 の時点で既に `RicNode | RicNode[]` だったが、
+`createDropdown` の `label` は `string` のみに取り残されていた — 見た目の指定場所が部品に
+よって違う (`trigger` object 形 vs top-level props) だけでなく、型の幅まで違っていた非対称。
+
+| 種別 | 名前 | 規約 | 判定 |
+|---|---|---|---|
+| Props フィールド (型を広げる、後方互換) | `DropdownProps.label`: `string` → `RicNode \| RicNode[]` | 既存の `PopupTriggerObject.label` と同一の型 | OK |
+
+命名規約からの逸脱なし。破壊的変更はゼロ (`string` は `RicNode` の部分型なので、既存の
+`label: '選択肢'` のような呼び出しはそのまま型・実行時とも変わらず動く)。実装も
+`Array.isArray(label) ? label : [label]` を `{ tag: 'span', children: [...] }` に渡すだけの
+型レベルの変更 — 挙動変更はゼロ。SPEC.md §10.3.1a・`docs/V1_VS_V2.ja.md` の popup 行に
+FACT/経緯を追記。
 SPEC.md §8 に追記。
