@@ -47,6 +47,12 @@ are documentation-only clarifications (see Docs below).
   `triggerChildren` (the same `ric-button--${variant}` class naming `uiButton` already
   uses). Defaults to `'primary'`, matching v1. Has no effect in controlled mode or when
   `triggerChildren` is omitted (the consumer supplies their own trigger in both cases).
+  **Visible change for `2.0.0-alpha.13` and earlier consumers**: the auto-trigger used to
+  render as a plain `.ric-button` (v2 carried the v1 key as dead code and never applied
+  it), so an existing `triggerChildren` dialog now shows a primary-styled trigger. Pass
+  `triggerVariant: 'default'` to keep the plain look. The v1 default was kept on purpose
+  (design doc §20: an official v1 behavior is restored by default) rather than freezing
+  the accidental alpha look.
 
 ### Fixed
 
