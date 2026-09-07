@@ -187,6 +187,7 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **第 9 号の alpha.11 結果**: dev IIFE で 906 check → **warn 2 件 = 本物 (テストハーネスの後始末の深い代入 2 path)、canon 由来 0 件** (`mutate()` 数百回で 0)。遅延判定方式が意図どおり働いた証拠。修正後 906/906・warn 0。Potopeta の canon 運用 (CLAUDE.md で規約化) が v1 時代から本体に発火忘れを作っていなかったことも判明
 - **再現しない報告の扱い**: Potopeta の「`push()` 1 回で warn 3 件」は、統括が `f918134` の dist で CJS+jsdom / dev IIFE+jsdom / dev IIFE+実 Chromium の 3 経路で試して**すべて 1 件**。方針どおり推測でガードを入れず、再現ページと取り込み commit の提示を依頼。文言の残り (「mutating メソッドは検知対象外です」= alpha.10 以前の残骸) と「どのトップレベル代入でも pending は破棄 (path は見ない)」の FACT は再現済みなので alpha.12 に含めた
 - コア 4,801B (不変)、ui 25,049B (+574B、light dismiss)。unit 573 / browser 139。**パイロット 10 アプリ・13 consumer で計 55 件** (第 10 号 = 変更 1 + 型 1 + docs 3 + 配布/告知 1、第 9 号追報 = 文言 1 + FACT 1)
+- **追検証 (2026-09-07、alpha.12) で第 10 号は完了**: Escape の回避策を外しても light dismiss 経路が 1 クリックで通る (E2E 62/62)、`label` に palette アイコンが型どおりに戻る、dev IIFE で ricdom 由来の警告 0。回避策ゼロ (`v1_to_v2()` は Rancha が v2 に移るまで維持する upstream 依存の吸収)。提案の「TUTORIAL §1 に dev / min の使い分け」を反映 (移行プロンプト B-5 の 1 行では見落とされる位置だった)。線茶は shallow copy 差し替えの規律で書いていたため alpha.11 の警告も 0 — 「発火忘れだけを鳴らす」設計と整合
 
 ## 29. パイロット第 9 号の追報 (配列経由の深い代入 / 発火忘れ判定) からの確定事項 (2026-09-07、2.0.0-alpha.11)
 

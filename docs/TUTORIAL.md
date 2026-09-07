@@ -33,6 +33,10 @@ One `<script>` tag is enough:
 <div id="app"></div>
 ```
 
+While developing, load `dist/ricdom.iife.js` instead — the unminified build with dev-mode
+warnings (deep-assignment misses, duplicate keys, invalid theme names) enabled. Ship
+`.iife.min.js`, which has that code removed. The same pair exists for `ricdom-ui`.
+
 Or, with a bundler / native ESM:
 
 ```js
