@@ -429,3 +429,114 @@ describe('実ブラウザ: createPopup のメニューが項目選択で閉じ�
     expect(app.querySelector('[role="menu"]')).toBeNull();
   });
 });
+
+// light dismiss (#A、2.0.0-alpha.12、パイロット第 10 号・線茶からの報告)。
+// alpha.11 以前は `.ric-popup__overlay` (viewport 全面、pointer-events:auto + onclick) が
+// 外側クリックを吸っていたため、「開いたまま別のボタンを押す」操作は「閉じるだけ」に
+// なり、実ユーザー・Playwright の actionability 待ち双方で「1 回目のクリックは効かない」
+// 問題になっていた。ここでは userEvent.click (実マウスイベント列 = pointerdown を含む) を
+// 使う — `element.click()` (プログラム的呼び出し) は 'click' イベントのみで pointerdown を
+// 発火しないため、light dismiss の再現には userEvent 経由が必須。
+describe('実ブラウザ: createPopup の light dismiss (2.0.0-alpha.12)', () => {
+  it('外側のボタンをクリックすると閉じ、かつそのクリックがボタンの onclick まで届く (修正前は閉じるだけでボタンは呼ばれなかった)', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () =>
+      menu ? menu({ trigger: ['⋯'], children: [{ tag: 'button', class: 'ric-button', children: ['A'] }] }) : null,
+    );
+    menu = handle.use(createPopup());
+    await flush();
+
+    const outsideBtn = document.createElement('button');
+    Object.assign(outsideBtn.style, { position: 'fixed', top: '450px', left: '10px' });
+    outsideBtn.textContent = '外側';
+    let clicked = 0;
+    outsideBtn.addEventListener('click', () => {
+      clicked++;
+    });
+    document.body.appendChild(outsideBtn);
+
+    await userEvent.click(app.querySelector('button')!);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(menu!.isOpen()).toBe(true);
+
+    await userEvent.click(outsideBtn);
+    await new Promise((r) => setTimeout(r, 350)); // exit アニメーション終了を待つ
+
+    expect(menu!.isOpen()).toBe(false);
+    expect(clicked).toBe(1); // 修正前: 0 (overlay がクリックを吸っていた)
+  });
+
+  it('本体内 (menuitem ではない領域) をクリックしても閉じない (外側判定に巻き込まれない)', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () =>
+      menu ? menu({ trigger: ['⋯'], closeOnSelect: false, children: [{ tag: 'div', style: { padding: '20px' }, children: ['本文'] }] }) : null,
+    );
+    menu = handle.use(createPopup());
+    await flush();
+
+    await userEvent.click(app.querySelector('button')!);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(menu!.isOpen()).toBe(true);
+
+    const body = app.querySelector('[role="menu"]') as HTMLElement;
+    await userEvent.click(body);
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(menu!.isOpen()).toBe(true); // 閉じていない
+  });
+
+  it('トリガーを再クリックすると閉じてフォーカスが復帰する (outside pointerdown 判定はトリガー上のクリックを除外するため、二重に close が走らない)', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () =>
+      menu ? menu({ trigger: ['⋯'], children: [{ tag: 'button', class: 'ric-button', children: ['A'] }] }) : null,
+    );
+    menu = handle.use(createPopup());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    await userEvent.click(trigger);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(menu!.isOpen()).toBe(true);
+
+    await userEvent.click(trigger); // 再クリック (トグルで close)
+    await new Promise((r) => setTimeout(r, 350)); // exit アニメーション終了を待つ
+
+    expect(menu!.isOpen()).toBe(false);
+    // outside-pointerdown 経路 (doClose のみ、フォーカス復帰なし) がトリガークリックにも
+    // 反応してしまっていると、toggle 側の closeAndRestoreFocus() が isClosing ガードで
+    // 早期 return し、フォーカスが復帰しなくなる — この assert がその回帰を検知する。
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('openAt() で開いた popup も外側クリックで閉じる (トリガーボタンをクリックせずに開いた場合)', async () => {
+    const app = setupApp();
+    let menu: ReturnType<typeof createPopup>;
+    const handle = createApp('#app', {}, () =>
+      menu ? menu({ trigger: ['⋯'], children: [{ tag: 'button', class: 'ric-button', children: ['A'] }] }) : null,
+    );
+    menu = handle.use(createPopup());
+    await flush();
+
+    menu.openAt({ x: 100, y: 100 });
+    await flush();
+    await new Promise((r) => setTimeout(r, 100)); // rAF 実測フェーズ
+    expect(menu!.isOpen()).toBe(true);
+
+    const outsideBtn = document.createElement('button');
+    Object.assign(outsideBtn.style, { position: 'fixed', top: '450px', left: '10px' });
+    let clicked = 0;
+    outsideBtn.addEventListener('click', () => {
+      clicked++;
+    });
+    document.body.appendChild(outsideBtn);
+
+    await userEvent.click(outsideBtn);
+    await new Promise((r) => setTimeout(r, 350));
+
+    expect(menu!.isOpen()).toBe(false);
+    expect(clicked).toBe(1);
+  });
+});

@@ -73,10 +73,13 @@ export const createDropdown = (): DropdownInstance => {
   let dir: 'below' | 'above' = 'below';
   let pos: Pos = {};
   let escBound = false;
+  let lightDismissBound = false;
   let bodyChildrenLast: RicNode | RicNode[] = [];
   let restoreFocusEl: HTMLElement | null = null;
 
   const getBodyEl = (): HTMLElement | null => (typeof document === 'undefined' ? null : document.querySelector(`[data-ricdom-dropdown-id="${bodyMarker}"]`));
+  // light dismiss (#A、2.0.0-alpha.12、createPopup と同じ理由 — popup.ts のコメント参照)。
+  const getTriggerEl = (): HTMLElement | null => (typeof document === 'undefined' ? null : document.querySelector(`[data-ricdom-dropdown-trigger-id="${bodyMarker}"]`));
 
   const handleAnimEnd = (): void => {
     if (!isClosing) return;
@@ -113,6 +116,30 @@ export const createDropdown = (): DropdownInstance => {
     }
   };
 
+  // light dismiss (#A、2.0.0-alpha.12): createPopup と同じ実装 (popup.ts のコメント参照)。
+  const handleOutsidePointerDown = (ev: PointerEvent): void => {
+    if (!isOpen || isClosing) return;
+    const target = ev.target as Node | null;
+    if (!target) return;
+    const body = getBodyEl();
+    if (body && body.contains(target)) return; // 本体内クリックでは閉じない
+    const triggerEl = getTriggerEl();
+    if (triggerEl && triggerEl.contains(target)) return; // トリガー上は既存の toggle に任せる (二重に閉じない)
+    doClose(); // 外側クリックはフォーカス復帰しない (Esc は closeAndRestoreFocus のまま)
+  };
+
+  const bindLightDismissIfNeeded = (): void => {
+    if (typeof document === 'undefined') return;
+    if (isOpen && !lightDismissBound) {
+      document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+      lightDismissBound = true;
+    }
+    if (!isOpen && lightDismissBound) {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      lightDismissBound = false;
+    }
+  };
+
   // #14 (2.0.0-alpha.5): 実測前 (measuredWidth undefined、= 実測 render の間) は
   // `measuringLeft()` で本体を viewport マージン位置に仮置きし、実測を横幅制約なしで
   // 行う (popupPosition.ts の `measuringLeft` コメント参照)。実測後は従来どおり
@@ -132,6 +159,7 @@ export const createDropdown = (): DropdownInstance => {
     const triggerContent: RicNode | RicNode[] = isLabel ? [{ tag: 'span', children: [props.label] }] : (props.icon ?? '≡');
     bodyChildrenLast = props.children ?? [];
     bindKeydownIfNeeded();
+    bindLightDismissIfNeeded();
 
     const triggerChildren: RicNode[] = isLabel
       ? [
@@ -146,6 +174,8 @@ export const createDropdown = (): DropdownInstance => {
         .filter(Boolean)
         .join(' '),
       'data-ricdom-role': UI_ROLE.dropdownTrigger,
+      // light dismiss (#A) の getTriggerEl が問い合わせる安定セレクタ (popup.ts と対称)。
+      'data-ricdom-dropdown-trigger-id': bodyMarker,
       'aria-haspopup': 'dialog',
       'aria-expanded': isOpen ? 'true' : 'false',
       onclick: (ev: MouseEvent) => {
@@ -194,7 +224,9 @@ export const createDropdown = (): DropdownInstance => {
   inst.renderPortal = (): RicNode => {
     if (!guard.host || !isOpen) return null;
     return [
-      { tag: 'div', class: 'ric-popup__overlay', 'data-ricdom-role': UI_ROLE.popupOverlay, onclick: closeAndRestoreFocus },
+      // light dismiss (#A、2.0.0-alpha.12): overlay は視覚・role 用に残すが pointer-events:
+      // none (cssTemplates.ts) で onclick は持たない。popup.ts のコメント参照。
+      { tag: 'div', class: 'ric-popup__overlay', 'data-ricdom-role': UI_ROLE.popupOverlay },
       {
         tag: 'div',
         class: `ric-dropdown__body ric-popup__body--${dir}${isClosing ? ' ric-popup__body--out' : ''}`,
@@ -215,6 +247,10 @@ export const createDropdown = (): DropdownInstance => {
     if (escBound && typeof document !== 'undefined') {
       document.removeEventListener('keydown', handleKeydown);
       escBound = false;
+    }
+    if (lightDismissBound && typeof document !== 'undefined') {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      lightDismissBound = false;
     }
     if (guard.host) unregisterExclusive(guard.host.app, exclusiveSelf);
     guard.dispose();

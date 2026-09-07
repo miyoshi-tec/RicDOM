@@ -144,12 +144,20 @@ export const createPopup = (): PopupInstance => {
   let dir: 'below' | 'above' = 'below';
   let pos: Pos = {};
   let escBound = false;
+  let lightDismissBound = false;
   let triggerChildrenLast: RicNode | RicNode[] = [];
   let menuChildrenLast: RicNode[] = [];
   let closeOnSelectLast = true;
   let restoreFocusEl: HTMLElement | null = null;
 
   const getBodyEl = (): HTMLElement | null => (typeof document === 'undefined' ? null : document.querySelector(`[data-ricdom-popup-id="${bodyMarker}"]`));
+  // light dismiss (#A、2.0.0-alpha.12) が「トリガー上のクリックか」を判定するための参照。
+  // トリガーはこの部品自身の描画結果 (inst の戻り値) の一部で portal の外にあるため、
+  // getBodyEl と同じ「マーカー属性を都度クエリする」方式にする — onclick 内で要素を
+  // 変数に保持する方式だと openAt() 経由 (トリガーボタンをクリックせずに開く) で
+  // 一度も更新されず stale になる (openAt でも menu({...}) は毎 render 呼ばれ続けるため
+  // トリガー自体は常に存在する、トリガー経由で開いていないだけ)。
+  const getTriggerEl = (): HTMLElement | null => (typeof document === 'undefined' ? null : document.querySelector(`[data-ricdom-popup-trigger-id="${bodyMarker}"]`));
 
   const getMenuItems = (): HTMLElement[] => {
     const body = getBodyEl();
@@ -219,6 +227,36 @@ export const createPopup = (): PopupInstance => {
     }
   };
 
+  // light dismiss (#A、2.0.0-alpha.12): HTML `popover="auto"` と同じ「外側の pointerdown
+  // で閉じつつ、そのクリックは下の要素にそのまま届く」挙動。alpha.11 以前は
+  // `.ric-popup__overlay` (viewport 全面を覆う要素) が click を吸っていたため、
+  // 「dropdown を開いたまま別のボタンを押す」操作が「閉じるだけ」になり、consumer は
+  // 2 回目のクリックを要求されていた (パイロット第 10 号・線茶からの報告)。
+  // capture phase で見るのは、項目 (menuitem) 側が stopPropagation() していても
+  // (wrapMenuItem と同じ理由で) 確実に検知するため。
+  const handleOutsidePointerDown = (ev: PointerEvent): void => {
+    if (!isOpen || isClosing) return;
+    const target = ev.target as Node | null;
+    if (!target) return;
+    const body = getBodyEl();
+    if (body && body.contains(target)) return; // 本体内クリックでは閉じない
+    const triggerEl = getTriggerEl();
+    if (triggerEl && triggerEl.contains(target)) return; // トリガー上は既存の toggle に任せる (二重に閉じない)
+    doClose(); // 外側クリックはフォーカス復帰しない (Esc/項目活性化は closeAndRestoreFocus のまま)
+  };
+
+  const bindLightDismissIfNeeded = (): void => {
+    if (typeof document === 'undefined') return;
+    if (isOpen && !lightDismissBound) {
+      document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+      lightDismissBound = true;
+    }
+    if (!isOpen && lightDismissBound) {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      lightDismissBound = false;
+    }
+  };
+
   // #14 (2.0.0-alpha.5): 実測前 (measuredWidth undefined、= 実測 render の間) は
   // `measuringLeft()` で本体を viewport マージン位置に仮置きし、実測を横幅制約なしで
   // 行う (popupPosition.ts の `measuringLeft` コメント参照)。実測後は従来どおり
@@ -255,6 +293,7 @@ export const createPopup = (): PopupInstance => {
     menuChildrenLast = props.children ?? [];
     closeOnSelectLast = props.closeOnSelect ?? true;
     bindKeydownIfNeeded();
+    bindLightDismissIfNeeded();
 
     // object 形トリガー (2.0.0-alpha.2、PopupTriggerObject) は icon/label を
     // uiButton 相当の見た目 (.ric-button + --ghost + --sm/--lg) に組み立てる。
@@ -274,6 +313,9 @@ export const createPopup = (): PopupInstance => {
       // dropdown には dropdownTrigger role があるのに popup のトリガーには無かった非対称を
       // 解消 (#2 の役割棚卸しで発見、2.0.0-alpha.8)。
       'data-ricdom-role': UI_ROLE.popupTrigger,
+      // light dismiss (#A) の getTriggerEl が問い合わせる安定セレクタ。getBodyEl の
+      // data-ricdom-popup-id と対になる (両方とも bodyMarker を共有する)。
+      'data-ricdom-popup-trigger-id': bodyMarker,
       'aria-haspopup': 'menu',
       'aria-expanded': isOpen ? 'true' : 'false',
       onclick: (ev: MouseEvent) => {
@@ -313,7 +355,10 @@ export const createPopup = (): PopupInstance => {
   inst.renderPortal = (): RicNode => {
     if (!guard.host || !isOpen) return null;
     return [
-      { tag: 'div', class: 'ric-popup__overlay', 'data-ricdom-role': UI_ROLE.popupOverlay, onclick: closeAndRestoreFocus },
+      // light dismiss (#A、2.0.0-alpha.12): overlay は視覚・role (popup-overlay) 用に
+      // 残すが pointer-events: none にして onclick は持たない (CSS 側、cssTemplates.ts)。
+      // 閉じる判定・下要素へのクリック透過は handleOutsidePointerDown (document 監視) が担う。
+      { tag: 'div', class: 'ric-popup__overlay', 'data-ricdom-role': UI_ROLE.popupOverlay },
       {
         tag: 'div',
         class: `ric-popup__body ric-popup__body--${dir}${isClosing ? ' ric-popup__body--out' : ''}`,
@@ -335,6 +380,10 @@ export const createPopup = (): PopupInstance => {
     if (escBound && typeof document !== 'undefined') {
       document.removeEventListener('keydown', handleKeydown);
       escBound = false;
+    }
+    if (lightDismissBound && typeof document !== 'undefined') {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      lightDismissBound = false;
     }
     if (guard.host) unregisterExclusive(guard.host.app, exclusiveSelf);
     guard.dispose();

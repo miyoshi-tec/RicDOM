@@ -1010,6 +1010,38 @@ original `onclick` first, then closes.
 - Applies identically regardless of how the menu was opened — from the trigger button or
   via `openAt()`.
 
+### 10.3.1e FACT: `createPopup`/`createDropdown` light dismiss (2.0.0-alpha.12)
+
+Both close on an outside `pointerdown` — and, unlike a click landing on `.ric-popup__overlay`
+in earlier versions, that same pointerdown/click is **not** consumed: it reaches whatever
+element is actually under the pointer. This mirrors HTML's `popover="auto"` light-dismiss
+behavior rather than a modal backdrop.
+
+- The overlay element (`.ric-popup__overlay`, role `popup-overlay`) is still rendered while
+  open — CSS/E2E selectors that target it for styling or visibility keep working — but it is
+  `pointer-events: none` and carries no `onclick`; it exists purely as a visual/role marker,
+  not a click target. Before 2.0.0-alpha.12 it was `pointer-events: auto` (the default) with
+  an `onclick` that closed the popup/dropdown, and because it covers the full viewport it
+  swallowed the click entirely — a second click on the actually-intended target was required
+  (reported as a 30-second Playwright actionability timeout on "open a dropdown, then click a
+  different button" — the overlay intercepted the click, so the target button was never
+  considered actionable).
+- The close is driven by a single `document` `pointerdown` listener (capture phase),
+  registered only while open and removed on close/`dispose()` (no listener leak — same
+  bind/unbind pattern already used for the `Escape` listener). It closes (`doClose()`, with
+  **no** forced focus restore — unlike `Escape` or menuitem activation, which both call
+  `closeAndRestoreFocus()`) whenever the event's target is outside both the rendered body and
+  the trigger button.
+- A click landing back on the trigger button itself is deliberately excluded from this check
+  and left entirely to the trigger's own `onclick` (the existing open/close toggle) — the two
+  mechanisms never both fire for the same click, so a second click on the trigger closes
+  exactly once and still restores focus to it (via `closeAndRestoreFocus()`).
+- Applies identically to a popup opened via `openAt()` with no trigger button ever clicked —
+  every `pointerdown` outside the rendered body then counts as "outside" (§10.3.1a).
+- `createDialog`'s own `.ric-dialog__overlay` is unaffected by this — it stays a modal
+  backdrop (`pointer-events: auto`, closes on click, `reason: 'overlay'`) by design; a dialog
+  is not meant to let clicks fall through to whatever is behind it.
+
 ### 10.3.2 Stateful — `createFocusWhen`
 
 The `ricdom/ui` successor to v1's `focus_when`, for moving focus to a specific element on a

@@ -246,7 +246,14 @@ const POPUP_CSS = `
 @keyframes ric-popup-in  { from { opacity:0; transform:scaleY(0.6); } to { opacity:1; transform:scaleY(1); } }
 @keyframes ric-popup-out { from { opacity:1; transform:scaleY(1); }   to { opacity:0; transform:scaleY(0.6); } }
 
-.ric-popup__overlay { position: fixed; inset: 0; z-index: 401; }
+/* light dismiss (#A、2.0.0-alpha.12、パイロット第 10 号・線茶からの報告): alpha.11 以前は
+   pointer-events:auto (既定値) + onclick で閉じており、viewport 全面を覆うこの要素が
+   外側クリックを吸ってしまっていた (「1 回目のクリックは閉じるだけ」)。HTML の
+   popover="auto" と同じ「外側の pointerdown で閉じつつ、そのクリックは下の要素に
+   届く」挙動にするため pointer-events:none にする — role (popup-overlay) と見た目用の
+   要素として残すのみで、閉じる判定は popup.ts/dropdown.ts 側の document pointerdown
+   監視 (handleOutsidePointerDown) が担う。 */
+.ric-popup__overlay { position: fixed; inset: 0; z-index: 401; pointer-events: none; }
 
 .ric-popup__body {
   position: fixed;

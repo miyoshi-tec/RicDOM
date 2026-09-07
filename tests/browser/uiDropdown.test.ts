@@ -105,3 +105,76 @@ describe('実ブラウザ: createDropdown', () => {
     expect(actual.right).toBeLessThanOrEqual(window.innerWidth - 8 + 1);
   });
 });
+
+// light dismiss (#A、2.0.0-alpha.12、パイロット第 10 号・線茶からの報告)。詳細は
+// uiPopup.test.ts の同名 describe のコメント参照 (userEvent.click が必須な理由 = pointerdown
+// を発火させるため)。
+describe('実ブラウザ: createDropdown の light dismiss (2.0.0-alpha.12)', () => {
+  it('外側のボタンをクリックすると閉じ、かつそのクリックがボタンの onclick まで届く (修正前は閉じるだけでボタンは呼ばれなかった)', async () => {
+    const app = setupApp();
+    let dd: ReturnType<typeof createDropdown>;
+    const handle = createApp('#app', {}, () => (dd ? dd({ label: '選択肢', children: [{ tag: 'div', children: ['項目'] }] }) : null));
+    dd = handle.use(createDropdown());
+    await flush();
+
+    const outsideBtn = document.createElement('button');
+    Object.assign(outsideBtn.style, { position: 'fixed', top: '450px', left: '10px' });
+    outsideBtn.textContent = '外側';
+    let clicked = 0;
+    outsideBtn.addEventListener('click', () => {
+      clicked++;
+    });
+    document.body.appendChild(outsideBtn);
+
+    await userEvent.click(app.querySelector('button')!);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(dd!.isOpen()).toBe(true);
+
+    await userEvent.click(outsideBtn);
+    await new Promise((r) => setTimeout(r, 350)); // exit アニメーション終了を待つ
+
+    expect(dd!.isOpen()).toBe(false);
+    expect(clicked).toBe(1); // 修正前: 0 (overlay がクリックを吸っていた)
+  });
+
+  it('本体内のチェックボックスを切り替えても閉じない (外側判定に巻き込まれない)', async () => {
+    const app = setupApp();
+    let dd: ReturnType<typeof createDropdown>;
+    const handle = createApp('#app', {}, () => (dd ? dd({ label: '選択肢', children: [{ tag: 'input', type: 'checkbox', id: 'chk' }] }) : null));
+    dd = handle.use(createDropdown());
+    await flush();
+
+    await userEvent.click(app.querySelector('button')!);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(dd!.isOpen()).toBe(true);
+
+    const checkbox = app.querySelector('#chk') as HTMLInputElement;
+    await userEvent.click(checkbox);
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(checkbox.checked).toBe(true);
+    expect(dd!.isOpen()).toBe(true); // 閉じていない (開いたまま)
+  });
+
+  it('トリガーを再クリックすると閉じてフォーカスが復帰する (outside pointerdown 判定はトリガー上のクリックを除外するため、二重に close が走らない)', async () => {
+    const app = setupApp();
+    let dd: ReturnType<typeof createDropdown>;
+    const handle = createApp('#app', {}, () => (dd ? dd({ label: '選択肢', children: [{ tag: 'div', children: ['項目'] }] }) : null));
+    dd = handle.use(createDropdown());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    await userEvent.click(trigger);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(dd!.isOpen()).toBe(true);
+
+    await userEvent.click(trigger); // 再クリック (トグルで close)
+    await new Promise((r) => setTimeout(r, 350)); // exit アニメーション終了を待つ
+
+    expect(dd!.isOpen()).toBe(false);
+    // outside-pointerdown 経路 (doClose のみ、フォーカス復帰なし) がトリガークリックにも
+    // 反応してしまっていると、toggle 側の closeAndRestoreFocus() が isClosing ガードで
+    // 早期 return し、フォーカスが復帰しなくなる — この assert がその回帰を検知する。
+    expect(document.activeElement).toBe(trigger);
+  });
+});

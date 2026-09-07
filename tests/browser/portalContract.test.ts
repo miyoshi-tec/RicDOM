@@ -19,6 +19,7 @@
 // 含めない形にする。
 
 import { describe, expect, it } from 'vitest';
+import { userEvent } from '@vitest/browser/context';
 import { createApp } from '../../src/app.js';
 import { createPopup } from '../../src/ui/popup.js';
 import { createDropdown } from '../../src/ui/dropdown.js';
@@ -311,6 +312,43 @@ describe('実ブラウザ: ポータル部品の共通コントラクト', () =>
         expect(after.top).toBeCloseTo(before.top, 0);
         expect(after.left).toBeCloseTo(before.left, 0);
       });
+    });
+  }
+});
+
+// light dismiss (#A、2.0.0-alpha.12、パイロット第 10 号・線茶からの報告)。popup/dropdown の
+// 個別テスト (uiPopup.test.ts/uiDropdown.test.ts) が詳細を見るのに対し、このファイルの方針
+// (部品横断で「利用者が観測できる結果」を見る) に合わせて、5 部品のうち実際に外側クリックで
+// 閉じる契約を持つ 2 部品 (popup/dropdown) だけを対象に「本体が消える」「そのクリックが下の
+// 要素まで届く」を確認する。tooltip はホバー/フォーカスで開閉し外側クリックの契約を持たない、
+// toast はそもそも閉じる操作の対象ではない (queue 経由の通知)、dialog は独自の overlay
+// (`.ric-dialog__overlay`、pointer-events:auto のまま、クリックを吸うモーダル背景として
+// 意図的に維持) を持ち今回のスコープ外 — いずれも対象から外す理由をここに明記する。
+describe('実ブラウザ: ポータル部品の light dismiss (外側 pointerdown で閉じ、下の要素にクリックが届く、2.0.0-alpha.12)', () => {
+  const LIGHT_DISMISS_CASES = CASES.filter((c) => c.name === 'createPopup' || c.name === 'createDropdown');
+
+  for (const c of LIGHT_DISMISS_CASES) {
+    it(`${c.name}: 外側の要素をクリックすると閉じ、そのクリックが下の要素まで届く`, async () => {
+      const { app, open } = await c.build();
+      await open();
+      expect(app.querySelector(c.bodySelector)).not.toBeNull();
+
+      const outsideBtn = document.createElement('button');
+      Object.assign(outsideBtn.style, { position: 'fixed', top: '450px', left: '10px' });
+      let clicked = 0;
+      outsideBtn.addEventListener('click', () => {
+        clicked++;
+      });
+      document.body.appendChild(outsideBtn);
+
+      // userEvent.click (実マウスイベント列 = pointerdown を含む) を使う — `.click()`
+      // (プログラム的呼び出し) は 'click' イベントのみで pointerdown を発火しないため、
+      // light dismiss の再現には userEvent 経由が必須 (uiPopup.test.ts と同じ理由)。
+      await userEvent.click(outsideBtn);
+      await new Promise((r) => setTimeout(r, 350)); // exit アニメーション終了を待つ
+
+      expect(app.querySelector(c.bodySelector)).toBeNull();
+      expect(clicked).toBe(1);
     });
   }
 });
