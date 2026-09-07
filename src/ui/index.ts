@@ -5,8 +5,15 @@
 // まとめてグローバルに公開される (tsup.config.ts 参照)。`ricdom` (コア) の後に
 // 読み込む想定 (型のみの参照であり、バンドル上の実行時依存は無い — 詳細は最終報告)。
 
-export { applyTheme, createTheme, createDensity, createFontSize, exportTheme } from './theme.js';
-export type { ThemeName, DensityName, FontSizeName, ThemeVars, ApplyThemeOptions } from './theme.js';
+// `version` export (v1→v2 パリティ一括監査 #3、2.0.0-alpha.14)。コア src/index.ts の
+// version と同じ理由・同じ仕組み (__RICDOM_VERSION__、tsup.config.ts / src/env.d.ts 参照)。
+// ui はコアに実行時依存が無いので、コア側の export を re-export せず同じ定数を独立に読む
+// (ui はコアと別々に import される場合がある — ricdomUI.version がコア読み込み無しでも
+// 単独で使えることを保証する)。
+export const version: string = typeof __RICDOM_VERSION__ === 'string' ? __RICDOM_VERSION__ : '0.0.0-dev';
+
+export { applyTheme, createTheme, createDensity, createFontSize, exportTheme, exportSettings } from './theme.js';
+export type { ThemeName, DensityName, FontSizeName, ThemeVars, ApplyThemeOptions, ExportedSettings } from './theme.js';
 
 export { buildStylesheet } from './cssTemplates.js';
 export { injectStyles } from './injectStyles.js';
@@ -45,7 +52,7 @@ export type { UiTextProps, UiTextVariant } from './text.js';
 export { uiIcon } from './icon.js';
 export type { IconDescriptor, UiIconOptions } from './icon.js';
 
-export { bindInput, bindTextarea, bindCheckbox, bindSelect, bindRange } from './bind.js';
+export { bindInput, bindTextarea, bindCheckbox, bindSelect, bindRange, bindRadiobutton, bindColor } from './bind.js';
 
 // ── レイアウト ──
 export { uiCol } from './col.js';

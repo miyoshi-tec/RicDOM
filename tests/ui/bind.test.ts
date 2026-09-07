@@ -3,7 +3,7 @@
 // value/checked が s[key] を反映し、ハンドラを呼ぶと s[key] が更新されることを確認する。
 
 import { describe, expect, it } from 'vitest';
-import { bindCheckbox, bindInput, bindRange, bindSelect, bindTextarea } from '../../src/ui/bind.js';
+import { bindCheckbox, bindColor, bindInput, bindRadiobutton, bindRange, bindSelect, bindTextarea } from '../../src/ui/bind.js';
 
 interface TestNodeWithInput {
   value?: string;
@@ -101,5 +101,69 @@ describe('bindRange', () => {
     const s: { volume?: number } = {};
     const node = bindRange(s, 'volume', { min: 10 }) as unknown as { children: [TestNodeWithInput] };
     expect(node.children[0].value).toBe('10');
+  });
+});
+
+// v1 bind_radiobutton.js / bind_color.js 継承 (v1→v2 パリティ一括監査 #1、alpha.14 で追加移植)
+// uiRadiobutton の戻り値は div.ric-radiogroup で、`name` は各 <input> に付く (top-level には
+// 付かない) — uiRadiobutton.ts の実装参照。
+describe('bindRadiobutton', () => {
+  interface TestRadioNode {
+    children: { children: [TestNodeWithInput, unknown] }[];
+  }
+
+  it('name の既定は key、value/checked が s[key] を反映する', () => {
+    const s = { role: 'editor' };
+    const node = bindRadiobutton(s, 'role', { options: ['viewer', 'editor', 'admin'] }) as unknown as TestRadioNode;
+    const editorInput = node.children[1]!.children[0];
+    expect(editorInput.name).toBe('role');
+    expect(editorInput.value).toBe('editor');
+    expect(editorInput.checked).toBe(true);
+  });
+
+  it('onchange で s[key] が更新される (双方向)', () => {
+    const s = { role: 'viewer' };
+    const node = bindRadiobutton(s, 'role', { options: ['viewer', 'editor'] }) as unknown as TestRadioNode;
+    const editorInput = node.children[1]!.children[0];
+    editorInput.onchange?.({ target: { value: 'editor' } });
+    expect(s.role).toBe('editor');
+  });
+
+  it('options.name で既定 (key) を上書きできる (同一 key の複数グループ対策)', () => {
+    const s = { role: 'viewer' };
+    const node = bindRadiobutton(s, 'role', { name: 'role_ja', options: ['viewer'] }) as unknown as TestRadioNode;
+    expect(node.children[0]!.children[0].name).toBe('role_ja');
+  });
+
+  it('s[key] が undefined のときは空文字にフォールバックする', () => {
+    const s: { role?: string } = {};
+    const node = bindRadiobutton(s, 'role', { options: ['viewer'] }) as unknown as TestRadioNode;
+    const viewerInput = node.children[0]!.children[0];
+    expect(viewerInput.checked).toBe(false);
+  });
+});
+
+describe('bindColor', () => {
+  interface TestColorNode {
+    children: [TestNodeWithInput, unknown];
+  }
+
+  it('value に s[key] が反映される', () => {
+    const s = { bgColor: '#ff00ff' };
+    const node = bindColor(s, 'bgColor') as unknown as TestColorNode;
+    expect(node.children[0].value).toBe('#ff00ff');
+  });
+
+  it('oninput で s[key] が更新される (双方向)', () => {
+    const s = { bgColor: '#000000' };
+    const node = bindColor(s, 'bgColor') as unknown as TestColorNode;
+    node.children[0].oninput?.({ target: { value: '#ffffff' } });
+    expect(s.bgColor).toBe('#ffffff');
+  });
+
+  it('s[key] が undefined のときは #000000 にフォールバックする', () => {
+    const s: { bgColor?: string } = {};
+    const node = bindColor(s, 'bgColor') as unknown as TestColorNode;
+    expect(node.children[0].value).toBe('#000000');
   });
 });

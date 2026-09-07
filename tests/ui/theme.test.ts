@@ -1,7 +1,7 @@
 // applyTheme / createTheme / exportTheme (設計書 §4)
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyTheme, createTheme, createDensity, createFontSize, exportTheme } from '../../src/ui/theme.js';
+import { applyTheme, createTheme, createDensity, createFontSize, exportTheme, exportSettings } from '../../src/ui/theme.js';
 
 const THEMES = ['light', 'dark', 'teal', 'cyber', 'aqua'] as const;
 const DARK_LIKE = new Set(['dark', 'cyber']);
@@ -237,5 +237,46 @@ describe('exportTheme: round-trip', () => {
 
   it('無効な要素を渡すと console.error して空オブジェクトを返す', () => {
     expect(exportTheme(null as unknown as Element)).toEqual({});
+  });
+});
+
+// v1 `ric_ui/context.js` の export_settings 継承 (v1→v2 パリティ一括監査 #2、2.0.0-alpha.14)
+describe('exportSettings: theme/density/fontSize のグループ分け + round-trip', () => {
+  it('applyTheme した内容を 3 グループに正しく分類する', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { theme: 'dark', density: 'compact', fontSize: 'lg' });
+    const settings = exportSettings(el);
+    expect(settings.theme['color-scheme']).toBe('dark');
+    expect(settings.theme['--ric-color-fg']).toBe('#e5e7eb');
+    expect(settings.density['--ric-control-h']).toBe('28px');
+    expect(settings.fontSize['--ric-font-size']).toBe('16px');
+    // density/fontSize の変数が theme 側に紛れ込んでいないこと
+    expect(settings.theme['--ric-control-h']).toBeUndefined();
+    expect(settings.theme['--ric-font-size']).toBeUndefined();
+  });
+
+  it('exportSettings(el).theme は exportTheme(el) と一致する', () => {
+    const el = document.createElement('div');
+    applyTheme(el, { theme: 'cyber', density: 'tight', fontSize: 'sm' });
+    expect(exportSettings(el).theme).toEqual(exportTheme(el));
+  });
+
+  it('round-trip: applyTheme → exportSettings → 別要素に applyTheme で全変数が一致する', () => {
+    const el1 = document.createElement('div');
+    applyTheme(el1, { theme: 'dark', density: 'compact', fontSize: 'lg' });
+    const settings = exportSettings(el1);
+
+    const el2 = document.createElement('div');
+    applyTheme(el2, settings);
+
+    for (let i = 0; i < el1.style.length; i++) {
+      const key = el1.style.item(i)!;
+      expect(el2.style.getPropertyValue(key)).toBe(el1.style.getPropertyValue(key));
+    }
+    expect(el2.style.length).toBe(el1.style.length);
+  });
+
+  it('無効な要素を渡すと console.error して 3 つとも空オブジェクトを返す', () => {
+    expect(exportSettings(null as unknown as Element)).toEqual({ theme: {}, density: {}, fontSize: {} });
   });
 });

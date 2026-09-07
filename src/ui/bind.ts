@@ -11,12 +11,16 @@
 // v2 では 5 関数とも「options を先に展開 → 計算済みの value/onchange/oninput を後に置いて
 // 上書き不可にする」で統一する (rest スプレッド契約 A15 と同じ考え方を bind* にも適用)。
 //
-// v1 の bind_color / bind_radiobutton は対象外 (設計書指定の 5 関数のみ移植)。
+// v1 の bind_color / bind_radiobutton は当初対象外だった (設計書指定の 5 関数のみ移植)が、
+// v1→v2 パリティ一括監査 (docs/V1_PARITY_AUDIT.ja.md 表 #1) で「振り分け漏れ」と判定され、
+// 2.0.0-alpha.14 で bindRadiobutton / bindColor として追加移植した。
 // name 衝突の既知制約は uiRadiobutton 側の JSDoc に記載済み。
 
 import type { RicNode } from '../types.js';
 import { uiCheckbox, type UiCheckboxProps } from './checkbox.js';
+import { uiColor, type UiColorProps } from './color.js';
 import { uiInput, type UiInputProps } from './input.js';
+import { uiRadiobutton, type UiRadiobuttonProps } from './radiobutton.js';
 import { uiRange, type UiRangeProps } from './range.js';
 import { uiSelect, type UiSelectProps } from './select.js';
 import { uiTextarea, type UiTextareaProps } from './textarea.js';
@@ -97,4 +101,39 @@ export const bindRange = <S extends object, K extends KeyOfType<S, number>>(s: S
     ...options,
     value: (s[key] as unknown as number) ?? options.min ?? 0,
     oninput: (ev: Event) => setKey(s, key, (parseFloat((ev.target as HTMLInputElement).value) || 0) as S[K]),
+  });
+
+/**
+ * uiRadiobutton を state と双方向バインドする (v1 bind_radiobutton.js 継承、alpha.14 で追加移植)。
+ *   bindRadiobutton(s, 'role', { options: ['viewer', 'editor', 'admin'] })
+ *
+ * name は既定で key を使う (v1 と同じ)。同一ページに同じ key のグループを複数置く場合は
+ * options.name で別名を指定する (ブラウザは name が同じ radio を 1 グループとして扱うため、
+ * name を分けないと意図せず連動してしまう — uiRadiobutton の JSDoc の既知の制約と同じ)。
+ * name は他の options より先に展開するので、options.name があればそちらが勝つ。
+ */
+export const bindRadiobutton = <S extends object, K extends KeyOfType<S, string>>(
+  s: S,
+  key: K,
+  options: Omit<UiRadiobuttonProps, 'value' | 'onchange' | 'name'> & { name?: string } = {},
+): RicNode =>
+  uiRadiobutton({
+    name: String(key),
+    ...options,
+    value: (s[key] as unknown as string) ?? '',
+    onchange: (ev: Event) => setKey(s, key, (ev.target as HTMLInputElement).value as S[K]),
+  });
+
+/**
+ * uiColor を state と双方向バインドする (v1 bind_color.js 継承、alpha.14 で追加移植)。
+ *   bindColor(s, 'bgColor')    // state 値が hex なら hex picker
+ *   bindColor(s, 'overlay')    // state 値が rgba(...) なら自動で alpha つき picker
+ * alpha モードは state 値が rgba(...) 形式か否かで uiColor が自動判定するため、
+ * 呼び出し側で明示するオプションはない (v1 継承)。
+ */
+export const bindColor = <S extends object, K extends KeyOfType<S, string>>(s: S, key: K, options: Omit<UiColorProps, 'value' | 'oninput'> = {}): RicNode =>
+  uiColor({
+    ...options,
+    value: (s[key] as unknown as string) ?? '#000000',
+    oninput: (ev: Event) => setKey(s, key, (ev.target as HTMLInputElement).value as S[K]),
   });

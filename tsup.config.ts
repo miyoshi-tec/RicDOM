@@ -1,4 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'tsup';
+
+// `version` export (コア/ui、v1→v2 パリティ一括監査 #3、2.0.0-alpha.14) 用に
+// package.json の version を読み、__RICDOM_VERSION__ として焼き込む。__RICDOM_DEV__ と
+// 違い dev/prod の分岐用ではなく「publish 時点の値を固定する」だけの定数なので、
+// NODE_ENV を注入しない ESM/CJS エントリにも無条件で define する
+// (src/env.d.ts の declare 直前のコメント参照)。
+const pkgVersion = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string }).version;
+const versionDefine = { __RICDOM_VERSION__: JSON.stringify(pkgVersion) };
 
 // ビルド構成 (Phase 2 で ricdom/ui サブパスを追加、設計書 §4/§6):
 //  - コア: ESM (dist/index.js) + CJS (dist/index.cjs) + 型宣言 (.d.ts / .d.cts)
@@ -29,6 +38,7 @@ export default defineConfig([
     minify: false,
     clean: true,
     target: 'es2020',
+    define: versionDefine,
   },
   {
     // IIFE は「<script src> 1 本で動く」利用側ビルド不要デモ・配布用 (G1)。
@@ -55,6 +65,7 @@ export default defineConfig([
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
       __RICDOM_DEV__: 'false',
+      ...versionDefine,
     },
     // パイロット第 9 号 = Potopeta からの報告 (2.0.0-alpha.10): esbuild の IIFE 出力は
     // `var ricdom=(()=>{...})();` というトップレベル bare var で、通常の <script> 実行
@@ -102,6 +113,7 @@ export default defineConfig([
     outExtension: () => ({ js: '.iife.js' }),
     define: {
       __RICDOM_DEV__: 'true',
+      ...versionDefine,
     },
     // production 版と同じ理由 (B) で、関数スコープ eval 耐性のため footer は dev 版にも付ける。
     footer: { js: 'globalThis.ricdom=ricdom;' },
@@ -117,6 +129,7 @@ export default defineConfig([
     minify: false,
     clean: false,
     target: 'es2020',
+    define: versionDefine,
   },
   {
     // ricdomUI IIFE。`<script src>` 2 本 (ricdom → ricdom-ui) で部品が動くことの根拠。
@@ -137,6 +150,7 @@ export default defineConfig([
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
       __RICDOM_DEV__: 'false',
+      ...versionDefine,
     },
     // 上のコア IIFE と同じ理由・同じ対策 (2.0.0-alpha.10、パイロット第 9 号 = Potopeta)。
     footer: { js: 'globalThis.ricdomUI=ricdomUI;' },
@@ -156,6 +170,7 @@ export default defineConfig([
     outExtension: () => ({ js: '.iife.js' }),
     define: {
       __RICDOM_DEV__: 'true',
+      ...versionDefine,
     },
     footer: { js: 'globalThis.ricdomUI=ricdomUI;' },
   },

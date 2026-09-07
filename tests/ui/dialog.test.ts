@@ -59,6 +59,40 @@ describe('createDialog: uncontrolled', () => {
     expect(dialogEl.getAttribute('data-ricdom-role')).toBe('dialog'); // portal ルートの安定セレクタ
   });
 
+  // v1 create_ui_dialog.js の trigger_variant 継承 (v1→v2 パリティ一括監査 #4)
+  it('triggerVariant 省略時は既定 (primary) の class が付く (v1 と同じ既定)', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () => (dlg ? dlg({ triggerChildren: ['開く'], title: 't' }) : null));
+    dlg = handle.use(createDialog());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    expect(trigger.className).toBe('ric-button ric-button--primary');
+  });
+
+  it('triggerVariant を指定すると uiButton と同じ命名規則のクラスが付く', async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () => (dlg ? dlg({ triggerChildren: ['開く'], triggerVariant: 'ghost', title: 't' }) : null));
+    dlg = handle.use(createDialog());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    expect(trigger.className).toBe('ric-button ric-button--ghost');
+  });
+
+  it("triggerVariant: 'default' では修飾クラスを付けない", async () => {
+    const app = setupApp();
+    let dlg: ReturnType<typeof createDialog>;
+    const handle = createApp('#app', {}, () => (dlg ? dlg({ triggerChildren: ['開く'], triggerVariant: 'default', title: 't' }) : null));
+    dlg = handle.use(createDialog());
+    await flush();
+
+    const trigger = app.querySelector('button')!;
+    expect(trigger.className).toBe('ric-button');
+  });
+
   it('triggerChildren を省略すると trigger ボタンを描画しない (自前トリガー用)', async () => {
     const app = setupApp();
     let dlg: ReturnType<typeof createDialog>;

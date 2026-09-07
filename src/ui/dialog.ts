@@ -30,6 +30,7 @@
 
 import type { RicNode } from '../types.js';
 import { ANIMATION_FALLBACK_MS, type AttachGuard, type Component, createAttachGuard } from './internal/component.js';
+import type { UiButtonVariant } from './button.js';
 import { UI_ROLE } from './internal/pureHelpers.js';
 
 export type DialogCloseReason = 'overlay' | 'close-button' | 'escape' | 'api';
@@ -37,6 +38,10 @@ export type DialogCloseReason = 'overlay' | 'close-button' | 'escape' | 'api';
 export interface DialogProps {
   /** uncontrolled + 自動トリガーのときのボタン中身。省略すると trigger ボタンを出さない。 */
   triggerChildren?: RicNode | RicNode[];
+  /** 自動トリガーボタンの見た目 (uiButton と同じ variant、v1 `create_ui_dialog.js` の
+   *  `trigger_variant` 継承、v1→v2 パリティ一括監査 #4)。既定 'primary' (v1 と同じ)。
+   *  triggerChildren を渡さない場合は無視される。 */
+  triggerVariant?: UiButtonVariant;
   title?: string;
   children?: RicNode | RicNode[];
   /** フッターに並べるボタン等 */
@@ -283,7 +288,7 @@ export const createDialog = (): DialogInstance => {
     const host = guard.ensure();
     if (!host) return null;
 
-    const { triggerChildren, title = '', children = [], actions = [], open, onClose, width, returnFocus } = props;
+    const { triggerChildren, triggerVariant = 'primary', title = '', children = [], actions = [], open, onClose, width, returnFocus } = props;
 
     const controlled = open !== undefined;
     if (controlled && 'triggerChildren' in props) {
@@ -321,13 +326,15 @@ export const createDialog = (): DialogInstance => {
       }
     }
 
-    if (!controlled) return triggerChildren === undefined ? null : buildTrigger(triggerChildren);
+    if (!controlled) return triggerChildren === undefined ? null : buildTrigger(triggerChildren, triggerVariant);
     return null;
   }) as DialogInstance;
 
-  const buildTrigger = (triggerChildren: RicNode | RicNode[]): RicNode => ({
+  const buildTrigger = (triggerChildren: RicNode | RicNode[], triggerVariant: UiButtonVariant): RicNode => ({
     tag: 'button',
-    class: 'ric-button',
+    // v1 `create_ui_dialog.js` の trigger_variant 継承 (v1→v2 パリティ一括監査 #4)。
+    // uiButton と同じ命名規則 (`ric-button--${variant}`) にそのまま乗る。
+    class: triggerVariant !== 'default' ? `ric-button ric-button--${triggerVariant}` : 'ric-button',
     // uiButton を経由しない直書きの button (見た目だけ ric-button を借りている) だったため
     // 他の全 uiButton と違い role が付いていなかった (#2 の役割棚卸しで発見、2.0.0-alpha.8)。
     'data-ricdom-role': UI_ROLE.button,

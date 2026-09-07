@@ -7,9 +7,10 @@
 //     v2 には page コンポーネントが無いため、el への適用まで 1 関数で完結させる
 //     (`:root` は使わない。同一ページ内で複数要素が別テーマを持てる、v1 踏襲)。
 //   - density / fontSize は camelCase 化 (v1 は density / font_size)。
-//   - v1 の `create_density` / `create_font_size` / `export_settings` は
-//     最小移植スコープに含めない (設計書 §4 が明示するのは applyTheme / createTheme /
-//     exportTheme の 3 つ)。必要になった時点で追加を検討する。
+//   - v1 の `create_density` / `create_font_size` は当初最小移植スコープに含めなかったが、
+//     パイロット第 9 号 (Potopeta) の報告を受け 2.0.0-alpha.10 で追加した (下記参照)。
+//     `export_settings` も当初は対象外だったが、v1→v2 パリティ一括監査 #2 を受け
+//     2.0.0-alpha.14 で `exportSettings` として追加した (下記参照)。
 //   - **無効な theme/density/fontSize 名を console.warn する** (2.0.0-alpha.7)。v1 は
 //     タイポ (例 `density: 'md'` — 正しくは comfortable/compact/tight) を黙って既定値に
 //     落としており、consumer が誤設定に気づかないまま動いていた実例がある。挙動 (既定値
@@ -301,4 +302,47 @@ export const exportTheme = (el: Element): ThemeVars => {
     result[key] = style.getPropertyValue(key).trim();
   }
   return result;
+};
+
+/** exportSettings の戻り値 (v1 export_settings の 3 グループ、camelCase 化)。 */
+export interface ExportedSettings {
+  theme: ThemeVars;
+  density: ThemeVars;
+  fontSize: ThemeVars;
+}
+
+/**
+ * 要素から theme / density / fontSize をグループ別にまとめて取り出す
+ * (v1 `ric_ui/context.js` の `export_settings` 継承、v1→v2 パリティ一括監査 #2、
+ * 2.0.0-alpha.14)。`exportTheme` は density/fontSize 系の変数を除外して返すが、
+ * それらを保存したい consumer は本来 v1 でも `export_settings` を使っていた
+ * (`export_theme` の JSDoc にも明記されている使い分け)。分類ロジックは exportTheme と
+ * 同じ判定 (isThemeKey/isDensityVar/isFontVar) を使うため、
+ * `exportSettings(el).theme` は必ず `exportTheme(el)` と一致する。
+ *   const saved = exportSettings(document.querySelector('#app'));
+ *   localStorage.setItem('settings', JSON.stringify(saved));
+ *   const restored = JSON.parse(localStorage.getItem('settings')!);
+ *   applyTheme(el2, restored); // { theme, density, fontSize } をそのまま渡せる
+ */
+export const exportSettings = (el: Element): ExportedSettings => {
+  if (!el || typeof (el as HTMLElement).style === 'undefined') {
+    console.error('RicDOM UI: exportSettings には有効な DOM 要素を渡してください。');
+    return { theme: {}, density: {}, fontSize: {} };
+  }
+  const style = (el as HTMLElement).style;
+  const theme: ThemeVars = {};
+  const density: ThemeVars = {};
+  const fontSize: ThemeVars = {};
+  for (let i = 0; i < style.length; i++) {
+    const key = style.item(i);
+    if (!key || !isThemeKey(key)) continue;
+    if (isFontVar(key)) {
+      fontSize[key] = style.getPropertyValue(key).trim();
+    } else if (isDensityVar(key)) {
+      density[key] = style.getPropertyValue(key).trim();
+    } else {
+      theme[key] = style.getPropertyValue(key).trim();
+    }
+  }
+  return { theme, density, fontSize };
 };
