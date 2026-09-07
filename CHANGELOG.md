@@ -57,7 +57,11 @@ successfully at alpha.9), triaged and verified by the maintainer before implemen
   silently reducing the match to zero replacements. `docs/SPEC.md` §10.3.1a gained a short
   paragraph on `label`'s type (both components now share `RicNode | RicNode[]`), §10.3.1e is
   a new FACT for the light-dismiss behavior above, and `docs/API_AUDIT.ja.md` gained a
-  post-audit tracking entry for the `DropdownProps.label` type change.
+  post-audit tracking entry for the `DropdownProps.label` type change. §3 gained a FACT (from
+  an 11th-pilot report) spelling out that *any* same-task top-level trigger clears the whole
+  deep-assignment pending set regardless of path, and the array-mutating-method dev warning's
+  parenthetical was corrected (it used to claim mutating methods were undetected, which was
+  stale leftover text from before alpha.11 — they are detected and warned on).
 
 ### Verified
 

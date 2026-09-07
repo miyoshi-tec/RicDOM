@@ -176,7 +176,7 @@ const wrapDeepWarn = <T extends object>(value: T, path: string, ctx: PendingWarn
             ctx,
             label,
             `RicDOM: "${label}" のあと、同じタスク内で再描画が発火されませんでした` +
-              ' (配列の mutating メソッドは検知対象外です)。\n' +
+              ' (配列の要素変更は再描画をトリガーしません)。\n' +
               suggestion,
           );
           // target (生配列) に直接適用する。receiver (この Proxy) 越しに呼ぶと

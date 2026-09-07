@@ -257,6 +257,16 @@ runs. Only entries still pending when the microtask actually runs (meaning nothi
 same task ever triggered a render) produce a `console.warn`, one per distinct path
 (repeated assignments to the same path within the task collapse into a single warning).
 
+**FACT — the clear is unconditional: any top-level trigger in the same task discards the
+whole pending set, regardless of path.** The pending set holds paths, but what clears it does
+not consult them — *any* tracked top-level assignment, *any* one-level-deep assignment, or
+`renderNow()`, no matter which key it touches, discards every pending entry. This is correct
+rather than a loophole: a render re-reads the entire state tree regardless of what triggered
+it, so even an unrelated top-level write still carries the deep change to the screen. This is
+what a consumer pattern like `mutate(() => { app.pages[0].page.width = 1; }); app.render_tick++`
+(bumping an unrelated tracked counter purely to trigger a render after a batch of deep writes)
+relies on — `render_tick` has nothing to do with `pages`, and the warning still stays silent.
+
 **FACT — an `await` between the deep write and the trigger defeats this.**
 `queueMicrotask` callbacks run as soon as the current task finishes, which is before the
 continuation after an `await` runs:
