@@ -185,6 +185,7 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **alpha ごとの annotated tag `v2.0.0-alpha.N` (ユーザー決定)**: alpha.0〜12 を「その alpha を閉じる § コミット = consumer に告知した hash」に遡って付与 (version bump 基準にしなかったのは、bump が各 alpha の最後の docs コミットで行われるため、bump 基準だと次の alpha の実装コミットが前の alpha 側に混ざるから)。alpha.1 は package.json の bump が漏れていた (tag メッセージに注記)。**以後は § コミット直後に tag、bump 確認を運用に追加**。README の Status 節と移行プロンプトに案内
 - **ricdom-lz を MIT の別リポジトリに (ユーザー決定)**: Potopeta の「v2 (MIT) + app + v1 由来の展開 wrapper (PolyForm) の混在で、wrapper の数十行だけが PolyForm を引きずる」相談が起点。v1 `scripts/lz.js` は自作 LZSS (他者コードの派生ではない) なので再許諾に障害なし → `miyoshi-tec/ricdom-lz` (private、`e684895`)。アルゴリズム・出力形式は不変 (v1 v0.4.5 の `RicDOM.lz.min.js` と byte 一致の回帰テスト 48 件)、v1 側のコピーは PolyForm のまま。v2 本体に LZ を含めない方針 (§13) は維持し、README から「意図的に同梱しない、ricdom-lz を使う」でリンク。副産物: Windows の `core.autocrlf=true` では LZ 成果物内の意図的な生 LF が作業ツリー上で CRLF 化され壊れる (git blob は正しい) → ricdom-lz は fixtures を `.gitattributes -text` に
 - **パイロット 10 アプリ・13 consumer で計 56 件** (alpha.13 = regression 1)
+- **第 9 号 (Potopeta) 完全クローズ (2026-09-07)**: alpha.13 で再現 4 指標 (B 3→1 / structuredClone ok / isProxy false / spread 3 回で warn 0) すべて解消、906/906・warn 0・error 0。ricdom-lz も実入力 3 本 (core / ui / app.js) で v1 コピーと sha256 一致を確認し vendoring で差し替え。consumer 側の教訓「再現できないと返されたら環境差ではなく条件差を疑う」は統括側の教訓と対。次は beta で pin 固定
 
 ## 30. パイロット移行第 10 号 (線茶 Sencha、Rancha 派生 Electron) + 第 9 号の alpha.11 結果 からの確定事項 (2026-09-07、2.0.0-alpha.12)
 
