@@ -176,6 +176,15 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 32. v1 inline style / 暗黙挙動 / 正式 API の一括パリティ監査 (2026-09-07、ユーザー指示)
+
+- **動機**: パイロット 10 アプリの実バグの半数以上 (dialog/popup の z-index、dropdown の `position: fixed`、page の bg/fg/font-size、`gap` prop、`variant: 'link'`、`create_density` / `create_font_size`) が「v1 の inline style・暗黙挙動・正式 API を v2 の CSS クラス・props に移植したときの取りこぼし」という同じ型だった。個別対応を重ねてきたが系統的な監査をしていなかった (統括の見落とし) → 残りを consumer に踏ませる前に洗う
+- **方法**: 読み取り専用の Sonnet 3 系統を並列 (A: control / layout / text 約 1,300 行、B: popup / composite 約 2,300 行、C: テーマ・コア + 公開 export 突合 + `--ric-*` 24 トークン突合 + 5 テーマのパレット値突合、約 1,900 行)。各項目を v1 `file:line` → v2 `file:line` で突き合わせ、判定 (同等 / 意図的・docs あり / 意図的・docs なし / 欠落 / 要確認)。alpha.1〜13 で対応済みは除外。結果は `docs/V1_PARITY_AUDIT.ja.md` (内部記録) に集約
+- **結果**: **欠落 6 / 意図的・docs なし 4 / 要確認 14**。**既知パターン (z-index / position / 塗り / prop 消失 / variant 消失) の再発はゼロ** — パイロット報告で塞いだものが全部だった。パレット 5 種・トークン 24 種は名前・値とも完全一致、コアの契約 (diff / スケジューラ / FORCE_REAPPLY / key / 編集中ガード) は FACT 化済みで挙動一致
+- **統括の振り分け** (詳細は V1_PARITY_AUDIT の表 1〜18): **復活・修正 (alpha.14 候補、ユーザー確認後)** = `bindRadiobutton` / `bindColor` (実装ごと不在)、`exportSettings` (density / fontSize の読み戻し)、`version` export (core / ui)、`createDialog` の `triggerVariant`、`createFocusWhen` の `!el.disabled` ガード、`uiInput.maxlength` の型、hljs 未読込 warn の console ガード、`toast.ts` のコメント誤り。**現状維持 + docs 明記 (再検討条件つき)** = dropdown label トリガーの `width: auto` (v1 `100%`。3 パイロットが auto で確認済み)、`watch_outside_click` 廃止 (v1 でも 5 行、代替 1 行を明記)、`create_ui_panel` 廃止 (`uiPanel` + `applyTheme` の島)、`ric-theme-change` 非同期、`class` の Record 形、containing block 探索の簡略化、tweak folder の `<details>` → `hidden` (条件: find-in-page の要望 → `hidden="until-found"`)、`bind_tabs` 廃止
+- **原則の再確認**: 「v1 で正式だった prop / API は復活が原則」(§20) は、rest スプレッドで黙って崩れるものに限らず、import で落ちるものにも適用する (気づけるからよいのではなく、移行コストの問題)。ただし v1 でも数行の汎用ヘルパー (`watch_outside_click`) は代替を明記して廃止でよい
+- **次回同種の監査をする条件**: v2 の破壊的変更、または v1 に新 API が入ったとき
+
 ## 31. alpha.11 の regression (spread による dev Proxy の state 混入) と配布・ライセンスの確定事項 (2026-09-07、2.0.0-alpha.13)
 
 - **regression の内容**: alpha.11 で 1 段目の配列も dev の deep-warn Proxy で包んだ結果、canon の `app.pages = [...app.pages]` が **Proxy 化された要素を新配列に写し、root の set で生 state に Proxy が混入**。以後 `pages[0]` は「Proxy の Proxy」(キャッシュが生 object キーなのでミス)、mutating メソッドの `apply` 先が内側 Proxy になり内部 set が pending に積まれて `push()` で 3 件、spread のたびに 1 枚増え、`structuredClone(state)` が **state 自体**で DataCloneError。production では起きない = dev/prod で state の中身が違う。canon を使う consumer 全員が踏む経路
