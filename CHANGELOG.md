@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.13] — not yet published
+
+A differential-experiment report from the ninth pilot (Potopeta), confirmed against the code
+by the maintainer before implementation: 2.0.0-alpha.11's array dev-warning coverage (above)
+broke the very canon pattern it was supposed to make silent.
+
+### Fixed
+
+- **The `app.pages = [...app.pages]` canon corrupted the raw state with dev-only Proxies, a
+  2.0.0-alpha.11 regression.** Reading an array through reactive state in dev now returns it
+  wrapped for the deep-assignment warning (2.0.0-alpha.11); spreading that wrapped array
+  (`[...app.pages]`) reads each element through the wrapper's own `get` trap, which handed
+  back a wrapper Proxy for every object element instead of the underlying raw object — and
+  the fresh array built from that spread, containing those Proxies, was then written straight
+  into the raw state on the top-level assignment. Pilot's differential experiment: before the
+  spread, `util.types.isProxy(state.pages[0])` is `false`; after it, `true`. From there it
+  compounded — reading `pages[0]` again wrapped an already-wrapped Proxy in a second one
+  (`deepWarnProxies`'s cache is keyed by the raw object, so a Proxy passed back in got its own,
+  separate cache entry), and the nine mutating array methods apply the real method to
+  `target`, which by then was an inner Proxy rather than the raw array — so
+  `app.pages[0].nodes.push({})`, which should record exactly one pending warning, recorded
+  three (`push()`, plus `nodes[0]` and `nodes.length` from element writes happening *inside*
+  `push` now going through that inner Proxy's own `set` trap instead of bypassing it). Spread
+  three times in a row and the raw state object itself held nested Proxies deep enough that
+  `structuredClone()` on the *raw* state (not a value read from it) started throwing
+  `DataCloneError` too. The fix (`src/reactivity.ts`) is two-layered, per the pilot's own
+  proposal: (1) every place that wraps a value for the warning (or for the existing one-level
+  child-Proxy tracking) first normalizes it back to the raw object if it turns out to already
+  be a Proxy this library produced, via a shared `Proxy → raw` `WeakMap`, so wrapping is
+  idempotent and a cache lookup by a Proxy always resolves to the same entry as a lookup by
+  its raw target; (2) every `set` that can receive a value coming from outside (the top-level
+  Proxy, the one-level child Proxy, and the warning Proxy's own `set`) now recursively
+  unwraps whatever it's given — plain objects and arrays are walked and any Proxy found
+  anywhere inside is replaced with what it wraps — before storing it, so a nested spread like
+  `{ ...app.pages[0], nodes: [...app.pages[0].nodes] }` can't leave a Proxy behind either. A
+  branch that finds nothing to unwrap returns the exact same reference it was given (no
+  incidental copying), and a circular reference is not walked twice. Both of the above are
+  dev-only (`bakedDevMode ?? isDevMode()`, same discipline as everywhere else in the file) —
+  in production this code path doesn't exist, since state reads there are never wrapped in
+  the first place. See `docs/SPEC.md` §3 for the updated FACT.
+
+### Verified
+
+- Unit (jsdom, `tests/arraySpreadProxyLeak.test.ts`, new): confirmed red-first against the
+  pre-fix code — `app.pages[0].nodes.push({})` after a deep write + `app.pages =
+  [...app.pages]` in a separate task warned 3 times (now 1); `util.types.isProxy(raw.pages[0])`
+  was `true` after the spread (now always `false`, checked directly against the object passed
+  into `createReactiveState`, not a value read back through it); the nested-spread case left a
+  Proxy in `raw.pages[0].nodes`/`.page` (now doesn't); `structuredClone(raw)` after three
+  spreads threw `DataCloneError` (now succeeds). Also covers: a `wrapChild` Proxy
+  (`app.user`) assigned into a fresh array unwraps to the original raw object (same
+  reference, since nothing inside it changed); the same raw object always gets back the same
+  cached warning Proxy, before and after a spread that doesn't otherwise touch it; assigning a
+  value that contains no Proxy anywhere stores the exact same reference (no copying); in
+  production the new unwrap code doesn't run at all (assignment stores the given reference
+  unchanged). The existing deferred-warning suites (`tests/deepAssignPendingDiscard.test.ts`'s
+  four canon-is-silent cases, one forgot-to-trigger case, and the await-crosses-a-task case;
+  `tests/devArrayDeepWarning.test.ts`) are unaffected by this change. 582 unit tests total
+  (was 573).
+- Core min gzip: **4,801B → 4,803B** (+2B; raw minified byte length 12,140B → 12,141B, +1B).
+  Confirmed via `grep` (after decoding `\uXXXX` escapes) that none of the new dev-only code —
+  `rawByProxy`, `toRaw`, `isPlainRecursable`, `unwrapDeep` — nor any of their identifying
+  calls (`Object.getPrototypeOf`, an extra `Object.keys`, a `WeakSet`) appear anywhere in
+  `dist/ricdom.iife.min.js`; `new WeakMap`/`new Proxy` counts are unchanged from the prior
+  release. The always-shipped code paths this change touches (`wrapChild`, the top-level
+  `set` trap) were deliberately written so their production branch is byte-identical, source
+  line for source line, to what shipped before this release — confirmed by pretty-printing
+  and diffing both bundles, which shows every changed line is a pure minifier identifier
+  rename (same total statement count, 406 lines either way), not new logic. The remaining +2B
+  is minifier identifier-slot churn from the larger dev-only source, not a functional
+  addition. Dev IIFE gzip: 8,229B → 8,633B (+404B, the actual cost of the new dev-only
+  idempotency/unwrap machinery; no ceiling applies to the dev IIFE).
+
 ## [2.0.0-alpha.12] — not yet published
 
 A report from the tenth pilot (線茶/Sencha, a Rancha-derived Electron app that migrated

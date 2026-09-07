@@ -308,15 +308,34 @@ Arrays are a separate axis from this and the two halves must not be conflated:
   Production (`.iife.min.js`, `__RICDOM_DEV__` baked `false`) is unaffected: arrays read
   from state are the plain, unwrapped array, identical to before this change.
 
-**FACT — structured cloning a dev-wrapped value throws.** Because dev-mode state reads
-return Proxy wrappers (this was already true for plain objects below the first level, and is
-now also true for arrays from the first level down), passing a value read from state
-straight into `structuredClone()` or `postMessage()` throws `DataCloneError` in dev builds,
-while the same call succeeds in production (where the value is the unwrapped original). This
-is a consequence of the wrapping, not a bug to route around with a special case — if you need
-to hand state data to one of those APIs, produce a plain copy first (`JSON.parse(JSON.stringify(v))`,
+**FACT — structured cloning a value read through the reactive state still throws; the raw
+state object itself is always cloneable.** Because dev-mode state reads return Proxy wrappers
+(this was already true for plain objects below the first level, and is now also true for
+arrays from the first level down), passing a value read from state straight into
+`structuredClone()` or `postMessage()` throws `DataCloneError` in dev builds, while the same
+call succeeds in production (where the value is the unwrapped original). This is a
+consequence of the wrapping, not a bug to route around with a special case — if you need to
+hand state data to one of those APIs, produce a plain copy first (`JSON.parse(JSON.stringify(v))`,
 or a shallow/deep spread), which also happens to be the same shape of fix the shallow-copy
 canon above already asks for.
+
+**Invariant — the raw state object never contains a Proxy, in dev or production, no matter
+how many times the canon spread pattern above runs.** A value read from state is wrapped in
+dev (unchanged from the FACT above), but writing that same value back into state — directly,
+or nested inside a fresh object/array built with a spread (`app.pages = [...app.pages]`,
+`{ ...app.pages[0], nodes: [...app.pages[0].nodes] }`) — always unwraps it back to the
+identical raw value before it is stored, recursively, in both `createApp`'s `state` and
+`app.use()`'s parts. dev and production therefore always hold the same underlying data; only
+what a *read* returns differs between them. This closes a 2.0.0-alpha.11 regression
+(2.0.0-alpha.13, found by a pilot's differential experiment): reading an array through its
+dev-mode wrapper and spreading it (the canon pattern itself) fed the wrapper Proxies for its
+elements back into a fresh array, which was then stored as-is — after enough repeated spreads
+this left the raw state object holding nested Proxies, at which point `structuredClone()` on
+the *raw* object (not a value read from it) also started throwing, and further reads
+downstream re-wrapped an already-wrapped Proxy instead of the original value. Neither of
+those is possible now: writing a value that turns out to be (or to contain) a proxy the
+library itself produced always substitutes the original raw value it was wrapping instead,
+so the array-replacement canon never leaves anything but plain data behind in `state`.
 
 Which build counts as "dev" depends on the distribution format (2.0.0-alpha.10, fixing a
 gap found while auditing the shipped `.iife.min.js`):
