@@ -176,6 +176,18 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 30. パイロット移行第 10 号 (線茶 Sencha、Rancha 派生 Electron) + 第 9 号の alpha.11 結果 からの確定事項 (2026-09-07、2.0.0-alpha.12)
+
+- **第 10 号 (線茶)**: 打診一覧外から自発参加 (13 番目の consumer)。v1 v0.4.5 → alpha.9、「移行できた」(E2E 62/62、機械変換 253 箇所を 7 ファイル明示列挙)。**v2 で構造的に消えた自前コード 2 点**: number 入力の編集中ガード 40 行 + 回帰 e2e (コアの規則で代替できることをガードを外して実証) / CSP の `script-src 'unsafe-eval'` (LZ 版を本体から外した効果、Electron の Insecure CSP 警告も消滅)。「`children` 省略 = 空要素」は SVG の葉要素 (line/circle/path) にちょうどよく island 不要 — 罠 2 の設計判断が SVG 用途では利点になる実例
+- **popup / dropdown の外側クリックを light dismiss に** (HTML `popover="auto"` と同じ: 外側の pointerdown で閉じ、そのクリックは下の要素に届く)。v1 も overlay で吸っていたので **v1 パリティではなく設計変更**。理由: 「dropdown を開いたまま別のボタンを押す」E2E が Playwright の actionability 待ちで 30 秒 timeout、実ユーザーも 1 回目のクリックが閉じるだけになる (線茶で実測、他アプリの E2E でも同型が出るはず)。overlay 要素は role 用に残し `pointer-events: none`、document の capture `pointerdown` で外側判定 (トリガー上は既存の toggle に任せ二重 close を防ぐ、`openAt` 経路も同じ)。外側 dismiss は `doClose()` (フォーカス復帰なし = popover の semantics)、Esc / トリガー / 項目活性化は従来どおり復帰あり。dialog の overlay はモーダル backdrop として据え置き。red-first: 9 件中 7 件が修正前に Playwright timeout (`subtree intercepts pointer events`) で赤
+- **`DropdownProps.label` を `RicNode | RicNode[]` に** (実装は元から描けていた、型だけの穴。`PopupTriggerObject.label` と揃えた)。「popup は trigger の中、dropdown は top-level」の非対称は据え置きだが、型の幅の違いは解消
+- **upstream から vendoring した vdom 生成器** (Rancha の dxf-to-svg が v1 形 `{ tag, ctx }` を返す) は罠 13 の新しい実例 → 境界 1 箇所で `ctx`→`children` を再帰変換、upstream が v2 に移った時点で外す。Rancha 派生アプリはすべて同型。置換スクリプトは件数を出力して確認 (heredoc で `\b` のエスケープが剥がれ無音で 0 件になった実例)
+- **配布の穴 (ユーザー判断待ち)**: `dist/` が gitignore で、alpha 期間は fetch ベースの pin ができない (線茶は clone → `npm ci` → build の 1〜2 分の sync に書き換え)。選択肢: alpha ごとの annotated tag / release asset に dist を添付 / 早期 npm publish
+- **リポジトリ改名の副作用**: 旧名 `miyoshi-tec/RicDOM` は v2 の `ricdom` に解決される (大文字小文字非区別) → v1 の sync が v2 リポジトリに v0.4.x を探しに行き**無音で 404**。v0.4.5 告知と移行プロンプトに明記。v0.4.4 の告知では「旧名が v2 に取られる」まで書いていなかった
+- **第 9 号の alpha.11 結果**: dev IIFE で 906 check → **warn 2 件 = 本物 (テストハーネスの後始末の深い代入 2 path)、canon 由来 0 件** (`mutate()` 数百回で 0)。遅延判定方式が意図どおり働いた証拠。修正後 906/906・warn 0。Potopeta の canon 運用 (CLAUDE.md で規約化) が v1 時代から本体に発火忘れを作っていなかったことも判明
+- **再現しない報告の扱い**: Potopeta の「`push()` 1 回で warn 3 件」は、統括が `f918134` の dist で CJS+jsdom / dev IIFE+jsdom / dev IIFE+実 Chromium の 3 経路で試して**すべて 1 件**。方針どおり推測でガードを入れず、再現ページと取り込み commit の提示を依頼。文言の残り (「mutating メソッドは検知対象外です」= alpha.10 以前の残骸) と「どのトップレベル代入でも pending は破棄 (path は見ない)」の FACT は再現済みなので alpha.12 に含めた
+- コア 4,801B (不変)、ui 25,049B (+574B、light dismiss)。unit 573 / browser 139。**パイロット 10 アプリ・13 consumer で計 55 件** (第 10 号 = 変更 1 + 型 1 + docs 3 + 配布/告知 1、第 9 号追報 = 文言 1 + FACT 1)
+
 ## 29. パイロット第 9 号の追報 (配列経由の深い代入 / 発火忘れ判定) からの確定事項 (2026-09-07、2.0.0-alpha.11)
 
 - **第 9 号完了**: alpha.10 で回避策 3 つ (`globalize()` / CSS マーカー / `theme_vars_of()`) を撤去し 906/906・console 0、**v2 の非公開実装に依存する箇所ゼロ**。`spacious` は v1 時点のバグとして `tight` に (v1 本番にも)
