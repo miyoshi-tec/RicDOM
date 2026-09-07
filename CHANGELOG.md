@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.12] — not yet published
+
+A report from the tenth pilot (線茶/Sencha, a Rancha-derived Electron app that migrated
+successfully at alpha.9), triaged and verified by the maintainer before implementation.
+
+### Changed
+
+- **`createPopup`/`createDropdown` now light-dismiss on an outside click instead of
+  swallowing it.** Before this release, opening either component rendered a full-viewport
+  `.ric-popup__overlay` with `pointer-events: auto` and an `onclick` that closed it — since
+  the overlay covers the entire viewport, a click meant for anything else underneath it was
+  entirely consumed: closing the popup/dropdown was the only effect, and the actually-intended
+  target required a *second* click. This surfaced as a 30-second Playwright actionability
+  timeout on an "open a dropdown, then click a different button" E2E test (the overlay
+  intercepted the click, so the target button was never considered actionable), and as "the
+  first click just closes it" for real users. The overlay element is unchanged in every other
+  respect (still rendered while open, same `.ric-popup__overlay` class, same `popup-overlay`
+  role, same z-index) — it is now `pointer-events: none` and carries no `onclick`, existing
+  purely as a visual/role marker. Closing is now driven by a `document` `pointerdown` listener
+  (capture phase, bound only while open, unbound on close/`dispose()`) that closes
+  (`doClose()`, no forced focus restore) whenever the pointerdown's target is outside both the
+  rendered body and the trigger button — a click on the trigger itself is excluded from this
+  check and left entirely to the trigger's own existing open/close toggle, so a second click on
+  the trigger still closes exactly once and still restores focus to it. This mirrors HTML's own
+  `popover="auto"` light-dismiss behavior rather than a modal backdrop; `createDialog`'s
+  `.ric-dialog__overlay` is deliberately unaffected (it stays a `pointer-events: auto` modal
+  backdrop by design). See SPEC.md §10.3.1e for the full FACT.
+
+### Fixed
+
+- **`DropdownProps.label` was `string`-only** while `PopupTriggerObject.label` (the
+  equivalent field on `createPopup`'s trigger object form) had already been `RicNode |
+  RicNode[]` since 2.0.0-alpha.2 — a label mixing in a `uiIcon(...)` (e.g. `[uiIcon(ICON),
+  ' テーマ']`) could be built for a popup trigger but not for a dropdown trigger, an
+  asymmetry with no reason behind it. `DropdownProps.label` is now `RicNode | RicNode[]` to
+  match; a plain string still works exactly as before (`string` is a `RicNode`). Type-only
+  change, no behavior change: the implementation already just needed
+  `Array.isArray(label) ? label : [label]` fed into the label `<span>`'s `children`.
+
+### Docs
+
+- **`docs/V1_VS_V2.ja.md`**: added a note to the machine-conversion section that a vdom
+  generator *vendored from an upstream project* (one that still returns v1-shaped `{ tag,
+  ctx }` nodes — e.g. 線茶 syncing Rancha's dxf-to-svg generator) should be excluded from a
+  repo-wide `ctx`→`children` conversion entirely; convert only at the single boundary where
+  its output enters your own tree (a recursive `ctx`→`children` pass in the adapter), and drop
+  that boundary conversion once the upstream project itself moves to v2. Also noted, in the
+  same section: a conversion script should print how many replacements it made — a past
+  incident lost the `\b` word-boundary escape when a regex was piped through a shell heredoc,
+  silently reducing the match to zero replacements. `docs/SPEC.md` §10.3.1a gained a short
+  paragraph on `label`'s type (both components now share `RicNode | RicNode[]`), §10.3.1e is
+  a new FACT for the light-dismiss behavior above, and `docs/API_AUDIT.ja.md` gained a
+  post-audit tracking entry for the `DropdownProps.label` type change.
+
+### Verified
+
+- Unit (jsdom): `DropdownProps.label` accepting a `RicNode[]` (icon + text) renders both parts
+  in the trigger button, label mode still detected via the same truthiness check. 573 unit
+  tests total (was 572).
+- Real browser: new light-dismiss coverage in `tests/browser/uiPopup.test.ts` (4 tests) and
+  `tests/browser/uiDropdown.test.ts` (3 tests) — outside click closes and the same click still
+  reaches an unrelated button's own `onclick` (confirmed red against the pre-fix code: a
+  `userEvent.click` on the outside button hit a 14-second-plus Playwright actionability
+  timeout, `<div class="ric-popup__overlay">... subtree intercepts pointer events`, reproducing
+  the reported bug exactly), a click inside the body (dropdown: toggling a checkbox; popup: a
+  non-menuitem area) does not close it, a second click on the trigger still closes exactly once
+  and still restores focus to it (this assertion catches a regression where the outside-click
+  path would otherwise also fire on the trigger's own click and suppress the toggle's focus
+  restore), and a popup opened via `openAt()` (no trigger ever clicked) still light-dismisses on
+  an outside click. `tests/browser/portalContract.test.ts` gained one more cross-component
+  case (popup + dropdown) for the same "closes and the click passes through" contract, using
+  the file's existing build/open harness. 139 browser tests total (was 130).
+- `npm run test:examples` (production IIFE) unaffected: 0 deep-assignment/console warnings,
+  all 6 example pages pass.
+- Core min gzip: **unchanged at 4,801B** (no core files touched — `src/*.ts` at the top level
+  was not modified, only `src/ui/popup.ts`/`dropdown.ts`/`cssTemplates.ts`). UI IIFE min gzip:
+  24,408B → 24,975B (+567B; the `document`-level pointerdown listener, its bind/unbind
+  bookkeeping, and the new trigger-marker attributes/queries, duplicated across
+  `createPopup`/`createDropdown`).
+
 ## [2.0.0-alpha.11] — not yet published
 
 A minimal-repro report from the ninth pilot (Potopeta), confirmed against the code by the
