@@ -73,7 +73,9 @@ re-rendering, and zero required build step for the consumer, at the same time.
 
 ## Status
 
-`2.0.0-alpha` — API-complete and under active testing, not yet published to npm.
+`2.0.0-alpha` — API-complete and under active testing, not yet published to npm. Every alpha
+is tagged (`v2.0.0-alpha.N`, annotated); pin a tag and build `dist/` with
+`npm ci && npm run build` until the npm release.
 
 This is the successor to [RicDOM v1](https://github.com/miyoshi-tec/RicDOM-v1) (now in
 maintenance mode), rebuilt in TypeScript with camelCase APIs, real accessibility, and a

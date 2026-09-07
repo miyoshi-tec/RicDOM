@@ -74,7 +74,9 @@ import { createApp } from 'https://esm.sh/ricdom@2';
 
 ## 現在の状態
 
-`2.0.0-alpha` — API は確定し活発にテスト中、npm には未公開。
+`2.0.0-alpha` — API は確定し活発にテスト中、npm には未公開。alpha ごとに annotated tag
+(`v2.0.0-alpha.N`) を打っているので、npm 公開までは tag で pin して `npm ci && npm run build` で
+`dist/` を生成してください。
 
 本パッケージは [RicDOM v1](https://github.com/miyoshi-tec/RicDOM-v1) (現在は保守モード)
 の後継として、TypeScript・camelCase API・本物のアクセシビリティ・ブラウザテスト付き
