@@ -32,14 +32,14 @@
 
 | # | 項目 | 出所 | 判定 | 統括の振り分け | 備考 / 再検討の条件 |
 |---|---|---|---|---|---|
-| 1 | `bindRadiobutton` / `bindColor` が実装ごと不在 | C §4.2 | 欠落 | **復活 (alpha.14 候補)** | v1 正式 API。`bind.ts` に定義が無い |
-| 2 | `export_settings` 相当 (theme / density / fontSize の一括読み戻し) が無い | C §1.3 | 欠落 | **復活 (alpha.14 候補)**: `exportSettings(el)` | density / fontSize を読み戻す公開 API が無い |
-| 3 | `version` export が core / ui に無い | C §4.1 / §4.2 | 欠落 | **復活 (alpha.14 候補)** | consumer の VERSION.txt / sync に使う |
-| 4 | `createDialog` に `trigger_variant` 相当が無い | B 上位 2 | 要確認 → 欠落 | **復活 (alpha.14 候補)**: `triggerVariant?: UiButtonVariant` | v1 正式オプション。popup は alpha.2 で trigger object 形を得た |
-| 5 | `focus_when` の `!el.disabled` ガードが `createFocusWhen` に無い | A 上位 3 | 要確認 | **修正 (alpha.14 候補)** | 小さな parity |
-| 6 | `uiInput.maxlength` が型に無い (rest 透過はする) | A 上位 5 | 要確認 | **型に追加 (alpha.14 候補)** | LCP の `style` と同型 |
-| 7 | hljs 未読込 warn の console ガード省略 | A 上位 5 | 要確認 | **修正 (alpha.14 候補、防御コードの復元)** | |
-| 8 | `toast.ts` ヘッダコメント「v1 から role/aria-live あり」は誤り | B 上位 5 | 要確認 (docs) | **コメント修正 (alpha.14 候補)** | v1 には無かった |
+| 1 | `bindRadiobutton` / `bindColor` が実装ごと不在 | C §4.2 | 欠落 | **alpha.14 で対応**: `bindRadiobutton`/`bindColor` を `src/ui/bind.ts` に追加 | v1 正式 API。`bind.ts` に定義が無い |
+| 2 | `export_settings` 相当 (theme / density / fontSize の一括読み戻し) が無い | C §1.3 | 欠落 | **alpha.14 で対応**: `exportSettings(el)` を `src/ui/theme.ts` に追加 | density / fontSize を読み戻す公開 API が無い |
+| 3 | `version` export が core / ui に無い | C §4.1 / §4.2 | 欠落 | **alpha.14 で対応**: `ricdom`/`ricdom/ui` に `version` export を追加 (tsup の `define` で package.json の値を焼き込み) | consumer の VERSION.txt / sync に使う |
+| 4 | `createDialog` に `trigger_variant` 相当が無い | B 上位 2 | 要確認 → 欠落 | **alpha.14 で対応**: `DialogProps.triggerVariant?: UiButtonVariant` を追加 | v1 正式オプション。popup は alpha.2 で trigger object 形を得た |
+| 5 | `focus_when` の `!el.disabled` ガードが `createFocusWhen` に無い | A 上位 3 | 要確認 | **alpha.14 で対応**: `focusWhen.ts` の focus 直前に disabled ガードを追加 | 小さな parity |
+| 6 | `uiInput.maxlength` が型に無い (rest 透過はする) | A 上位 5 | 要確認 | **alpha.14 で対応**: `UiInputProps.maxlength?: number` を追加 | LCP の `style` と同型 |
+| 7 | hljs 未読込 warn の console ガード省略 | A 上位 5 | 要確認 | **alpha.14 で対応**: `internal/hljs.ts` に console 未対応環境向けの防御を復元 | |
+| 8 | `toast.ts` ヘッダコメント「v1 から role/aria-live あり」は誤り | B 上位 5 | 要確認 (docs) | **alpha.14 で対応**: ヘッダコメントを「v1 には無く v2 で新設」に修正 | v1 には無かった |
 | 9 | `.ric-dropdown__trigger--label` の `width` が v1 `100%` → v2 `auto` | B 上位 1 | 意図的・docs なし | **現状維持 + V1_VS_V2 に明記** | 3 パイロット (TG / 線茶 / Potopeta) が `auto` で見た目確認済み。条件: 親幅いっぱいに依存したレイアウトの実害報告 |
 | 10 | `watch_outside_click` 公開ヘルパーの消失 | A 上位 1 / C §4.2 | 欠落 | **廃止を明記 (V1_VS_V2) + 代替 1 行** | v1 でも 5 行 (document の click 監視 + 解除)。条件: 2 consumer から要望 |
 | 11 | `create_ui_panel` (状態を持つ panel ファクトリ) の廃止 | A 上位 2 / C §4.2 | 意図的・docs なし | **V1_VS_V2 に明記**: `uiPanel` + 要素への `applyTheme` (島) で表現 | |

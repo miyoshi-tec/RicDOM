@@ -329,3 +329,28 @@ v2 版が欠けており、consumer は detached div に `applyTheme` して `el
 型レベルの変更 — 挙動変更はゼロ。SPEC.md §10.3.1a・`docs/V1_VS_V2.ja.md` の popup 行に
 FACT/経緯を追記。
 SPEC.md §8 に追記。
+
+### 2.0.0-alpha.14: v1→v2 パリティ一括監査 (`docs/V1_PARITY_AUDIT.ja.md`) の振り分け #1〜#4 を実装
+
+v1 の inline style / 暗黙挙動 / 正式 API を一括監査した結果 (§32、`docs/V1_PARITY_AUDIT.ja.md`
+表 #1〜#8) のうち、公開 API に影響する 4 件 (#1・#2・#3・#4) をオーナー決定により全件実装。
+
+| 種別 | 名前 | 規約 | 判定 |
+|---|---|---|---|
+| 関数 (追加) | `bindRadiobutton(s, key, options?)` | `bind` + 名詞、既存の `bindInput`/`bindSelect` 等と同一の形 (`Omit<Props, 'value' \| 'onchange'>` を受け、計算済みの value/onchange を上書き不可にする) | OK |
+| 関数 (追加) | `bindColor(s, key, options?)` | 同上 (`oninput` 版) | OK |
+| 関数 (追加) | `exportSettings(el)` | `export` + 名詞、既存の `exportTheme(el)` と同一の形 (要素の inline style から読み戻す) | OK |
+| 型 (追加) | `ExportedSettings` | PascalCase、`{ theme: ThemeVars; density: ThemeVars; fontSize: ThemeVars }` | OK |
+| 定数 (追加) | `version: string` (`ricdom` / `ricdom/ui` の両方) | 動詞を持たない名詞のみの export だが、`version` は npm パッケージの export として広く定着した慣用語であり、他の命名規約 (create/ui/bind/apply/build/export/infer) のどれとも競合しない。**改名は不要と判断** | OK |
+| Props フィールド (追加) | `DialogProps.triggerVariant?: UiButtonVariant` | 既存の `UiButtonProps.variant` と同じ型・同じ命名 (`ric-button--${variant}`) | OK |
+
+命名規約からの逸脱なし。破壊的変更はゼロ (すべて追加のみ)。`bindRadiobutton`/`bindColor` は
+当初 (設計書 §4 選定時) スコープ外とされていたが、v1 に正式 API として存在した以上「v1 で
+正式 prop/API だったものは復活が原則」(§20) の対象であり、一括監査で振り分け漏れと判定した。
+`exportSettings` も同じ理由 (v1 `export_settings` の当初対象外判定を撤回)。`version` は
+tsup の `define` (`__RICDOM_VERSION__`、`tsup.config.ts`) で package.json の値を焼き込む
+ビルド時定数の re-export であり、`ricdom`/`ricdom/ui` どちらもコア/ui 単独で読める
+(ui はコアへの実行時依存が無いという既存方針を維持するため、re-export ではなく同じ定数を
+独立に読む)。コア min gzip: **4,803B → 4,831B** (+28B、天井 5,200B 内)。
+`docs/V1_PARITY_AUDIT.ja.md` 表 #1〜#4・`docs/V1_VS_V2.ja.md`・`docs/SPEC.md`・
+`CHANGELOG.md` に反映。

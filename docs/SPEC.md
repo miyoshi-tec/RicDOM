@@ -97,6 +97,33 @@ the plain-object tree itself.
 - `style` keys are camelCased automatically (`background-color` and `backgroundColor` are
   equivalent); `--custom-property` keys are left untouched.
 
+### FACT: `on*` handling of `null`/`undefined` (v1→v2 parity audit #16)
+
+An `on*` key's value that isn't a function is **not** simply "removed" the same way a
+plain attribute is — the exact behavior differs by phase, and (confirmed by reading both
+`src/dom.ts` and v1's `src/ricdom.js`) is **identical between v1 and v2** in both phases:
+
+- **Initial build**: a `function` value assigns the handler property; `null` explicitly
+  assigns `null` to the property; `undefined` is skipped entirely — the property is never
+  touched (no handler ends up present either way, so `null` and `undefined` are
+  observably the same at build time).
+- **Patch (re-render)**: every `on*` key present on the next node has its property
+  unconditionally reassigned as `typeof val === 'function' ? val : null` — this means an
+  `undefined` value on a re-render **actively clears a previously assigned handler**,
+  unlike a plain attribute where `undefined` is treated the same as `null` (removed).
+  This is not new v2 behavior — v1's patch function (`_patch_attributes`) has the exact
+  same `el[key] = (typeof val === 'function') ? val : null;` line.
+- If an `on*` key is present on the previous node but absent from the next node entirely
+  (not just `undefined` — the key itself is gone), the handler is also nulled out (both
+  versions).
+
+Net effect: `onclick: undefined` and omitting `onclick` altogether behave the same on the
+very first render, but differ from `onclick: undefined` on a later render replacing an
+`onclick: fn` from an earlier one — the later render **does** clear the handler. This
+asymmetry exists in both v1 and v2, so no behavior change was needed; it is documented
+here because it was flagged as unconfirmed during the v1→v2 parity audit
+(`docs/V1_PARITY_AUDIT.ja.md` #16) and is easy to assume works like a plain attribute.
+
 ### 2.2 Key-based reconciliation
 
 If **any** sibling in either the previous or the next children list has a non-null `key`,
@@ -735,7 +762,7 @@ native browser chrome inside the themed subtree — scrollbars, `<select>` dropd
 checkboxes, date pickers — automatically follows light/dark, without any ricdom-specific
 styling of those controls.
 
-### `createTheme` / `createDensity` / `createFontSize` / `exportTheme`
+### `createTheme` / `createDensity` / `createFontSize` / `exportTheme` / `exportSettings`
 
 - `createTheme(base, overrides)` returns a plain `ThemeVars` object (a merge of a base
   theme's color variables with your overrides) suitable for passing back into
@@ -757,6 +784,28 @@ styling of those controls.
 - `exportTheme(el)` reads the current `--ric-*`/`color-scheme` inline-style values off
   `el` (density/font-size variables are excluded) — round-trips with `applyTheme`, e.g.
   for persisting a user's theme choice to `localStorage`.
+- `exportSettings(el)`, added in `2.0.0-alpha.14` (a port of v1's `export_settings` from
+  `ric_ui/context.js`, flagged as missing by the v1→v2 parity audit, #2), reads the same
+  inline styles as `exportTheme` but returns all three groups separately: `{ theme,
+  density, fontSize }`, each a plain `ThemeVars` object. `exportSettings(el).theme` always
+  equals `exportTheme(el)` (both use the same variable-name classification internally) —
+  use `exportTheme` if you only ever persist the color theme, `exportSettings` if you also
+  want to save/restore a user's density and font-size choice. The result round-trips
+  directly into `applyTheme(el2, exportSettings(el1))`.
+
+### FACT: no built-in mechanism keeps multiple `applyTheme`d roots in sync (v1→v2 parity audit #12)
+
+`applyTheme` only ever touches the one element it's called on — there is no event (no
+`ric-theme-change` or equivalent) fired when a theme is applied, and no registry of
+previously-themed elements. If an app calls `applyTheme` on more than one root (e.g. a
+main window and a detached popout, or a host page plus an embedded island with its own
+theme), keeping them showing the same theme is entirely the consumer's responsibility:
+call `applyTheme` on each root yourself whenever the theme choice changes. v1 had an
+internal `ric-theme-change` `window` event (`create_ui_page`, not part of its public API)
+that some of its own internal components listened for; v2 has no page component and no
+equivalent — a consumer that needs cross-root sync should call `applyTheme` on every root
+it owns from the same place it decides to change the theme (e.g. a single `state.theme`
+setter that loops over a list of root elements).
 
 ### FACT: `applyTheme` warns on an invalid `theme`/`density`/`fontSize` name (2.0.0-alpha.7)
 
@@ -942,6 +991,27 @@ placeholder near the trigger instead (`2.0.0-alpha.4` and earlier) constrained t
 to `innerWidth - rect.left`, so a trigger near the viewport's right edge measured a falsely small
 `offsetWidth` for wrappable content, which steps 2/3 then anchored flush against the right edge
 with no margin to spare.
+
+### FACT: popup/dropdown positioning is viewport-based, with no containing-block search (v1→v2 parity audit #14)
+
+The three steps above (and the below/above flip) are computed purely from
+`window.innerWidth`/`innerHeight` and the trigger's `getBoundingClientRect()` — there is
+no search up the DOM tree for a `position: fixed`'s actual containing block. v1's
+`_popup_utils.js` had this search (`_get_portal_cb`, walking ancestors of `.ric-page` for
+a `backdrop-filter`/`transform`/`filter` that would change what a `position: fixed`
+descendant is actually positioned relative to) plus `_get_expand_ref` (finding a "logical
+container" to decide which way an icon-mode menu should expand). Neither is ported to v2:
+there is no `.ric-page` concept to search from, and `createPopup`/`createDropdown` already
+treat the viewport as ground truth. In the common case (no `backdrop-filter`/`transform`/
+`filter` on an intervening ancestor) this makes no difference — a `position: fixed`
+element really is positioned relative to the viewport. It only diverges when the popup's
+DOM ancestor chain has such a property set (the `cyber`/`aqua` bundled themes use
+`backdrop-filter`/`blur()` inside `.ric-panel`, so a popup/dropdown nested inside a
+`cyber`/`aqua`-themed `.ric-panel` island could theoretically be positioned relative to
+that panel by the browser while `ricdom`'s own math still assumes the viewport) — in that
+case the computed `left`/`top` could be visually offset from the intended viewport-relative
+position. No such case has been reported in practice. Re-examine if a `cyber`/`aqua`
+`.ric-panel` popup/dropdown mispositioning is reported.
 
 #### 10.3.1 FACT: dialog focus-return control (`returnFocus`)
 
@@ -1206,6 +1276,22 @@ own `rows: RicNode[]`, appended at the end of that specific folder's body — di
 the panel-level `rows` prop, which only ever appends to the very end of the whole panel.
 Use this to put a hand-built row (e.g. a "reset this section" button) inside a particular
 folder rather than at the panel's outer edge.
+
+#### FACT: a folder is a `<button aria-expanded>` + `<div role=region hidden>`, not `<details>` (v1→v2 parity audit #15)
+
+v1's `ui_tweak.js` rendered a folder as a native `<details>`/`<summary>` pair. v2 renders
+`tweak-folder-header` as a `<button aria-expanded aria-controls>` and `tweak-folder-body`
+as a `<div role="region" hidden>` (matching the same open/close-state pattern as
+`createAccordion`, §10.3.3). Functionally these are equivalent for click-to-toggle and for
+screen readers, but `<details>` carries one behavior v2's markup doesn't reproduce: a
+browser's in-page find (Ctrl+F) can automatically expand a closed `<details>` to reveal a
+match inside it (browsers that support it treat `<details>` specially for this purpose); a
+plain `hidden` `<div>` is invisible to in-page find no matter what, same as any other
+`[hidden]` content. No consumer has reported this as a problem in practice. Re-examine if a
+consumer requests find-in-page support for closed tweak folders — the fix would be
+`hidden="until-found"` (the modern hidden-content-that-find-can-reveal attribute) rather
+than reverting to `<details>`, since `<details>` doesn't compose with the folder's own
+`aria-expanded`/animation model as cleanly.
 
 #### FACT: every leaf row carries `data-ricdom-role="tweak-row"` + `data-ricdom-tweak-key`
 

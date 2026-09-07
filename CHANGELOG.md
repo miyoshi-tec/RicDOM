@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.14] — not yet published
+
+Result of a v1→v2 parity bulk audit (`docs/V1_PARITY_AUDIT.ja.md`): a systematic,
+mechanical cross-check of every v1 (`RicDOM-v1`) inline style, implicit behavior, and
+official prop/export against v2, run after all ten pilot migrations completed, since past
+gaps of this kind (missing z-index, missing position, missing paint, dropped props,
+dropped variants) had only ever surfaced one pilot report at a time. The maintainer triaged
+all 17 findings and decided to implement all 8 that were actionable now; the remaining 9
+are documentation-only clarifications (see Docs below).
+
+### Added
+
+- **`bindRadiobutton(s, key, options?)` / `bindColor(s, key, options?)`** (`ricdom/ui`):
+  the `uiRadiobutton`/`uiColor` counterparts of the existing `bindInput`/`bindCheckbox`/
+  `bindSelect`/`bindRange`, restoring v1's `bind_radiobutton`/`bind_color`
+  (`ric_ui/control/bind_*.js`), both of which were official v1 APIs that had no v2
+  equivalent at all. `bindRadiobutton`'s `name` defaults to `key` (matching v1) and can be
+  overridden via `options.name` for the case of two independent groups bound to the same
+  `key` (radio inputs sharing a `name` are treated as one group by the browser regardless
+  of which component rendered them — a plain HTML constraint, not fixable from userspace,
+  documented on `uiRadiobutton` already).
+- **`exportSettings(el)`** (`ricdom/ui`): the three-group counterpart of `exportTheme`,
+  restoring v1's `export_settings` (`ric_ui/context.js`). Returns `{ theme, density,
+  fontSize }` (each a `ThemeVars` object) instead of just the theme-only object
+  `exportTheme` returns — `exportSettings(el).theme` always equals `exportTheme(el)`, since
+  both use the same variable-name classification. Round-trips directly into
+  `applyTheme(el2, exportSettings(el1))`.
+- **`version` export** (`ricdom` and `ricdom/ui`): a `string` matching `package.json`'s
+  `version` at publish time, restoring v1's `version` export from both `src/ricdom.js` and
+  `ric_ui/index.js`. Baked in at build time via a new `__RICDOM_VERSION__` constant
+  (`src/env.d.ts`), defined by `tsup.config.ts` for every entry (ESM, CJS, and all four
+  IIFE builds) from `package.json`'s `version` field — unlike `__RICDOM_DEV__`, this
+  constant is not a dev/prod switch, so it's defined unconditionally rather than left for
+  the consumer's own bundler. `vitest.config.ts` defines the same constant (per test
+  project, since `test.projects` entries don't inherit a root-level `define`) so
+  `version === package.json.version` can be asserted directly in tests without a build
+  step. Core min gzip: **4,803B → 4,831B** (+28B, well under the 5,200B ceiling).
+- **`DialogProps.triggerVariant?: UiButtonVariant`**: restores v1's `trigger_variant`
+  (`ric_ui/popup/create_ui_dialog.js`), applied to the auto-trigger button built from
+  `triggerChildren` (the same `ric-button--${variant}` class naming `uiButton` already
+  uses). Defaults to `'primary'`, matching v1. Has no effect in controlled mode or when
+  `triggerChildren` is omitted (the consumer supplies their own trigger in both cases).
+
+### Fixed
+
+- **`createFocusWhen` no longer focuses a `disabled` element**, restoring a guard v1's
+  `focus_when.js:45` had (`if (!el.disabled && ...) el.focus();`) that `createFocusWhen`
+  never picked up when it was ported. When the `ref`'d element is found but `disabled`, the
+  focus call is now skipped — silently, without the "ref not found" `console.warn`, since
+  the ref *was* found; `disabled` is an ordinary, consumer-intended state, not a
+  misconfiguration.
+- **`UiInputProps` now declares `maxlength?: number`**, matching v1's `ui_input.js` (same
+  lowercase attribute name, same as `UiTextareaProps.maxlength` already had). The attribute
+  itself already worked at runtime (it passed through the existing rest-spread contract
+  undeclared), so this is a type-only fix — `uiInput({ maxlength: 10 })` previously worked
+  without type errors only because of the props interface's index signature, but wasn't
+  discoverable from the type or documented.
+- **`internal/hljs.ts`'s `warnHljsMissing` no longer assumes `console`/`console.warn`
+  exist**, restoring a guard v1's `_factory_helpers.js:59-69` had
+  (`typeof console === 'undefined' || typeof console.warn !== 'function'`) that was lost
+  when the helper was ported to v2. In an environment without a usable `console`, the
+  function now returns without marking the "already warned once" flag, so a
+  `console.warn` still fires the first time it's called after `console` becomes usable
+  (rather than a broken `console.warn` call throwing, or a real warning opportunity being
+  permanently consumed by an environment that couldn't have received it anyway).
+
+### Docs
+
+- `src/ui/toast.ts`'s header comment claimed `role`/`aria-live` were "already implemented
+  in v1, inherited as-is" — false; grepping v1's `create_ui_toast.js` in full confirms it
+  has neither attribute. Corrected to state these are new in v2.
+- `docs/V1_VS_V2.ja.md`: five clarifications from the audit — (1) `.ric-dropdown__trigger--label`'s
+  CSS `width` is `auto` in v2 vs. `100%` in v1, an intentional change three pilots
+  (Trend Guard, 線茶, Potopeta) have already confirmed doesn't affect their layouts; (2)
+  `watch_outside_click` has no v2 equivalent (it was a five-line internal helper in v1;
+  the one-line `document.addEventListener('pointerdown', ...)` replacement is now spelled
+  out); (3) `create_ui_panel` (the stateful panel factory) is gone — express the same
+  result as a stateless `uiPanel` plus `applyTheme` on the element (a themed "island");
+  (4) `class` now additionally accepts a `Record<string, boolean>` truthy-key map, on top
+  of the string/array forms v1 had; (5) there is no v2 equivalent of `bind_tabs` — it's
+  unnecessary, since `createTabs` itself now handles both controlled and uncontrolled
+  modes internally.
+- `docs/SPEC.md`: four FACTs added — (1) no built-in mechanism keeps multiple
+  `applyTheme`d roots in sync (no `ric-theme-change`-style event exists; the consumer
+  calls `applyTheme` on every root itself); (2) popup/dropdown positioning is
+  viewport-based only, with no containing-block search up the DOM tree (v1's
+  `_get_portal_cb`/`_get_expand_ref` are not ported — could theoretically diverge inside a
+  `cyber`/`aqua` `.ric-panel`'s `backdrop-filter`, unconfirmed in practice); (3) `on*`
+  handling of `null`/`undefined` is subtle and phase-dependent (build vs. patch) but,
+  after reading both `src/dom.ts` and v1's `src/ricdom.js`, turns out to be identical
+  between v1 and v2 — documented so it isn't mistaken for v2-only behavior; (4) a tweak
+  folder is a `<button aria-expanded>` + `<div role=region hidden>`, not v1's native
+  `<details>` — functionally equivalent except for in-page find's automatic-expand
+  behavior on closed `<details>`, which the `hidden` `<div>` doesn't reproduce (revisit
+  with `hidden="until-found"` if requested).
+- `docs/API_AUDIT.ja.md`: addendum for the five new/changed public API surfaces above
+  (`bindRadiobutton`, `bindColor`, `exportSettings`, `version`, `DialogProps.triggerVariant`),
+  confirming naming-convention compliance.
+- `docs/V1_PARITY_AUDIT.ja.md`: table rows #1–#8 updated to record that all eight were
+  implemented in this release.
+
 ## [2.0.0-alpha.13] — not yet published
 
 A differential-experiment report from the ninth pilot (Potopeta), confirmed against the code
