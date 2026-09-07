@@ -22,6 +22,11 @@ declare global {
 let hljsWarned = false;
 export const warnHljsMissing = (): void => {
   if (hljsWarned) return;
+  // console 自体が無い環境 (一部の組み込み/SSR 実行系) で落ちないようにする防御
+  // (v1 ric_ui/_factory_helpers.js:59-69 の warn_hljs_missing 継承、v1→v2 パリティ
+  // 一括監査 #7)。ここで return した場合は hljsWarned を立てない — console が
+  // 後から使えるようになった時点で改めて 1 回 warn できるようにするため。
+  if (typeof console === 'undefined' || typeof console.warn !== 'function') return;
   hljsWarned = true;
   console.warn(
     'RicDOM UI: uiMdPre/uiCodePre は window.hljs (highlight.js) があればシンタックスハイライトします。\n' +

@@ -55,6 +55,11 @@ export const createFocusWhen = (): FocusWhenInstance => {
   const focusRef = (host: Host, refName: string): void => {
     const el = host.app.refs.get(refName);
     if (el && typeof (el as HTMLElement).focus === 'function') {
+      // disabled な要素にはフォーカスしない (v1 focus_when.js:45 `!el.disabled` 継承、
+      // v1→v2 パリティ一括監査 #5)。ref 自体は見つかっているので「見つからない」警告は
+      // 出さない — disabled は consumer が意図して設定している通常の状態であり、
+      // ref の綴り間違い等とは性質が異なる。
+      if ((el as HTMLElement & { disabled?: boolean }).disabled) return;
       (el as HTMLElement).focus();
       return;
     }

@@ -112,6 +112,28 @@ describe('createFocusWhen: 立ち上がりエッジでの focus', () => {
   });
 });
 
+// v1 focus_when.js:45 の `!el.disabled` 継承 (v1→v2 パリティ一括監査 #5)
+describe('createFocusWhen: disabled ガード', () => {
+  it('ref 先の要素が disabled のときは focus せず、warn も出さない (ref は見つかっているため)', async () => {
+    const app = setupApp();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = { open: false };
+    let fw: FocusWhenInstance;
+    const handle = createApp('#app', state, (s) => {
+      fw?.('theInput', s.open);
+      return { tag: 'div', children: [{ tag: 'input', ref: 'theInput', disabled: true }] };
+    });
+    fw = handle.use(createFocusWhen());
+    await flush();
+
+    handle.open = true;
+    await flush();
+    expect(document.activeElement).not.toBe(app.querySelector('input'));
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
 describe('createFocusWhen: ref が見つからない場合', () => {
   it('要素が無ければ何もしない (throw しない)、dev モードでは console.warn する', async () => {
     setupApp();

@@ -12,6 +12,9 @@ export interface UiInputProps {
   placeholder?: string;
   value?: string;
   type?: string;
+  /** 最大入力文字数 (v1 ui_input.js 継承、v1→v2 パリティ一括監査 #6。属性名は v1 と同じ
+   *  小文字 `maxlength` — uiTextarea 側の既存の同名プロパティと揃える)。 */
+  maxlength?: number;
   disabled?: boolean;
   class?: ClassValue;
   /** rest スプレッド経由で常に透過されていたが、型に無かった (LCP の指摘、2.0.0-alpha.9)。 */
@@ -24,7 +27,7 @@ export interface UiInputProps {
  * テキスト入力。状態を持たない純粋関数 (controlled、双方向バインドは `bindInput` 参照)。
  *   uiInput({ value: s.name, oninput: (ev) => { s.name = ev.target.value; } })
  */
-export const uiInput = ({ placeholder, value = '', type = 'text', disabled = false, class: extraClass, ...rest }: UiInputProps = {}): RicNode =>
+export const uiInput = ({ placeholder, value = '', type = 'text', maxlength, disabled = false, class: extraClass, ...rest }: UiInputProps = {}): RicNode =>
   ({
     ...rest,
     tag: 'input',
@@ -34,4 +37,5 @@ export const uiInput = ({ placeholder, value = '', type = 'text', disabled = fal
     value, // 常に含める (空文字でも FORCE_REAPPLY で反映されるよう)
     ...(placeholder ? { placeholder } : {}),
     ...(disabled ? { disabled: true } : {}),
+    ...(maxlength != null ? { maxlength } : {}),
   }) as RicElementNode;

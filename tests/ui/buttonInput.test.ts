@@ -6,8 +6,10 @@
 // 直接言い表すシンプルなローカル型にキャストして回避する。
 
 import { describe, expect, it } from 'vitest';
+import { expectTypeOf } from 'expect-type';
 import { uiButton } from '../../src/ui/button.js';
 import { uiInput } from '../../src/ui/input.js';
+import type { UiInputProps } from '../../src/ui/input.js';
 
 interface TestButtonNode {
   tag: string;
@@ -119,5 +121,22 @@ describe('uiInput', () => {
   it('disabled: true で disabled 属性が付く', () => {
     const node = uiInput({ disabled: true }) as unknown as TestInputNode;
     expect(node.disabled).toBe(true);
+  });
+
+  // v1 ui_input.js 継承の maxlength (v1→v2 パリティ一括監査 #6)。当初 UiInputProps に
+  // 型が無く、rest 経由で通ってはいたが discoverable ではなかった。
+  it('maxlength を指定すると属性が出る', () => {
+    const node = uiInput({ maxlength: 10 }) as unknown as TestInputNode & { maxlength?: number };
+    expect(node.maxlength).toBe(10);
+  });
+
+  it('maxlength 省略時は属性を持たない', () => {
+    const node = uiInput() as unknown as TestInputNode & { maxlength?: number };
+    expect('maxlength' in node).toBe(false);
+  });
+
+  it('型テスト: UiInputProps.maxlength は number 型 (v1→v2 パリティ一括監査 #6)', () => {
+    expectTypeOf<UiInputProps['maxlength']>().toEqualTypeOf<number | undefined>();
+    expect(true).toBe(true);
   });
 });

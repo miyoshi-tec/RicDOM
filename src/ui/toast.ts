@@ -1,8 +1,10 @@
 // ricdom/ui — createToast (設計書 §3.4 部品契約 + §5/付録 E a11y)
 //
 // v1 (ric_ui/popup/create_ui_toast.js) の移植。v1 との相違点は portal の描画先が
-// host.portal になったこと (§3.5) と、app.use() 経由でしか動かないこと (§3.4) のみ —
-// a11y (role="status"/"alert" + aria-live) は v1 から既に実装されていたのでそのまま継承する。
+// host.portal になったこと (§3.5)、app.use() 経由でしか動かないこと (§3.4) に加えて、
+// a11y (role="status"/"alert" + aria-live) — v1 には無く、v2 で新設した
+// (v1_parity_audit #8。v1 は data-ric-role のみで aria 属性を持たず、スクリーンリーダーは
+// トースト表示に気づけなかった)。
 //
 // 使い方:
 //   const toast = app.use(createToast());
