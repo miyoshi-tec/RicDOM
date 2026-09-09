@@ -385,6 +385,19 @@ gap found while auditing the shipped `.iife.min.js`):
   global, so it falls back to dev mode (warnings on) — the library treats "can't tell" as
   dev mode rather than silently hiding the problem.
 
+### FACT: dev mode costs a Proxy trap per nested read; production costs nothing
+
+In dev mode every nested read through the reactive handle (`app.items[i].field`,
+`app.map[key].score`, …) goes through the deep-warning Proxy's `get` trap plus a `WeakMap`
+lookup. On a hot loop this is measurable: 40,000 nested reads took ~24ms on the dev IIFE vs
+~9.5ms on the production IIFE in a jsdom measurement, and a pilot app (a scanner sorting 800
+records every 60s) saw 1–1.8s long tasks when it was unknowingly running the pre-alpha.10
+`.iife.min.js` in dev mode (see the paragraph above). Production builds have none of this
+code, so: **measure performance against `.iife.min.js`, never against `.iife.js`**, and if a
+no-bundler ESM deployment is performance-sensitive, bundle it with `NODE_ENV=production`
+instead. A dev-only optimization (e.g. not wrapping reads that happen during `render`) is
+deliberately not attempted until a consumer reports the dev build itself becoming unusable.
+
 ### `ignore`
 
 A property literally named `ignore` (`state.ignore = {...}`) is never wrapped, never

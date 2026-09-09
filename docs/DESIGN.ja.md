@@ -176,6 +176,14 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **追報 4 (alpha.4 取り込み) で第 2 号は完了**: 再現スクリプト 5→5→5→5→5、E2E 10/10、回避策ゼロ。初報 10 + 追報 5 = 15 件が同日中に公式 API で閉じた
 - ~~観察 (対応なし)~~ → **§23 で実バグ (#14) と判明**。DPI 150% の実機で右端密着トリガーの dropdown body の `right` が `innerWidth` を 0.33px 超えた件、統括は「`clampLeft` が右端も収めるので最終位置では起き得ない、実測フェーズの rect を拾ったのでは」と判断したが誤り。consumer が再計測後 (200ms / 600ms) の inline `left` / `offsetWidth` / 本来幅を取り直し、**測った幅そのものが位置依存で過小**になっていることを示した (§23)。教訓: 「式は正しい」で止めず、式に入る実測値の取り方まで疑う
 
+## 33. 第 2 号 追報 7 (#15: alpha.9 以前の production IIFE が dev モードだったことの性能面の実害) (2026-09-09)
+
+- **報告**: Trend Guard (alpha.5 のまま評価中) が「他の画面から戻った直後に長時間、以後 1 分おきにホバーが効かない」を CPU プロファイル (500µs サンプリング) と `process` ダミー注入の A/B で機構特定: `isDevMode()` が `process` 無しの Electron renderer (`contextIsolation: true`、推奨設定) で dev 判定 → 入れ子読み取りごとに Proxy `get` + WeakMap → 800 銘柄のソートで **1〜1.8 秒の long task** (最小化 3 分で 123 件、復帰後 25 秒で 19 件)。ダミー注入で復帰後 0 件、プロファイル上位から `get@ricdom` が消える
+- **事実関係**: この穴は §28 (alpha.10) で修正済み (`__RICDOM_DEV__` のビルド時定数、min から警告コードを DCE)。Potopeta が「min に警告文字列が残っている」と見つけた同じ穴だが、**性能面の実害を定量化したのは今回が初めて**。統括の再現 (alpha.14 dist、jsdom、4 万回の入れ子読み取り): min 9.5ms / dev IIFE 24.3ms (TG の 3.4 / 7.6ms と同じ比)。production min は `process` 無しでも dev 判定にならないことを確認
+- **統括の反省**: alpha.10 の告知は「警告文字列が残っていた」と書いただけで、「alpha.9 以前の min を使う IIFE consumer は全員、本番で dev モード = 入れ子読み取りが数倍重い」という影響範囲を伝えていなかった。→ 全パイロット向けに改めて告知 (`_announce_v2_alpha10_perf.md`)。**教訓: バグの修正告知には「誰が・どの条件で・どの実害を受けていたか」を書く。「何を直したか」だけでは consumer は自分事にできない**
+- **SPEC に FACT**: dev ビルド (`.iife.js`、バンドラなしの ESM) は state の入れ子読み取りに Proxy コストが乗る (ホットループで数倍)。production には一切乗らない。性能計測は必ず min で。TG の提案 2 (render 中の読み取りはラップしない等の dev 最適化) は、dev で操作不能になる実害報告が来たときに再検討
+- TG は alpha.5 → alpha.14 への更新 (9 段分) と `process` ダミーの撤去を依頼。`tickScanner` の Map 化 (比較ごとの `.find` → tick ごとの Map、v1 にも適用) は Proxy の有無に関係なく正しい改善
+
 ## 32. v1 inline style / 暗黙挙動 / 正式 API の一括パリティ監査 (2026-09-07、ユーザー指示)
 
 - **動機**: パイロット 10 アプリの実バグの半数以上 (dialog/popup の z-index、dropdown の `position: fixed`、page の bg/fg/font-size、`gap` prop、`variant: 'link'`、`create_density` / `create_font_size`) が「v1 の inline style・暗黙挙動・正式 API を v2 の CSS クラス・props に移植したときの取りこぼし」という同じ型だった。個別対応を重ねてきたが系統的な監査をしていなかった (統括の見落とし) → 残りを consumer に踏ませる前に洗う
