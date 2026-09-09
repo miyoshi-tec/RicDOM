@@ -183,6 +183,8 @@ v1 は 5 か月・46 リリース・社内 11 アプリの実戦で API が磨�
 - **統括の反省**: alpha.10 の告知は「警告文字列が残っていた」と書いただけで、「alpha.9 以前の min を使う IIFE consumer は全員、本番で dev モード = 入れ子読み取りが数倍重い」という影響範囲を伝えていなかった。→ 全パイロット向けに改めて告知 (`_announce_v2_alpha10_perf.md`)。**教訓: バグの修正告知には「誰が・どの条件で・どの実害を受けていたか」を書く。「何を直したか」だけでは consumer は自分事にできない**
 - **SPEC に FACT**: dev ビルド (`.iife.js`、バンドラなしの ESM) は state の入れ子読み取りに Proxy コストが乗る (ホットループで数倍)。production には一切乗らない。性能計測は必ず min で。TG の提案 2 (render 中の読み取りはラップしない等の dev 最適化) は、dev で操作不能になる実害報告が来たときに再検討
 - TG は alpha.5 → alpha.14 への更新 (9 段分) と `process` ダミーの撤去を依頼。`tickScanner` の Map 化 (比較ごとの `.find` → tick ごとの Map、v1 にも適用) は Proxy の有無に関係なく正しい改善
+- **追報 8 (2026-09-09) で #15 完了・第 2 号は 17 件すべてクローズ (回避策ゼロ)**: alpha.14 取り込み + `process` ダミー撤去で、`typeof process` が undefined のまま復帰後 30 秒の long task **0 件** (alpha.5 シム無しは 19 件 / 5,235ms)、最小化 60 秒は 27 件 / 4,846ms → 7 件 / 466ms。production min に `typeof process` 0 件を consumer 側でも確認。**alpha.6〜14 の 9 段分をまとめて取り込んでも追随のコード変更はゼロ** (`:where()` の詳細度 0 でアプリ CSS が勝つ / 初期フォーカス順は「既に内側にあれば尊重」が先に効く / light dismiss は明示 `close()` と非競合 / `triggerVariant` は自前トリガーのため影響なし) — 互換性の維持が実証された。E2E 10/10 × 3 連続、unit 145
+- consumer 側の教訓: 固定 300ms 待ちの E2E がフェードアウトと競合して flake → 状態ポーリングに (「落ち着いた後で assert する」の consumer 側の実例)
 
 ## 32. v1 inline style / 暗黙挙動 / 正式 API の一括パリティ監査 (2026-09-07、ユーザー指示)
 
