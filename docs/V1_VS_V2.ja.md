@@ -273,6 +273,19 @@ TypeScript を使っていれば型エラーで気づけるが、JS のまま (`
 実行時まで気づけない。変換対象ファイルに対して `tag` を持たないオブジェクトリテラルを別途 grep
 し、`tag: 'div'` を補う一括変換をもう 1 パス走らせておく。
 
+### 部品に渡す props 名も snake_case → camelCase の対象 (RaccoonMemo からの報告、alpha.15)
+
+識別子 (`ui_md_pre` → `uiMdPre` 等) の変換リストに載っていても、**その部品に渡す props 名**が
+snake_case のまま残りやすい: `transform_text` / `transform_image_src` (`uiMdPre`)、
+`on_resize_end` / `on_collapse_change` (`createSplitter`)、`default_open` (`createAccordion`)、
+`stroke_width` (`uiIcon`) 等。部品は未知の prop を rest スプレッドで要素にそのまま透過する契約
+(SPEC §10.5) なので、綴りが違っても `console.error` も型エラー (JS のまま移行している場合) も出ず、
+**フックが黙って無効になる** (RaccoonMemo では画像相対リンクの解決 e2e が 1 本落ちて発覚)。
+唯一の実行時シグナルは alpha.15〜の dev ビルドの警告 `attribute "transform_image_src" received a
+function` (関数値が属性に落ちたときだけ。`default_open: true` のような真偽値・数値は検知できない)。
+変換スクリプトの識別子リストに、各部品の props 名 (`docs/API_AUDIT.ja.md` の一覧、または
+`dist/ui.d.ts` の `*Props` インターフェース) を含めること。
+
 ### 進め方の推奨: まず v1 依存を 1 ファイル (アダプタ) に寄せる
 
 第 3 号・第 4 号の移行はいずれも、最初にアプリ全体を書き換えるのではなく、**v1 の API 呼び出しを

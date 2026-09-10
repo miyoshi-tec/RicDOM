@@ -99,6 +99,53 @@ const removeStyleProp = (el: HTMLElement | SVGElement, key: string): void => {
 };
 
 // =====================================================================
+// select の value 再適用 (build / patch 共用)
+// =====================================================================
+
+// select の value は option が生えた後でないと選択に反映できない (ブラウザは
+// 該当 option が無い時点での value 代入を無視し、selectedIndex を -1 にする。
+// さらに selectedIndex が -1 のまま option が増えると「選択が無いので先頭 option を
+// 自動選択」する仕様があるため、症状としては新しい option ではなく先頭に戻って
+// 見える)。build 経路 (buildDomNode) は子 append 直後にこの再適用を行っていたが、
+// patch 経路は patchAttributes (value を含む属性適用) → patchChildren (option 追加)
+// の順で呼んでいたため非対称だった: value が「これから増える新しい option」を指す
+// render では、patchAttributes の時点でその option がまだ存在せず代入が無視され、
+// その後 patchChildren で option を追加しても再適用していなかった (Raccoon Memo
+// パイロット第 5 号、alpha.14 報告。options が後から増える描画で value が反映されない)。
+// 編集中ガード (shouldSkipValueReapply) は build 経路には無かった通常の value 代入と
+// 同じ扱いにするため、ここでも同じガードを通す。
+const reapplySelectValue = (el: HTMLElement | SVGElement, normalized: NormalizedElement): void => {
+  if (normalized.tag !== 'select' || !('value' in normalized.attrs)) return;
+  if (shouldSkipValueReapply(el)) return; // 編集中ガード (設計書 §3.2)
+  (el as HTMLSelectElement).value = normalized.attrs.value as string;
+};
+
+// =====================================================================
+// dev: 関数値が非イベント属性に渡ったときの警告
+// =====================================================================
+
+// UI コンポーネントは未知の prop を rest-spread でそのまま要素ノードの属性として
+// 素通しする (SPEC §10.5)。v1 から移行する consumer が camelCase を snake_case の
+// ままにしてしまう (例: transform_image_src) と isEventHandlerKey にも
+// マッチせず applyPlainAttr に落ち、String(fn) で意味の無い文字列が setAttribute
+// されるだけで hook が無言で死ぬ (Raccoon Memo パイロット第 5 号、alpha.14 報告。
+// on_resize_end のように on* に似ていても `/^on[a-z]/` に一致しないキーも同様)。
+// 関数値が HTML 属性として意味を持つことは絶対に無い = applyPlainAttr に関数が
+// 来た瞬間が実害確定 (設計書 §29「実害が確定した時点で警告する」) なので、
+// speculative fix (個別コンポーネントの alias 一覧) は持たず、ここ 1 箇所で
+// 汎用的に検知する。dev/prod 問わず「関数を stringify して属性に入れない」に
+// 統一する (壊れた属性値が DOM に残ること自体が望ましくないため)。
+// 同じ key への再 render での連続警告を防ぐため key 単位で dedupe する
+// (要素ごとではなくキー名だけで見る割り切り。isDevMode 定義直前のコメントの
+// 「小さな例外」と同じ扱い)。
+const warnedFunctionAttrKeys = new Set<string>();
+
+/** テスト用: 「同じ key につき 1 回だけ」警告する状態をリセットする */
+export const _resetFunctionAttrWarningsForTest = (): void => {
+  warnedFunctionAttrKeys.clear();
+};
+
+// =====================================================================
 // 素の属性の適用 (build / patch 共用)
 // =====================================================================
 
@@ -106,7 +153,28 @@ const removeStyleProp = (el: HTMLElement | SVGElement, key: string): void => {
 // 文字列化して setAttribute。null/undefined は呼び出し側に委ねる (build は既存属性が
 // 無いので何もしない、patch は removeAttribute する必要がある ため分岐が非対称) —
 // build/patch 双方で重複していた分岐を 1 箇所に集約する (挙動は変えない、#13 gzip 相殺)。
+// 関数値は (dev/prod 問わず) 属性として設定しない (warnedFunctionAttrKeys 定義直前の
+// コメント参照)。警告本体をここに直接書く (別の top-level 関数に切り出さない) のは、
+// 独立した関数として括り出すと production ビルドでその関数への「呼び出し」自体は
+// dead-code elimination で消えても、関数の宣言そのものは残ってしまうのを実測で確認した
+// ため (esbuild の tree-shaking は dead-branch の畳み込みより前に「参照があるかどうか」
+// で生死を判定する 1 パス構成で、後段の畳み込み結果を再度 tree-shaking にフィード
+// バックしない。dom.ts の重複 key 警告 (#13) は元から console.warn を分岐の中に直接
+// 書いていたため、この問題を最初から踏んでいなかった)。定数
+// (`bakedDevMode ?? isDevMode()`) を `&&` の左に置く規律は isDevMode 定義直前の
+// コメント参照。
 const applyPlainAttr = (el: Element, key: string, val: unknown): void => {
+  if (typeof val === 'function') {
+    if ((bakedDevMode ?? isDevMode()) && !warnedFunctionAttrKeys.has(key)) {
+      warnedFunctionAttrKeys.add(key);
+      console.warn(
+        `ricdom: attribute "${key}" received a function. Functions are only meaningful for ` +
+          'on* event handlers (onclick) or component props — check the prop name ' +
+          '(v1 snake_case → v2 camelCase, e.g. transformImageSrc).',
+      );
+    }
+    return;
+  }
   if (typeof val === 'boolean') {
     if (val) el.setAttribute(key, '');
     else el.removeAttribute(key);
@@ -172,12 +240,9 @@ export const buildDomNode = (raw: RicNode, inheritedNamespace: string | null = n
     }
   }
 
-  // select の value は option が生えた後でないと選択に反映できない
-  // (ブラウザは option 0 個の時点での value 代入を無視し、先頭 option を自動選択する)。
-  // 子 append 後にもう一度 value を当て直して確定させる (v1 踏襈)。
-  if (normalized.tag === 'select' && 'value' in normalized.attrs) {
-    (el as HTMLSelectElement).value = normalized.attrs.value as string;
-  }
+  // 子 append 後にもう一度 value を当て直して確定させる (v1 踏襈、詳細は
+  // reapplySelectValue 定義直前のコメント参照)。
+  reapplySelectValue(el, normalized);
 
   return el;
 };
@@ -445,6 +510,10 @@ const patchChildrenByKey = (prevChildren: RicNode[], nextChildren: RicNode[], pa
         if (!nextNormalized.island) {
           patchChildren(prevNormalized.children, nextNormalized.children, targetDom as Element);
         }
+        // option が今回の render で増えて value が新しい option を指す場合に備え、
+        // children を patch し終えてからもう一度 value を当て直す (reapplySelectValue
+        // 定義直前のコメント参照)。island でも属性レベルの話なので関係なく呼ぶ。
+        reapplySelectValue(targetDom as HTMLElement | SVGElement, nextNormalized);
       }
     }
   }
@@ -528,6 +597,8 @@ const patchChildrenByPosition = (
         if (!nextNormalized.island) {
           patchChildren(prevNormalized.children, nextNormalized.children, domEl as Element);
         }
+        // reapplySelectValue 定義直前のコメント参照 (patchChildrenByKey 側と同じ理由)。
+        reapplySelectValue(domEl as HTMLElement | SVGElement, nextNormalized);
       }
     }
   }

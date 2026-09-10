@@ -97,6 +97,22 @@ the plain-object tree itself.
 - `style` keys are camelCased automatically (`background-color` and `backgroundColor` are
   equivalent); `--custom-property` keys are left untouched.
 
+### FACT: a function value on a non-`on*` key is never set as an attribute (2.0.0-alpha.15)
+
+A key that is not one of `DOM_PROPERTY_KEYS` and does not match the event-handler pattern
+(`/^on[a-z]/`) but receives a `function` value is **never** stringified into the DOM via
+`setAttribute` — the attribute is simply not set (existing behavior for other keys, e.g.
+`null`/`undefined`, is unaffected). This is a deliberate guard, not a stringification
+edge case: a function is never a meaningful HTML attribute value, so a caller who reaches
+this path almost certainly mistyped an event-handler or component-prop name (the reported
+case: v1's snake_case `transform_image_src` instead of v2's camelCase
+`transformImageSrc`; note that `on_resize_end` also lands here, since it fails
+`/^on[a-z]/`). In a dev build (`isDevMode()`/`bakedDevMode`, §3.3), this fires
+`console.warn` once per attribute key (deduped across renders, not per element) naming the
+offending key; the warning — and the `Set` tracking which keys have already warned — is
+dead-code-eliminated from production builds via the same `bakedDevMode ?? isDevMode()`
+convention as the rest of `src/dom.ts`.
+
 ### FACT: `on*` handling of `null`/`undefined` (v1→v2 parity audit #16)
 
 An `on*` key's value that isn't a function is **not** simply "removed" the same way a
@@ -212,9 +228,18 @@ forgetting to write `children` would otherwise silently turn a node into an isla
 ### 2.6 `<select>`
 
 Because a browser ignores a `<select>`'s `value` assignment until it has at least one
-`<option>` child, `buildDomNode` re-applies `value` a second time immediately after all
-child `<option>` elements have been appended. Consumers never need to work around
-option/value construction order themselves.
+`<option>` child, `value` is re-applied a second time immediately after all child
+`<option>` elements exist in the DOM — in **both** the build path (`buildDomNode`, after
+appending children) and the patch path (after `patchChildren` has grown or changed the
+option list, at both patch call sites — keyed and positional reconciliation). This matters specifically for a render
+that both adds new `<option>`s *and* points `value` at one of them in the same render: the
+patch path applies attributes before children, so the first `value` assignment is ignored
+(the option doesn't exist yet); without the post-`patchChildren` re-apply, the browser is
+left as if `value` had never been set at all (falling back to its own "select the first
+option" default, or staying on the previously selected option) — fixed in 2.0.0-alpha.15.
+Consumers never need to work around option/value construction order themselves, in either
+path. As with any other `value` write, this re-apply still honors the editing guard (§3.2):
+while the `<select>` is `document.activeElement`, it is not force-corrected.
 
 ### 2.7 SVG
 

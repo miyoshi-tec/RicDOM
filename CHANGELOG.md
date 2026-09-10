@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.15] — not yet published
+
+Two core fixes reported by Raccoon Memo (pilot #5, alpha.14 report).
+
+### Fixed
+
+- **`<select>`'s `value` is now reapplied after the patch path grows `<option>`s, not just
+  the build path.** `buildDomNode` already reapplied `el.value` once its children (the
+  `<option>`s) had been appended, since a browser ignores a `value` assignment that names an
+  option not yet in the DOM — but the patch path called `patchAttributes` (which force-
+  reapplies `value` every render) *before* `patchChildren`, so a render that both grows the
+  option list and points `value` at one of the new options had its assignment silently
+  ignored, and nothing reapplied it afterward. Depending on prior selection state, the value
+  either stayed stale or (per a jsdom quirk: appending options while nothing is selected
+  re-triggers the browser's own "select the first option" default) snapped back to the first
+  option — matching the reporter's exact symptom. Fixed by extracting the existing
+  build-path logic into `reapplySelectValue(el, normalized)` (`src/dom.ts`) and calling it
+  after `patchChildren` at both patch call sites (`patchChildrenByKey` and
+  `patchChildrenByPosition`), still honoring the editing guard (`shouldSkipValueReapply`) so
+  a `<select>` the user is actively interacting with is not force-corrected mid-edit.
+- **A function value passed to a non-`on*` attribute now warns in dev and is never
+  stringified into the DOM**, instead of silently becoming a useless `"function foo() {
+  ... }"` attribute string. UI components pass unknown props straight through via
+  rest-spread (SPEC §10.5); a consumer migrating from v1's snake_case naming (e.g.
+  `transform_image_src` instead of `transformImageSrc`, or `on_resize_end`, which doesn't
+  match the `/^on[a-z]/` event-handler pattern either) had the resulting prop silently
+  routed to `applyPlainAttr`, which used to just `setAttribute(key, String(fn))` — the hook
+  never fired, with no signal anything was wrong. A function is never a meaningful HTML
+  attribute value, so `applyPlainAttr` receiving one is now treated as confirmed harm
+  (design principle, `docs/DESIGN.ja.md` §29): in dev, `console.warn`s once per attribute
+  key (deduped via a module-level `Set<string>` so re-renders don't spam); in both dev and
+  production, the attribute is no longer set at all. The warning is baked out of production
+  builds via the same `bakedDevMode ?? isDevMode()` dead-code-elimination convention as the
+  rest of `src/dom.ts` (verified: 0 occurrences in `dist/ricdom.iife.min.js`, present in
+  `dist/ricdom.iife.js`). Core min gzip: 4,831B → ~4,877B (+46B, still well under the
+  5,200B ceiling).
+
 ## [2.0.0-alpha.14] — not yet published
 
 Result of a v1→v2 parity bulk audit (`docs/V1_PARITY_AUDIT.ja.md`): a systematic,
