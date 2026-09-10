@@ -286,6 +286,20 @@ function` (関数値が属性に落ちたときだけ。`default_open: true` の
 変換スクリプトの識別子リストに、各部品の props 名 (`docs/API_AUDIT.ja.md` の一覧、または
 `dist/ui.d.ts` の `*Props` インターフェース) を含めること。
 
+### CSS 1 枚はアプリ CSS より前に読む (RaccoonMemo からの報告、alpha.15)
+
+v1 の `css_for('ric-splitter', 'ric-md-pre', …)` は注入する部品系統を選べたので、input / textarea /
+button / select の部品 CSS を要求していないアプリではアプリ CSS と衝突する相手がそもそも無かった。
+v2 の `ricdom-ui.css` 1 枚は**常に**それらの基底 (`.ric-textarea { font-family: inherit }`、
+`.ric-select { width: 100% }`、各コントロールの `font-size` / 色) を含み、詳細度はクラス 1 つ
+(0,1,0) で `@layer` も無い。`<link>` をアプリ CSS の**後**に置くと、同じ詳細度のアプリ規則
+(`.editor-body-textarea { font-family: monospace }` 等) が後勝ちで潰される (RaccoonMemo では
+等幅フォント・削除ボタンの赤・小ボタンの font-size など 15 箇所が v1 と違う見た目になっていた。
+スクリーンショット比較で発覚)。**`ricdom-ui.css` の `<link>` は `styles.css` より前** (基底 → アプリ
+上書き) に。`injectStyles()` は呼んだ時点で `<head>` 末尾に `<style>` を足すので、こちらを使う
+場合はアプリ CSS の読み込みより前に呼ぶ。v1 側で衝突していなかった基底 (`.ric-select` の
+`width: 100%` 等) はアプリ側で明示的に上書きする。
+
 ### 進め方の推奨: まず v1 依存を 1 ファイル (アダプタ) に寄せる
 
 第 3 号・第 4 号の移行はいずれも、最初にアプリ全体を書き換えるのではなく、**v1 の API 呼び出しを

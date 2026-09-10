@@ -866,6 +866,21 @@ same reason as the core bug), `dist/ricdom-ui.iife.js` always warns, ESM/CJS def
 consumer's bundler's `process.env.NODE_ENV`, and a no-bundler ESM import falls back to dev
 mode.
 
+### FACT: `ricdom-ui.css` is a base layer — load it before app CSS (documented 2.0.0-alpha.15)
+
+Component rules in `ricdom-ui.css` (`.ric-input`, `.ric-textarea`, `.ric-button`,
+`.ric-select`, …) are ordinary single-class selectors, specificity (0,1,0). They include
+properties an app commonly overrides — `.ric-textarea { font-family: inherit }`,
+`.ric-select { width: 100% }`, control `font-size`, button colors. There is no `@layer`
+and no `:where()` on component rules (only the theme paint and scrollbar rules are
+zero-specificity, see below), so **an app rule of equal specificity wins only if it comes
+later in source order**. Load `ricdom-ui.css` before the app's own stylesheet.
+`injectStyles()` appends its `<style>` to the end of `<head>` at call time, so with that
+path call it before the app's stylesheets are parsed (or use `<link>`). Reported by Raccoon
+Memo (pilot #5): v1's `css_for(...)` injected only the requested component families, so
+apps that never requested the input/textarea/button families had nothing to collide with;
+v2's single sheet always carries those base rules.
+
 ### FACT: `applyTheme` paints `background`/`color`/`font-size` on the element (2.0.0-alpha.3, font-size added in alpha.6)
 
 `ricdom-ui.css` has a rule scoped to the `[data-ricdom-theme]` attribute itself (not its

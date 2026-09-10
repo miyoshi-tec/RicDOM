@@ -152,6 +152,12 @@ two-way case. Add the UI package:
 <script src="https://cdn.jsdelivr.net/npm/ricdom@2/dist/ricdom-ui.iife.min.js"></script>
 ```
 
+Put the `ricdom-ui.css` `<link>` **before your own stylesheet**. The sheet is a base layer:
+it styles inputs, textareas, buttons and selects too (`.ric-textarea { font-family: inherit }`,
+`.ric-select { width: 100% }`, …) at single-class specificity, so an app rule of the same
+specificity wins only if it comes later. `injectStyles()` appends a `<style>` at the end of
+`<head>`, so if you use it instead of a `<link>`, call it before your own stylesheets load.
+
 ```js
 import { createApp } from 'ricdom';
 import { bindInput, uiText } from 'ricdom/ui';

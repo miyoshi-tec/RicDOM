@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Two core fixes reported by Raccoon Memo (pilot #5, alpha.14 report).
 
+### Docs
+
+- **Load `ricdom-ui.css` before the app's own stylesheet.** The sheet always carries base
+  rules for inputs, textareas, buttons and selects at single-class specificity (v1's
+  `css_for(...)` only injected the requested component families, so apps that never asked
+  for those families had nothing to collide with). Placing the `<link>` after the app CSS
+  lets equal-specificity library rules win by source order (Raccoon Memo: monospace body
+  font and 14 other rules silently overridden). Documented in TUTORIAL §4, SPEC (FACT), and
+  `docs/V1_VS_V2.ja.md`; `injectStyles()` appends to the end of `<head>` and has the same
+  ordering caveat.
+
 ### Fixed
 
 - **`<select>`'s `value` is now reapplied after the patch path grows `<option>`s, not just
