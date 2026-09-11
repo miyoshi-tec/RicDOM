@@ -88,7 +88,8 @@ browser-tested CI pipeline. It is not source-compatible with v1 — see
 [CHANGELOG.md](CHANGELOG.md) for the breaking changes if you're migrating an existing v1
 app.
 
-License: [MIT](LICENSE).
+License: [MIT](LICENSE). A few bundled icons derive from Lucide (ISC); see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Learn more
 

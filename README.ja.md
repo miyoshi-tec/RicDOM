@@ -87,7 +87,8 @@ import { createApp } from 'https://esm.sh/ricdom@2';
 CI パイプラインで一から作り直したもの。v1 とのソース互換性は無い — 既存 v1 アプリを
 移行する場合の破壊的変更は [CHANGELOG.md](CHANGELOG.md) を参照。
 
-ライセンス: [MIT](LICENSE)。
+ライセンス: [MIT](LICENSE)。同梱アイコンの一部は Lucide (ISC) 由来 →
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 詳しく知る
 

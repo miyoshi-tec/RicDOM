@@ -67,7 +67,8 @@
     "ricdom-icon": "./dist/cli/ricdom-icon.cjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "build": "tsup && node scripts/build-css.mjs",

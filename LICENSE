@@ -19,9 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This package bundles a small set of icon data (`ricdom/icons`, `src/icons/index.ts`).
-Most of it is original to this project; a few entries are derived from a
-third-party icon set. See THIRD_PARTY_NOTICES.md for the full attribution.
